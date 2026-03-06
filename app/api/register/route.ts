@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcrypt";
-import db from "@/app/lib/db";
+import { supabaseAdmin, ensureAdminUser } from "@/app/lib/db";
 
 function isValidEmail(email: string) {
-  // simple + solid email check
   return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i.test(email);
 }
 
 export async function POST(req: Request) {
   try {
+    await ensureAdminUser();
+
     const body = await req.json();
 
     const userCode = String(body?.userCode || "").trim();
@@ -16,8 +17,8 @@ export async function POST(req: Request) {
     const firstName = String(body?.firstName || "").trim();
     const middleName = String(body?.middleName || "").trim();
     const lastName = String(body?.lastName || "").trim();
-    const suffix = String(body?.suffix || "").trim(); // "None" or "Jr" etc
-    const birthdate = String(body?.birthdate || "").trim(); // YYYY-MM-DD
+    const suffix = String(body?.suffix || "").trim();
+    const birthdate = String(body?.birthdate || "").trim();
     const employmentType = String(body?.employmentType || "").trim();
 
     const email = String(body?.email || "").trim().toLowerCase();
@@ -27,7 +28,6 @@ export async function POST(req: Request) {
     const department = String(body?.department || "").trim();
     const position = String(body?.position || "").trim();
 
-    // required
     if (!firstName || !lastName || !birthdate || !employmentType || !email || !password) {
       return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
     }
@@ -37,40 +37,61 @@ export async function POST(req: Request) {
     }
 
     if (password.length < 8) {
-      return NextResponse.json({ error: "Password must be at least 8 characters." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Password must be at least 8 characters." },
+        { status: 400 }
+      );
     }
 
-    const exists = db.prepare("SELECT id FROM users WHERE email = ?").get(email) as any;
-    if (exists) {
+    const { data: existingUser, error: findError } = await supabaseAdmin
+      .from("users")
+      .select("id")
+      .eq("email", email)
+      .maybeSingle();
+
+    if (findError) {
+      console.error("REGISTER CHECK ERROR:", findError);
+      return NextResponse.json({ error: "Server error" }, { status: 500 });
+    }
+
+    if (existingUser) {
       return NextResponse.json({ error: "Email already registered." }, { status: 409 });
     }
 
     const hashed = await bcrypt.hash(password, 10);
     const createdAt = new Date().toISOString();
 
-    // build display name for current system compatibility
     const suffixText = suffix && suffix !== "None" ? `, ${suffix}` : "";
     const fullName = `${firstName}${middleName ? ` ${middleName}` : ""} ${lastName}${suffixText}`.trim();
 
-    db.prepare(`
-      INSERT INTO users (
-        name, email, password, role,
-        userCode, firstName, middleName, lastName, suffix, birthdate, employmentType,
-        contact, department, position,
-        createdAt, mustChangePassword
-      )
-      VALUES (
-        ?, ?, ?, 'staff',
-        ?, ?, ?, ?, ?, ?, ?,
-        ?, ?, ?,
-        ?, 0
-      )
-    `).run(
-      fullName, email, hashed,
-      userCode, firstName, middleName, lastName, suffix, birthdate, employmentType,
-      contact, department, position,
-      createdAt
-    );
+    const { error: insertError } = await supabaseAdmin.from("users").insert([
+      {
+        name: fullName,
+        email,
+        password: hashed,
+        role: "staff",
+
+        userCode,
+        firstName,
+        middleName,
+        lastName,
+        suffix,
+        birthdate,
+        employmentType,
+
+        contact,
+        department,
+        position,
+
+        createdAt,
+        mustChangePassword: 0,
+      },
+    ]);
+
+    if (insertError) {
+      console.error("REGISTER INSERT ERROR:", insertError);
+      return NextResponse.json({ error: insertError.message }, { status: 500 });
+    }
 
     return NextResponse.json({ success: true });
   } catch (e) {

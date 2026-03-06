@@ -1,7 +1,7 @@
 export const runtime = "nodejs";
 
 import { NextResponse, type NextRequest } from "next/server";
-import db from "@/app/lib/db";
+import { supabaseAdmin } from "@/app/lib/db";
 import jwt from "jsonwebtoken";
 import { getDriveClient } from "@/app/lib/googleDrive";
 import { Readable } from "stream";
@@ -17,7 +17,6 @@ function normalizeCategory(v: string) {
   const s = (v || "").trim().toLowerCase();
   if (s === "stakeholder" || s === "stakeholders") return "Stakeholders";
   if (s === "academe") return "Academe";
-  // default
   return "Academe";
 }
 
@@ -58,30 +57,40 @@ function drivePreviewUrl(fileId: string) {
   return `https://drive.google.com/file/d/${fileId}/view?usp=drivesdk`;
 }
 
-/** GET documents (same as before) */
+/** GET documents */
 export async function GET(req: NextRequest) {
   const token = req.cookies.get("auth_token")?.value;
-  if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!token) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   try {
     jwt.verify(token, SECRET);
 
-    const rows = db
-      .prepare(`
-        SELECT
-          id, fileId, name, type,
-          category, folder, title, dateReceived,
-          year, uploadedAt
-        FROM documents
-        ORDER BY uploadedAt DESC
+    const { data: rows, error } = await supabaseAdmin
+      .from("documents")
+      .select(`
+        id,
+        fileId,
+        name,
+        type,
+        category,
+        folder,
+        title,
+        dateReceived,
+        year,
+        uploadedAt
       `)
-      .all() as any[];
+      .order("uploadedAt", { ascending: false });
 
-    const documents = rows.map((d) => ({
+    if (error) {
+      console.error("DOCUMENTS GET ERROR:", error);
+      return NextResponse.json({ error: "Failed to load documents" }, { status: 500 });
+    }
+
+    const documents = (rows || []).map((d: any) => ({
       ...d,
-      // keep for preview if you want
       url: d.fileId ? drivePreviewUrl(d.fileId) : "",
-      // ✅ add download endpoint for convenience
       downloadUrl: d.fileId ? `/api/documents/download?id=${d.fileId}` : "",
     }));
 
@@ -94,7 +103,9 @@ export async function GET(req: NextRequest) {
 /** POST upload (admin only) */
 export async function POST(req: NextRequest) {
   const token = req.cookies.get("auth_token")?.value;
-  if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!token) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   try {
     const payload = jwt.verify(token, SECRET) as any;
@@ -113,39 +124,34 @@ export async function POST(req: NextRequest) {
     const rawCategory = requiredString(formData.get("category")) || "Academe";
     const category = normalizeCategory(rawCategory);
 
-    const folder = requiredString(formData.get("folder")); // optional subfolder inside category
+    const folder = requiredString(formData.get("folder"));
     const title = requiredString(formData.get("title"));
-    const dateReceived = requiredString(formData.get("dateReceived")); // YYYY-MM-DD if you use date input
+    const dateReceived = requiredString(formData.get("dateReceived"));
     const year = requiredString(formData.get("year"));
     const type = requiredString(formData.get("type")) || "Document";
 
-    // file name handling
     const originalName = (file as File).name || "upload";
     const finalName = originalName;
 
     const drive = getDriveClient();
 
-    // ✅ ROOT folder
     const ROOT = "Hamiguitan Repository";
     const rootId = await findOrCreateFolder(drive, ROOT);
 
-    // ✅ Category folder
     const categoryId = await findOrCreateFolder(drive, category, rootId);
 
-    // ✅ Optional subfolder (School/Stakeholder name). No duplicates because search-by-parent.
     let targetParent = categoryId;
     if (folder) {
       targetParent = await findOrCreateFolder(drive, folder, categoryId);
     }
 
-    // ✅ Upload INTO correct folder so you can locate it in Drive
     const arrayBuffer = await (file as File).arrayBuffer();
     const streamBody = Readable.from(Buffer.from(arrayBuffer));
 
     const uploaded = await drive.files.create({
       requestBody: {
         name: finalName,
-        parents: [targetParent], // ✅ MAO NI
+        parents: [targetParent],
       },
       media: {
         mimeType: (file as File).type || "application/octet-stream",
@@ -157,34 +163,42 @@ export async function POST(req: NextRequest) {
     const fileId = uploaded.data.id!;
     const uploadedAt = new Date().toISOString();
 
-    // ✅ Save metadata sa DB
-    const info = db
-      .prepare(`
-        INSERT INTO documents (fileId, name, type, category, folder, title, dateReceived, year, uploadedAt)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `)
-      .run(
-        fileId,
-        finalName,
-        type,
-        category,
-        folder || "",
-        title || "",
-        dateReceived || "",
-        year || "",
-        uploadedAt
+    const { data: insertedRow, error: insertError } = await supabaseAdmin
+      .from("documents")
+      .insert([
+        {
+          fileId,
+          name: finalName,
+          type,
+          category,
+          folder: folder || "",
+          title: title || "",
+          dateReceived: dateReceived || "",
+          year: year || "",
+          uploadedAt,
+        },
+      ])
+      .select("id")
+      .single();
+
+    if (insertError) {
+      console.error("DOCUMENT INSERT ERROR:", insertError);
+      return NextResponse.json(
+        { error: insertError.message || "Failed to save document metadata" },
+        { status: 500 }
       );
+    }
 
     return NextResponse.json({
       ok: true,
-      id: info.lastInsertRowid,
+      id: insertedRow?.id,
       fileId,
       name: finalName,
       category,
       folder: folder || "",
     });
   } catch (e: any) {
-    console.error(e);
+    console.error("DOCUMENT POST ERROR:", e);
     return NextResponse.json({ error: e?.message || "Upload failed" }, { status: 500 });
   }
 }

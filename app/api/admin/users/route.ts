@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import db from "@/app/lib/db";
+import { supabaseAdmin } from "@/app/lib/db";
 import { getCurrentUser } from "@/app/lib/auth";
 
 export async function GET() {
@@ -14,31 +14,35 @@ export async function GET() {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const users = db
-      .prepare(
-        `SELECT
-          id,
-          name,
-          email,
-          role,
-          userCode,
-          firstName,
-          middleName,
-          lastName,
-          suffix,
-          birthdate,
-          employmentType,
-          contact,
-          position,
-          department,
-          createdAt
-        FROM users
-        ORDER BY id DESC`
-      )
-      .all();
+    const { data: users, error } = await supabaseAdmin
+      .from("users")
+      .select(`
+        id,
+        name,
+        email,
+        role,
+        userCode,
+        firstName,
+        middleName,
+        lastName,
+        suffix,
+        birthdate,
+        employmentType,
+        contact,
+        position,
+        department,
+        createdAt
+      `)
+      .order("id", { ascending: false });
 
-    return NextResponse.json({ users });
-  } catch {
+    if (error) {
+      console.error("USERS FETCH ERROR:", error);
+      return NextResponse.json({ error: "Failed to fetch users" }, { status: 500 });
+    }
+
+    return NextResponse.json({ users: users || [] });
+  } catch (e) {
+    console.error("USERS ROUTE ERROR:", e);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

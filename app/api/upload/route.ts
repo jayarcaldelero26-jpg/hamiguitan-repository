@@ -1,6 +1,6 @@
 export const runtime = "nodejs";
 
-import db from "@/app/lib/db";
+import { supabaseAdmin } from "@/app/lib/db";
 import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
 import { createOAuthClient } from "@/app/lib/googleDrive";
@@ -168,22 +168,27 @@ export async function POST(req: NextRequest) {
     const fileType = (file as File).type || "unknown";
     const uploadedAt = new Date().toISOString();
 
-    db.prepare(`
-      INSERT INTO documents (
-        fileId, name, type, category, folder, title, dateReceived, year, uploadedAt
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      fileId,
-      fileName,
-      fileType,
-      categoryFolderName,
-      folder || null,
-      title,
-      dateReceived,
-      year,
-      uploadedAt
-    );
+    const { error: insertError } = await supabaseAdmin.from("documents").insert([
+      {
+        fileId,
+        name: fileName,
+        type: fileType,
+        category: categoryFolderName,
+        folder: folder || "",
+        title,
+        dateReceived,
+        year,
+        uploadedAt,
+      },
+    ]);
+
+    if (insertError) {
+      console.error("UPLOAD DB INSERT ERROR:", insertError);
+      return NextResponse.json(
+        { error: insertError.message || "Failed to save metadata" },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({ success: true, fileId });
   } catch (error) {
@@ -193,4 +198,4 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
-} 
+}

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import db from "@/app/lib/db";
+import { supabaseAdmin } from "@/app/lib/db";
 import { getCurrentUser } from "@/app/lib/auth";
 
 function isValidEmail(email: string) {
@@ -9,7 +9,10 @@ function isValidEmail(email: string) {
 const ALLOWED_ROLES = ["admin", "co_admin", "staff"];
 const ALLOWED_EMPLOYMENT = ["Job Order", "Contract of Service", "Casual", "Permanent"];
 
-export async function PATCH(req: NextRequest, context: { params: Promise<{ id: string }> }) {
+export async function PATCH(
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
   try {
     const me = await getCurrentUser();
 
@@ -55,25 +58,65 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
       return NextResponse.json({ error: "Invalid employment type." }, { status: 400 });
     }
 
-    const existing = db.prepare("SELECT * FROM users WHERE id = ?").get(id) as any;
+    const { data: existing, error: existingError } = await supabaseAdmin
+      .from("users")
+      .select(`
+        id,
+        name,
+        email,
+        role,
+        userCode,
+        firstName,
+        middleName,
+        lastName,
+        suffix,
+        birthdate,
+        employmentType,
+        contact,
+        position,
+        department,
+        createdAt
+      `)
+      .eq("id", id)
+      .maybeSingle();
+
+    if (existingError) {
+      console.error("PATCH USER FETCH ERROR:", existingError);
+      return NextResponse.json({ error: "Failed to fetch user." }, { status: 500 });
+    }
+
     if (!existing) {
       return NextResponse.json({ error: "User not found." }, { status: 404 });
     }
 
-    const emailTaken = db
-      .prepare("SELECT id FROM users WHERE email = ? AND id != ?")
-      .get(email, id) as any;
+    const { data: emailTaken, error: emailTakenError } = await supabaseAdmin
+      .from("users")
+      .select("id")
+      .eq("email", email)
+      .neq("id", id)
+      .maybeSingle();
+
+    if (emailTakenError) {
+      console.error("PATCH USER EMAIL CHECK ERROR:", emailTakenError);
+      return NextResponse.json({ error: "Failed to validate email." }, { status: 500 });
+    }
 
     if (emailTaken) {
       return NextResponse.json({ error: "Email already exists." }, { status: 400 });
     }
 
     if (existing.role === "admin" && role !== "admin") {
-      const adminCount = db
-        .prepare("SELECT COUNT(*) as count FROM users WHERE role = 'admin'")
-        .get() as any;
+      const { count: adminCount, error: adminCountError } = await supabaseAdmin
+        .from("users")
+        .select("*", { count: "exact", head: true })
+        .eq("role", "admin");
 
-      if (adminCount.count <= 1) {
+      if (adminCountError) {
+        console.error("PATCH USER ADMIN COUNT ERROR:", adminCountError);
+        return NextResponse.json({ error: "Failed to validate admin count." }, { status: 500 });
+      }
+
+      if ((adminCount || 0) <= 1) {
         return NextResponse.json({ error: "Cannot demote the last admin." }, { status: 400 });
       }
     }
@@ -93,84 +136,71 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
         success: true,
         unchanged: true,
         message: "No changes were made.",
-        user: {
-          id: existing.id,
-          name: existing.name,
-          email: existing.email,
-          role: existing.role,
-          userCode: existing.userCode,
-          firstName: existing.firstName,
-          middleName: existing.middleName,
-          lastName: existing.lastName,
-          suffix: existing.suffix,
-          birthdate: existing.birthdate,
-          employmentType: existing.employmentType,
-          contact: existing.contact,
-          position: existing.position,
-          department: existing.department,
-          createdAt: existing.createdAt,
-        },
+        user: existing,
       });
     }
 
-    db.prepare(
-      `UPDATE users
-       SET
-         name = ?,
-         email = ?,
-         role = ?,
-         position = ?,
-         department = ?,
-         employmentType = ?,
-         contact = ?,
-         birthdate = ?
-       WHERE id = ?`
-    ).run(
-      name,
-      email,
-      role,
-      position || null,
-      department || null,
-      employmentType || null,
-      contact || null,
-      birthdate || null,
-      id
-    );
+    const { error: updateError } = await supabaseAdmin
+      .from("users")
+      .update({
+        name,
+        email,
+        role,
+        position: position || null,
+        department: department || null,
+        employmentType: employmentType || null,
+        contact: contact || null,
+        birthdate: birthdate || null,
+      })
+      .eq("id", id);
 
-    const updated = db
-      .prepare(
-        `SELECT
-          id,
-          name,
-          email,
-          role,
-          userCode,
-          firstName,
-          middleName,
-          lastName,
-          suffix,
-          birthdate,
-          employmentType,
-          contact,
-          position,
-          department,
-          createdAt
-        FROM users
-        WHERE id = ?`
-      )
-      .get(id);
+    if (updateError) {
+      console.error("PATCH USER UPDATE ERROR:", updateError);
+      return NextResponse.json({ error: "Failed to update user." }, { status: 500 });
+    }
+
+    const { data: updated, error: updatedError } = await supabaseAdmin
+      .from("users")
+      .select(`
+        id,
+        name,
+        email,
+        role,
+        userCode,
+        firstName,
+        middleName,
+        lastName,
+        suffix,
+        birthdate,
+        employmentType,
+        contact,
+        position,
+        department,
+        createdAt
+      `)
+      .eq("id", id)
+      .maybeSingle();
+
+    if (updatedError) {
+      console.error("PATCH USER REFRESH ERROR:", updatedError);
+      return NextResponse.json({ error: "Failed to fetch updated user." }, { status: 500 });
+    }
 
     return NextResponse.json({
       success: true,
       message: "User information updated successfully.",
       user: updated,
     });
-  } catch {
+  } catch (e) {
+    console.error("PATCH USER ROUTE ERROR:", e);
     return NextResponse.json({ error: "Failed to update user." }, { status: 500 });
   }
 }
 
-export async function DELETE(req: NextRequest, context: { params: Promise<{ id: string }> }) {
+export async function DELETE(
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
   try {
     const me = await getCurrentUser();
 
@@ -193,25 +223,50 @@ export async function DELETE(req: NextRequest, context: { params: Promise<{ id: 
       return NextResponse.json({ error: "You cannot delete your own account." }, { status: 400 });
     }
 
-    const target = db.prepare("SELECT id, role, name FROM users WHERE id = ?").get(id) as any;
+    const { data: target, error: targetError } = await supabaseAdmin
+      .from("users")
+      .select("id, role, name")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (targetError) {
+      console.error("DELETE USER FETCH ERROR:", targetError);
+      return NextResponse.json({ error: "Failed to fetch user." }, { status: 500 });
+    }
+
     if (!target) {
       return NextResponse.json({ error: "User not found." }, { status: 404 });
     }
 
     if (target.role === "admin") {
-      const adminCount = db
-        .prepare("SELECT COUNT(*) as count FROM users WHERE role = 'admin'")
-        .get() as any;
+      const { count: adminCount, error: adminCountError } = await supabaseAdmin
+        .from("users")
+        .select("*", { count: "exact", head: true })
+        .eq("role", "admin");
 
-      if (adminCount.count <= 1) {
+      if (adminCountError) {
+        console.error("DELETE USER ADMIN COUNT ERROR:", adminCountError);
+        return NextResponse.json({ error: "Failed to validate admin count." }, { status: 500 });
+      }
+
+      if ((adminCount || 0) <= 1) {
         return NextResponse.json({ error: "Cannot delete the last admin." }, { status: 400 });
       }
     }
 
-    db.prepare("DELETE FROM users WHERE id = ?").run(id);
+    const { error: deleteError } = await supabaseAdmin
+      .from("users")
+      .delete()
+      .eq("id", id);
+
+    if (deleteError) {
+      console.error("DELETE USER ERROR:", deleteError);
+      return NextResponse.json({ error: "Failed to delete user." }, { status: 500 });
+    }
 
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (e) {
+    console.error("DELETE USER ROUTE ERROR:", e);
     return NextResponse.json({ error: "Failed to delete user." }, { status: 500 });
   }
 }

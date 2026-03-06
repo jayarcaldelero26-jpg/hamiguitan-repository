@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
-import db from "@/app/lib/db";
+import { supabaseAdmin } from "@/app/lib/db";
 
 const SECRET = process.env.JWT_SECRET!;
 
@@ -10,7 +10,10 @@ export async function POST(req: Request) {
   try {
     const cookieStore = await cookies();
     const token = cookieStore.get("auth_token")?.value;
-    if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     let payload: any;
     try {
@@ -25,25 +28,50 @@ export async function POST(req: Request) {
 
     const { email, newPassword } = await req.json();
 
-    if (!email || !newPassword) {
+    const cleanEmail = String(email || "").trim().toLowerCase();
+    const cleanPassword = String(newPassword || "");
+
+    if (!cleanEmail || !cleanPassword) {
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
     }
 
-    if (String(newPassword).length < 8) {
+    if (cleanPassword.length < 8) {
       return NextResponse.json(
         { error: "New password must be at least 8 characters." },
         { status: 400 }
       );
     }
 
-    const user = db.prepare("SELECT id FROM users WHERE email = ?").get(email) as any;
-    if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
+    const { data: user, error: findError } = await supabaseAdmin
+      .from("users")
+      .select("id")
+      .eq("email", cleanEmail)
+      .maybeSingle();
 
-    const hashed = await bcrypt.hash(newPassword, 10);
-    db.prepare("UPDATE users SET password = ? WHERE email = ?").run(hashed, email);
+    if (findError) {
+      console.error("RESET PASSWORD FIND ERROR:", findError);
+      return NextResponse.json({ error: "Server error" }, { status: 500 });
+    }
 
-    return NextResponse.json({ success: true, email });
-  } catch {
+    if (!user) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    const hashed = await bcrypt.hash(cleanPassword, 10);
+
+    const { error: updateError } = await supabaseAdmin
+      .from("users")
+      .update({ password: hashed })
+      .eq("email", cleanEmail);
+
+    if (updateError) {
+      console.error("RESET PASSWORD UPDATE ERROR:", updateError);
+      return NextResponse.json({ error: "Server error" }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, email: cleanEmail });
+  } catch (e) {
+    console.error("RESET PASSWORD ERROR:", e);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

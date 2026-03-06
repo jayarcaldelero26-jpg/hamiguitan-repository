@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
-import db from "@/app/lib/db";
+import { supabaseAdmin } from "@/app/lib/db";
 
 const SECRET = process.env.JWT_SECRET!;
 
@@ -37,30 +37,34 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     return null;
   }
 
-  const user = db
-    .prepare(
-      `SELECT
-        id,
-        name,
-        email,
-        role,
-        avatar,
-        userCode,
-        firstName,
-        middleName,
-        lastName,
-        suffix,
-        birthdate,
-        employmentType,
-        contact,
-        department,
-        position,
-        createdAt,
-        mustChangePassword
-      FROM users
-      WHERE id = ?`
-    )
-    .get(payload.id) as CurrentUser | undefined;
+  const { data: user, error } = await supabaseAdmin
+    .from("users")
+    .select(`
+      id,
+      name,
+      email,
+      role,
+      avatar,
+      userCode,
+      firstName,
+      middleName,
+      lastName,
+      suffix,
+      birthdate,
+      employmentType,
+      contact,
+      department,
+      position,
+      createdAt,
+      mustChangePassword
+    `)
+    .eq("id", payload.id)
+    .maybeSingle();
 
-  return user || null;
+  if (error) {
+    console.error("GET CURRENT USER ERROR:", error);
+    return null;
+  }
+
+  return (user as CurrentUser) || null;
 }
