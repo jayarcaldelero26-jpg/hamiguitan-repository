@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useToast } from "@/app/components/ToastProvider";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
+import { useAuth } from "@/app/components/AuthProvider";
 import {
   MagnifyingGlassIcon,
   FolderIcon,
@@ -24,13 +24,6 @@ type DocRow = {
   title?: string | null;
   dateReceived?: string | null;
   folder?: string | null;
-};
-
-type Me = {
-  id: number;
-  name: string;
-  email: string;
-  role: "admin" | "co_admin" | "staff" | string;
 };
 
 type PageTheme = "dark" | "light";
@@ -93,7 +86,9 @@ function Badge({
       : "bg-cyan-50 text-cyan-700 border-cyan-200";
 
   return (
-    <span className={`inline-flex items-center px-2.5 py-1 rounded-full border text-[11px] font-semibold ${cls}`}>
+    <span
+      className={`inline-flex items-center px-2.5 py-1 rounded-full border text-[11px] font-semibold ${cls}`}
+    >
       {children}
     </span>
   );
@@ -195,7 +190,9 @@ function GroupCard({
             <h2 className={`text-2xl font-extrabold ${titleCls}`}>{title}</h2>
             <p className={`text-sm mt-1 ${textMuted}`}>{subtitle}</p>
           </div>
-          <div className={`px-2.5 py-1 rounded-full border text-[11px] font-semibold ${subBg} ${subBorder} ${textMain}`}>
+          <div
+            className={`px-2.5 py-1 rounded-full border text-[11px] font-semibold ${subBg} ${subBorder} ${textMain}`}
+          >
             {folders.reduce((sum, folder) => sum + (groupedItems[folder]?.length || 0), 0)}
           </div>
         </div>
@@ -212,10 +209,15 @@ function GroupCard({
             const items = groupedItems[folder] || [];
 
             return (
-              <div key={folder} className={`border rounded-2xl overflow-hidden ${subBg} ${subBorder}`}>
+              <div
+                key={folder}
+                className={`border rounded-2xl overflow-hidden ${subBg} ${subBorder}`}
+              >
                 <button
                   onClick={() => toggleFolder(folder)}
-                  className={`w-full flex items-center justify-between px-4 py-3 transition ${dark ? "hover:bg-white/[0.04]" : "hover:bg-white"}`}
+                  className={`w-full flex items-center justify-between px-4 py-3 transition ${
+                    dark ? "hover:bg-white/[0.04]" : "hover:bg-white"
+                  }`}
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <FolderIcon className={`w-6 h-6 ${folderIconCls}`} />
@@ -235,11 +237,19 @@ function GroupCard({
                 </button>
 
                 {open && (
-                  <div className={`border-t p-3 space-y-3 ${dark ? "border-cyan-300/10 bg-black/10" : "border-slate-200 bg-white/70"}`}>
+                  <div
+                    className={`border-t p-3 space-y-3 ${
+                      dark
+                        ? "border-cyan-300/10 bg-black/10"
+                        : "border-slate-200 bg-white/70"
+                    }`}
+                  >
                     {items.map((d) => (
                       <div
                         key={d.id}
-                        className={`rounded-2xl border shadow-sm p-3 transition ${subBg} ${subBorder} ${dark ? "hover:bg-white/[0.05]" : "hover:bg-white"}`}
+                        className={`rounded-2xl border shadow-sm p-3 transition ${subBg} ${subBorder} ${
+                          dark ? "hover:bg-white/[0.05]" : "hover:bg-white"
+                        }`}
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
@@ -265,7 +275,11 @@ function GroupCard({
                             {canDeleteDocs && (
                               <button
                                 onClick={() => onAskDelete(d.id)}
-                                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition shadow-sm ${dark ? "bg-rose-500/85 text-white hover:bg-rose-500" : "bg-rose-600 text-white hover:bg-rose-500"}`}
+                                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition shadow-sm ${
+                                  dark
+                                    ? "bg-slate-800 text-white hover:bg-slate-700"
+                                    : "bg-slate-800 text-white hover:bg-slate-700"
+                                }`}
                               >
                                 <TrashIcon className="w-4 h-4" />
                                 <span className="hidden sm:inline">Delete</span>
@@ -304,10 +318,7 @@ function GroupCard({
 
 export default function ResearchPage() {
   const router = useRouter();
-  const { toast } = useToast();
-
-  const [me, setMe] = useState<Me | null>(null);
-  const [loadingMe, setLoadingMe] = useState(true);
+  const { user: me, loading: loadingMe } = useAuth();
 
   const [docs, setDocs] = useState<DocRow[]>([]);
   const [loadingDocs, setLoadingDocs] = useState(true);
@@ -316,6 +327,8 @@ export default function ResearchPage() {
   const [cat, setCat] = useState<"All" | "Academe" | "Stakeholder" | "PAMO Activity">("All");
   const [successOpen, setSuccessOpen] = useState(false);
   const [successMsg, setSuccessMsg] = useState("Done.");
+  const [errorOpen, setErrorOpen] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("Something went wrong.");
   const [openFolders, setOpenFolders] = useState<Record<string, boolean>>({});
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [pageTheme, setPageTheme] = useState<PageTheme>("dark");
@@ -337,37 +350,20 @@ export default function ResearchPage() {
   useEffect(() => {
     let mounted = true;
 
-    setLoadingMe(true);
-    fetch("/api/me", { credentials: "include" })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (!mounted) return;
-        if (!data) {
-          router.replace("/login");
-          return;
-        }
-        setMe(data);
-      })
-      .finally(() => {
-        if (mounted) setLoadingMe(false);
-      });
-
-    return () => {
-      mounted = false;
-    };
-  }, [router]);
-
-  useEffect(() => {
-    if (!me) return;
-
-    let mounted = true;
-
     setLoadingDocs(true);
-    fetch("/api/documents", { credentials: "include" })
+
+    fetch("/api/documents", {
+      credentials: "include",
+      cache: "no-store",
+    })
       .then((res) => (res.ok ? res.json() : []))
       .then((data) => {
         if (!mounted) return;
         setDocs(Array.isArray(data) ? data : []);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setDocs([]);
       })
       .finally(() => {
         if (mounted) setLoadingDocs(false);
@@ -376,7 +372,7 @@ export default function ResearchPage() {
     return () => {
       mounted = false;
     };
-  }, [me]);
+  }, []);
 
   const filteredDocs = useMemo(() => {
     const query = q.trim().toLowerCase();
@@ -460,11 +456,8 @@ export default function ResearchPage() {
       const data = await res.json().catch(() => null);
 
       if (!res.ok) {
-        toast({
-          type: "error",
-          title: "Delete failed",
-          message: data?.error || "Unable to delete.",
-        });
+        setErrorMsg(data?.error || "Unable to delete.");
+        setErrorOpen(true);
         return;
       }
 
@@ -472,11 +465,8 @@ export default function ResearchPage() {
       setSuccessMsg("Document deleted successfully.");
       setSuccessOpen(true);
     } catch {
-      toast({
-        type: "error",
-        title: "Delete failed",
-        message: "Server unreachable.",
-      });
+      setErrorMsg("Server unreachable.");
+      setErrorOpen(true);
     }
   };
 
@@ -513,10 +503,11 @@ export default function ResearchPage() {
     <div className={`min-h-full p-6 md:p-10 ${dark ? "text-slate-100" : "text-slate-900"}`}>
       <ConfirmDialog
         open={deleteId !== null}
-        title="Delete Document"
-        message="This document will be permanently deleted."
+        title="Delete Document?"
+        message="This document will be permanently deleted and cannot be recovered."
         confirmText="Delete"
-        danger
+        cancelText="Cancel"
+        variant="danger"
         onCancel={() => setDeleteId(null)}
         onConfirm={() => {
           const id = deleteId!;
@@ -527,17 +518,30 @@ export default function ResearchPage() {
 
       <ConfirmDialog
         open={successOpen}
-        title="Success"
+        title="Document Deleted"
         message={successMsg}
+        confirmText="Continue"
+        oneButton
+        variant="success"
+        onConfirm={() => setSuccessOpen(false)}
+      />
+
+      <ConfirmDialog
+        open={errorOpen}
+        title="Action Failed"
+        message={errorMsg}
         confirmText="OK"
         oneButton
-        onConfirm={() => setSuccessOpen(false)}
+        variant="warning"
+        onConfirm={() => setErrorOpen(false)}
       />
 
       <div className="max-w-[1600px] mx-auto">
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
           <div>
-            <h1 className={`text-4xl md:text-5xl font-extrabold ${textMain}`}>Documents/Records</h1>
+            <h1 className={`text-4xl md:text-5xl font-extrabold ${textMain}`}>
+              Documents/Records
+            </h1>
             <p className={`${textMuted} mt-2`}>
               Browse documents by <span className={`font-semibold ${textMain}`}>Academe</span>,{" "}
               <span className={`font-semibold ${textMain}`}>Stakeholders</span>, and{" "}
@@ -565,7 +569,11 @@ export default function ResearchPage() {
           <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
             <div className="flex-1">
               <div className="relative">
-                <MagnifyingGlassIcon className={`w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 ${dark ? "text-cyan-100/45" : "text-slate-400"}`} />
+                <MagnifyingGlassIcon
+                  className={`w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 ${
+                    dark ? "text-cyan-100/45" : "text-slate-400"
+                  }`}
+                />
                 <input
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
@@ -585,10 +593,18 @@ export default function ResearchPage() {
                     : "border-slate-300 bg-white text-slate-900 focus:ring-4 focus:ring-cyan-100"
                 }`}
               >
-                <option className="text-slate-900" value="All">All</option>
-                <option className="text-slate-900" value="Academe">Academe</option>
-                <option className="text-slate-900" value="Stakeholder">Stakeholders</option>
-                <option className="text-slate-900" value="PAMO Activity">PAMO Activity</option>
+                <option className="text-slate-900" value="All">
+                  All
+                </option>
+                <option className="text-slate-900" value="Academe">
+                  Academe
+                </option>
+                <option className="text-slate-900" value="Stakeholder">
+                  Stakeholders
+                </option>
+                <option className="text-slate-900" value="PAMO Activity">
+                  PAMO Activity
+                </option>
               </select>
 
               <button

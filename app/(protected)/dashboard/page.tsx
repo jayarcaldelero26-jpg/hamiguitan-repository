@@ -1,9 +1,8 @@
 "use client";
 
 import ConfirmDialog from "@/app/components/ConfirmDialog";
-import { useToast } from "@/app/components/ToastProvider";
+import { useAuth } from "@/app/components/AuthProvider";
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import {
   TrashIcon,
   CloudArrowDownIcon,
@@ -14,14 +13,6 @@ import {
   ClockIcon,
   DocumentTextIcon,
 } from "@heroicons/react/24/outline";
-
-interface User {
-  id: number;
-  name: string;
-  email: string;
-  role: "admin" | "co_admin" | "staff" | string;
-  avatar?: string;
-}
 
 interface DocumentRow {
   id: number;
@@ -35,6 +26,8 @@ interface DocumentRow {
   dateReceived?: string | null;
   folder?: string | null;
 }
+
+type PageTheme = "dark" | "light";
 
 function initials(name: string) {
   const parts = (name || "").trim().split(/\s+/).filter(Boolean);
@@ -106,17 +99,11 @@ function canDeleteDocuments(role?: string) {
   return role === "admin";
 }
 
-type PageTheme = "dark" | "light";
-
 export default function Dashboard() {
-  const router = useRouter();
-  const { toast } = useToast();
+  const { user, loading: loadingUser } = useAuth();
 
-  const [user, setUser] = useState<User | null>(null);
   const [documents, setDocuments] = useState<DocumentRow[]>([]);
   const [pageTheme, setPageTheme] = useState<PageTheme>("dark");
-
-  const [loadingUser, setLoadingUser] = useState(true);
   const [loadingDocs, setLoadingDocs] = useState(true);
 
   const [query, setQuery] = useState("");
@@ -127,6 +114,8 @@ export default function Dashboard() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [successOpen, setSuccessOpen] = useState(false);
   const [successMsg, setSuccessMsg] = useState("Done.");
+  const [errorOpen, setErrorOpen] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("Something went wrong.");
   const [previewDoc, setPreviewDoc] = useState<DocumentRow | null>(null);
 
   useEffect(() => {
@@ -145,37 +134,30 @@ export default function Dashboard() {
 
   useEffect(() => {
     let mounted = true;
-    const ac = new AbortController();
-
-    setLoadingUser(true);
-    fetch("/api/me", { credentials: "include", signal: ac.signal })
-      .then((res) => {
-        if (!res.ok) {
-          router.replace("/login");
-          return null;
-        }
-        return res.json();
-      })
-      .then((data) => mounted && data && setUser(data))
-      .catch((e) => {
-        if (e?.name === "AbortError") return;
-      })
-      .finally(() => mounted && setLoadingUser(false));
 
     setLoadingDocs(true);
-    fetch("/api/documents", { credentials: "include", signal: ac.signal })
+
+    fetch("/api/documents", {
+      credentials: "include",
+      cache: "no-store",
+    })
       .then((res) => (res.ok ? res.json() : []))
-      .then((data) => mounted && setDocuments(Array.isArray(data) ? data : []))
-      .catch((e) => {
-        if (e?.name === "AbortError") return;
+      .then((data) => {
+        if (!mounted) return;
+        setDocuments(Array.isArray(data) ? data : []);
       })
-      .finally(() => mounted && setLoadingDocs(false));
+      .catch(() => {
+        if (!mounted) return;
+        setDocuments([]);
+      })
+      .finally(() => {
+        if (mounted) setLoadingDocs(false);
+      });
 
     return () => {
       mounted = false;
-      ac.abort();
     };
-  }, [router]);
+  }, []);
 
   const stats = useMemo(() => {
     const total = documents.length;
@@ -242,11 +224,8 @@ export default function Dashboard() {
       const data = await res.json().catch(() => null);
 
       if (!res.ok) {
-        toast({
-          type: "error",
-          title: "Delete Failed",
-          message: data?.error || "Unable to delete document.",
-        });
+        setErrorMsg(data?.error || "Unable to delete document.");
+        setErrorOpen(true);
         return;
       }
 
@@ -254,7 +233,8 @@ export default function Dashboard() {
       setSuccessMsg("Document deleted successfully.");
       setSuccessOpen(true);
     } catch {
-      toast({ type: "error", title: "Delete Failed", message: "Server unreachable." });
+      setErrorMsg("Server unreachable.");
+      setErrorOpen(true);
     }
   };
 
@@ -280,9 +260,17 @@ export default function Dashboard() {
       <div className="min-h-full flex items-center justify-center p-6">
         <div className={`${cardCls} p-6 w-[360px] text-center`}>
           <div className="animate-pulse">
-            <div className={`h-10 w-10 rounded-full mx-auto mb-4 ${dark ? "bg-cyan-300/20" : "bg-slate-200"}`} />
+            <div
+              className={`h-10 w-10 rounded-full mx-auto mb-4 ${
+                dark ? "bg-cyan-300/20" : "bg-slate-200"
+              }`}
+            />
             <div className={`h-4 rounded mb-2 ${dark ? "bg-cyan-300/10" : "bg-slate-200"}`} />
-            <div className={`h-4 rounded w-2/3 mx-auto ${dark ? "bg-cyan-300/10" : "bg-slate-200"}`} />
+            <div
+              className={`h-4 rounded w-2/3 mx-auto ${
+                dark ? "bg-cyan-300/10" : "bg-slate-200"
+              }`}
+            />
           </div>
           <p className={`${textMuted} mt-4 text-sm`}>Loading dashboard…</p>
         </div>
@@ -322,37 +310,49 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_1fr_1.2fr] gap-4 mb-5">
         <div className={`${cardCls} p-6 min-h-[220px]`}>
-          <div className={`text-[12px] uppercase tracking-[0.08em] ${textMuted}`}>Total Documents</div>
+          <div className={`text-[12px] uppercase tracking-[0.08em] ${textMuted}`}>
+            Total Documents
+          </div>
           <div className={`text-5xl font-extrabold mt-3 ${textMain}`}>{stats.total}</div>
 
           <div className="mt-5 flex flex-wrap gap-2">
-            <span className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border ${
-              dark
-                ? "bg-emerald-400/12 text-emerald-200 border-emerald-300/20"
-                : "bg-emerald-50 text-emerald-700 border-emerald-200"
-            }`}>
+            <span
+              className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border ${
+                dark
+                  ? "bg-emerald-400/12 text-emerald-200 border-emerald-300/20"
+                  : "bg-emerald-50 text-emerald-700 border-emerald-200"
+              }`}
+            >
               Academe: {stats.academe}
             </span>
-            <span className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border ${
-              dark
-                ? "bg-indigo-400/12 text-indigo-200 border-indigo-300/20"
-                : "bg-indigo-50 text-indigo-700 border-indigo-200"
-            }`}>
+            <span
+              className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border ${
+                dark
+                  ? "bg-indigo-400/12 text-indigo-200 border-indigo-300/20"
+                  : "bg-indigo-50 text-indigo-700 border-indigo-200"
+              }`}
+            >
               Stake: {stats.stake}
             </span>
-            <span className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border ${
-              dark
-                ? "bg-amber-400/12 text-amber-200 border-amber-300/20"
-                : "bg-amber-50 text-amber-700 border-amber-200"
-            }`}>
+            <span
+              className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border ${
+                dark
+                  ? "bg-amber-400/12 text-amber-200 border-amber-300/20"
+                  : "bg-amber-50 text-amber-700 border-amber-200"
+              }`}
+            >
               PAMO: {stats.pamo}
             </span>
           </div>
         </div>
 
         <div className={`${cardCls} p-6 min-h-[220px]`}>
-          <div className={`text-[12px] uppercase tracking-[0.08em] ${textMuted}`}>Most Common Type</div>
-          <div className={`text-2xl font-extrabold mt-4 break-words ${textMain}`}>{stats.topType}</div>
+          <div className={`text-[12px] uppercase tracking-[0.08em] ${textMuted}`}>
+            Most Common Type
+          </div>
+          <div className={`text-2xl font-extrabold mt-4 break-words ${textMain}`}>
+            {stats.topType}
+          </div>
           <div className={`mt-5 text-[12px] flex items-center gap-2 ${textMuted}`}>
             <ClockIcon className="w-4 h-4" />
             Tip: PDFs + Sheets are easiest to preview.
@@ -377,28 +377,34 @@ export default function Dashboard() {
 
                   <div className="mt-2 flex flex-wrap gap-2">
                     {d.folder && (
-                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-semibold border ${
-                        dark
-                          ? "bg-cyan-400/8 text-cyan-100 border-cyan-300/20"
-                          : "bg-cyan-50 text-cyan-700 border-cyan-200"
-                      }`}>
+                      <span
+                        className={`px-2.5 py-1 rounded-full text-[10px] font-semibold border ${
+                          dark
+                            ? "bg-cyan-400/8 text-cyan-100 border-cyan-300/20"
+                            : "bg-cyan-50 text-cyan-700 border-cyan-200"
+                        }`}
+                      >
                         {d.folder}
                       </span>
                     )}
                     {d.year && (
-                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-semibold border ${
-                        dark
-                          ? "bg-cyan-400/8 text-cyan-100 border-cyan-300/20"
-                          : "bg-cyan-50 text-cyan-700 border-cyan-200"
-                      }`}>
+                      <span
+                        className={`px-2.5 py-1 rounded-full text-[10px] font-semibold border ${
+                          dark
+                            ? "bg-cyan-400/8 text-cyan-100 border-cyan-300/20"
+                            : "bg-cyan-50 text-cyan-700 border-cyan-200"
+                        }`}
+                      >
                         {d.year}
                       </span>
                     )}
-                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-semibold border ${
-                      dark
-                        ? "bg-cyan-400/8 text-cyan-100 border-cyan-300/20"
-                        : "bg-cyan-50 text-cyan-700 border-cyan-200"
-                    }`}>
+                    <span
+                      className={`px-2.5 py-1 rounded-full text-[10px] font-semibold border ${
+                        dark
+                          ? "bg-cyan-400/8 text-cyan-100 border-cyan-300/20"
+                          : "bg-cyan-50 text-cyan-700 border-cyan-200"
+                      }`}
+                    >
                       {typeLabel(d.type)}
                     </span>
                   </div>
@@ -417,7 +423,11 @@ export default function Dashboard() {
       <div className={`${cardCls} p-5 mb-5`}>
         <div className="flex flex-col md:flex-row md:items-center gap-3">
           <div className="flex-1 relative">
-            <MagnifyingGlassIcon className={`w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 ${dark ? "text-cyan-100/45" : "text-slate-400"}`} />
+            <MagnifyingGlassIcon
+              className={`w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 ${
+                dark ? "text-cyan-100/45" : "text-slate-400"
+              }`}
+            />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -508,7 +518,9 @@ export default function Dashboard() {
 
         {!loadingDocs && filteredDocs.length === 0 && (
           <div className="text-center py-14">
-            <div className={`mx-auto h-12 w-12 rounded-2xl grid place-items-center mb-3 border ${subBg} ${subBorder}`}>
+            <div
+              className={`mx-auto h-12 w-12 rounded-2xl grid place-items-center mb-3 border ${subBg} ${subBorder}`}
+            >
               <DocumentTextIcon className={`w-7 h-7 ${dark ? "text-cyan-200" : "text-cyan-600"}`} />
             </div>
             <p className={`${textMain} font-semibold`}>No documents found.</p>
@@ -516,7 +528,11 @@ export default function Dashboard() {
           </div>
         )}
 
-        <div className={`mt-2 max-h-[62vh] overflow-y-auto rounded-2xl border ${dark ? "border-cyan-300/10 bg-[#07131f]/70" : "border-slate-200 bg-white"}`}>
+        <div
+          className={`mt-2 max-h-[62vh] overflow-y-auto rounded-2xl border ${
+            dark ? "border-cyan-300/10 bg-[#07131f]/70" : "border-slate-200 bg-white"
+          }`}
+        >
           <div
             className={`hidden lg:grid sticky top-0 z-30 backdrop-blur border-b grid-cols-[1.35fr_0.9fr_0.9fr_260px] gap-4 px-5 py-3 text-[11px] font-bold uppercase tracking-[0.06em] ${
               dark
@@ -534,13 +550,19 @@ export default function Dashboard() {
             {filteredDocs.map((doc) => (
               <div
                 key={doc.id}
-                className={`px-4 py-4 lg:px-5 transition ${dark ? "hover:bg-white/[0.03]" : "hover:bg-slate-50"}`}
+                className={`px-4 py-4 lg:px-5 transition ${
+                  dark ? "hover:bg-white/[0.03]" : "hover:bg-slate-50"
+                }`}
               >
                 <div className="grid grid-cols-1 lg:grid-cols-[1.35fr_0.9fr_0.9fr_260px] gap-4 items-start">
                   <div className="min-w-0">
                     <div className="flex items-start gap-3">
-                      <div className={`h-9 w-9 rounded-xl border grid place-items-center shrink-0 ${subBg} ${subBorder}`}>
-                        <DocumentTextIcon className={`w-5 h-5 ${dark ? "text-cyan-200" : "text-cyan-600"}`} />
+                      <div
+                        className={`h-9 w-9 rounded-xl border grid place-items-center shrink-0 ${subBg} ${subBorder}`}
+                      >
+                        <DocumentTextIcon
+                          className={`w-5 h-5 ${dark ? "text-cyan-200" : "text-cyan-600"}`}
+                        />
                       </div>
 
                       <div className="min-w-0">
@@ -580,7 +602,9 @@ export default function Dashboard() {
 
                       return (
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className={`px-2 py-1 rounded-full text-[10px] font-semibold border ${catPillClass}`}>
+                          <span
+                            className={`px-2 py-1 rounded-full text-[10px] font-semibold border ${catPillClass}`}
+                          >
                             {catRaw || "—"}
                           </span>
                           <span className={pill}>{doc.folder ? doc.folder : "—"}</span>
@@ -608,7 +632,11 @@ export default function Dashboard() {
                   <div className="flex lg:justify-end gap-2 flex-nowrap">
                     <button
                       onClick={() => setPreviewDoc(doc)}
-                      className={`${btnSm} border ${dark ? "border-cyan-300/12 bg-white/[0.05] hover:bg-white/[0.08] text-white" : "border-slate-300 bg-white hover:bg-slate-50 text-slate-900"}`}
+                      className={`${btnSm} border ${
+                        dark
+                          ? "border-cyan-300/12 bg-white/[0.05] hover:bg-white/[0.08] text-white"
+                          : "border-slate-300 bg-white hover:bg-slate-50 text-slate-900"
+                      }`}
                     >
                       <EyeIcon className="w-3.5 h-3.5" />
                       View
@@ -616,7 +644,11 @@ export default function Dashboard() {
 
                     <a
                       href={downloadUrl(doc.fileId)}
-                      className={`${btnSm} ${dark ? "bg-cyan-500/85 text-slate-950 hover:bg-cyan-400 font-bold" : "bg-cyan-600 text-white hover:bg-cyan-500"}`}
+                      className={`${btnSm} ${
+                        dark
+                          ? "bg-cyan-500/85 text-slate-950 hover:bg-cyan-400 font-bold"
+                          : "bg-cyan-600 text-white hover:bg-cyan-500"
+                      }`}
                     >
                       <CloudArrowDownIcon className="w-3.5 h-3.5" />
                       Download
@@ -625,7 +657,11 @@ export default function Dashboard() {
                     {canDeleteDocuments(user?.role) && (
                       <button
                         onClick={() => setConfirmDeleteId(doc.id)}
-                        className={`${btnSm} ${dark ? "bg-rose-500/85 text-white hover:bg-rose-500" : "bg-rose-600 text-white hover:bg-rose-500"}`}
+                        className={`${btnSm} ${
+                          dark
+                            ? "bg-slate-800 text-white hover:bg-slate-700"
+                            : "bg-slate-800 text-white hover:bg-slate-700"
+                        }`}
                       >
                         <TrashIcon className="w-3.5 h-3.5" />
                         Delete
@@ -639,14 +675,23 @@ export default function Dashboard() {
         </div>
 
         <div className={`mt-4 text-[11px] ${textMuted}`}>
-          Tip: Use tabs + search to filter quickly. Click <span className={`font-semibold ${textMain}`}>View</span> to preview.
+          Tip: Use tabs + search to filter quickly. Click{" "}
+          <span className={`font-semibold ${textMain}`}>View</span> to preview.
         </div>
       </div>
 
       {previewDoc && (
         <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className={`w-full max-w-5xl rounded-3xl shadow-2xl border overflow-hidden ${dark ? "bg-[#07131f] border-cyan-300/15" : "bg-white border-slate-200"}`}>
-            <div className={`flex items-center justify-between px-5 py-4 border-b ${dark ? "border-cyan-300/10 bg-[#0a1825]" : "border-slate-200 bg-slate-50"}`}>
+          <div
+            className={`w-full max-w-5xl rounded-3xl shadow-2xl border overflow-hidden ${
+              dark ? "bg-[#07131f] border-cyan-300/15" : "bg-white border-slate-200"
+            }`}
+          >
+            <div
+              className={`flex items-center justify-between px-5 py-4 border-b ${
+                dark ? "border-cyan-300/10 bg-[#0a1825]" : "border-slate-200 bg-slate-50"
+              }`}
+            >
               <div className="min-w-0">
                 <div className={`font-extrabold truncate text-sm ${textMain}`}>
                   {previewDoc.title?.trim() ? previewDoc.title : previewDoc.name}
@@ -659,7 +704,11 @@ export default function Dashboard() {
               <div className="flex items-center gap-2">
                 <a
                   href={downloadUrl(previewDoc.fileId)}
-                  className={`${btnSm} ${dark ? "bg-cyan-500/90 text-slate-950 hover:bg-cyan-400 font-bold" : "bg-cyan-600 text-white hover:bg-cyan-500"}`}
+                  className={`${btnSm} ${
+                    dark
+                      ? "bg-cyan-500/90 text-slate-950 hover:bg-cyan-400 font-bold"
+                      : "bg-cyan-600 text-white hover:bg-cyan-500"
+                  }`}
                 >
                   <CloudArrowDownIcon className="w-3.5 h-3.5" />
                   Download
@@ -667,7 +716,11 @@ export default function Dashboard() {
 
                 <button
                   onClick={() => setPreviewDoc(null)}
-                  className={`p-2 rounded-xl transition border ${dark ? "hover:bg-white/[0.06] border-cyan-300/10 bg-white/[0.03]" : "hover:bg-white border-slate-300 bg-white"}`}
+                  className={`p-2 rounded-xl transition border ${
+                    dark
+                      ? "hover:bg-white/[0.06] border-cyan-300/10 bg-white/[0.03]"
+                      : "hover:bg-white border-slate-300 bg-white"
+                  }`}
                 >
                   <XMarkIcon className={`w-5 h-5 ${dark ? "text-cyan-100" : "text-slate-700"}`} />
                 </button>
@@ -688,10 +741,11 @@ export default function Dashboard() {
 
       <ConfirmDialog
         open={confirmDeleteId !== null}
-        title="Delete Document"
-        message="This document will be permanently deleted."
+        title="Delete Document?"
+        message="This document will be permanently deleted and cannot be recovered."
         confirmText="Delete"
-        danger
+        cancelText="Cancel"
+        variant="danger"
         onCancel={() => setConfirmDeleteId(null)}
         onConfirm={async () => {
           const id = confirmDeleteId!;
@@ -702,11 +756,22 @@ export default function Dashboard() {
 
       <ConfirmDialog
         open={successOpen}
-        title="Success"
-        message={successMsg}
+        title="Document Deleted"
+        message="The selected file has been removed successfully from the repository."
+        confirmText="Continue"
+        oneButton
+        variant="success"
+        onConfirm={() => setSuccessOpen(false)}
+      />
+
+      <ConfirmDialog
+        open={errorOpen}
+        title="Action Failed"
+        message={errorMsg}
         confirmText="OK"
         oneButton
-        onConfirm={() => setSuccessOpen(false)}
+        variant="warning"
+        onConfirm={() => setErrorOpen(false)}
       />
     </div>
   );

@@ -3,7 +3,7 @@
 import ConfirmDialog from "@/app/components/ConfirmDialog";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useToast } from "@/app/components/ToastProvider";
+import { useAuth } from "@/app/components/AuthProvider";
 import { motion } from "framer-motion";
 import {
   ArrowUpTrayIcon,
@@ -16,7 +16,6 @@ import {
   CheckCircleIcon,
 } from "@heroicons/react/24/outline";
 
-type Me = { id: number; name: string; email: string; role: string };
 type Category = "Academe" | "Stakeholder" | "PAMO Activity";
 type FoldersState = { academe: string[]; stakeholders: string[]; pamo: string[] };
 type PageTheme = "dark" | "light";
@@ -49,10 +48,8 @@ function classNames(...xs: Array<string | false | null | undefined>) {
 
 export default function UploadPage() {
   const router = useRouter();
-  const { toast } = useToast();
+  const { user: me, loading: loadingMe } = useAuth();
 
-  const [me, setMe] = useState<Me | null>(null);
-  const [loadingMe, setLoadingMe] = useState(true);
   const [pageTheme, setPageTheme] = useState<PageTheme>("dark");
 
   const [category, setCategory] = useState<Category>("Academe");
@@ -72,7 +69,8 @@ export default function UploadPage() {
   const [uploading, setUploading] = useState(false);
 
   const [successOpen, setSuccessOpen] = useState(false);
-  const [successMsg, setSuccessMsg] = useState("Document uploaded successfully.");
+  const [errorOpen, setErrorOpen] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("Something went wrong.");
 
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -92,56 +90,38 @@ export default function UploadPage() {
   }, []);
 
   useEffect(() => {
-    let mounted = true;
-    const ac = new AbortController();
+    if (loadingMe) return;
 
-    setLoadingMe(true);
-    fetch("/api/me", { credentials: "include", signal: ac.signal })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (!mounted) return;
-        if (!data) {
-          router.replace("/login");
-          return;
-        }
-        if (data.role !== "admin" && data.role !== "co_admin") {
-          router.replace("/dashboard");
-          return;
-        }
-        setMe(data);
-      })
-      .catch((e) => {
-        if (e?.name === "AbortError") return;
-      })
-      .finally(() => {
-        if (!mounted) return;
-        setLoadingMe(false);
-      });
+    if (!me) {
+      router.replace("/login");
+      return;
+    }
 
-    return () => {
-      mounted = false;
-      ac.abort();
-    };
-  }, [router]);
+    if (me.role !== "admin" && me.role !== "co_admin") {
+      router.replace("/dashboard");
+    }
+  }, [loadingMe, me, router]);
 
   useEffect(() => {
-    const ac = new AbortController();
+    let mounted = true;
 
-    fetch("/api/folders", { credentials: "include", signal: ac.signal })
+    fetch("/api/folders", { credentials: "include", cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
-        if (!data) return;
+        if (!mounted || !data) return;
         setFolders({
           academe: safeArray(data.academe),
           stakeholders: safeArray(data.stakeholders ?? data.stakeholder ?? data.stakeholders),
           pamo: safeArray(data.pamo),
         });
       })
-      .catch((e) => {
-        if (e?.name === "AbortError") return;
+      .catch(() => {
+        if (!mounted) return;
       });
 
-    return () => ac.abort();
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -209,26 +189,27 @@ export default function UploadPage() {
     if (uploading) return;
 
     if (!file) {
-      toast({ type: "error", title: "Missing file", message: "Please select a file." });
+      setErrorMsg("Please select a file.");
+      setErrorOpen(true);
       return;
     }
     if (!title.trim()) {
-      toast({ type: "error", title: "Missing title", message: "Document title is required." });
+      setErrorMsg("Document title is required.");
+      setErrorOpen(true);
       return;
     }
     if (!dateReceived) {
-      toast({ type: "error", title: "Missing date", message: "Date received is required." });
+      setErrorMsg("Date received is required.");
+      setErrorOpen(true);
       return;
     }
     if (folderRequired && !finalFolder) {
-      toast({
-        type: "error",
-        title: "Missing folder",
-        message:
-          category === "Stakeholder"
-            ? "Please enter stakeholder name."
-            : "Please enter activity group.",
-      });
+      setErrorMsg(
+        category === "Stakeholder"
+          ? "Please enter stakeholder name."
+          : "Please enter activity group."
+      );
+      setErrorOpen(true);
       return;
     }
 
@@ -252,22 +233,15 @@ export default function UploadPage() {
       const data = await res.json().catch(() => null);
 
       if (!res.ok) {
-        toast({
-          type: "error",
-          title: "Upload failed",
-          message: data?.error || "Please try again.",
-        });
+        setErrorMsg(data?.error || "Please try again.");
+        setErrorOpen(true);
         return;
       }
 
-      setSuccessMsg("Document uploaded successfully.");
       setSuccessOpen(true);
     } catch {
-      toast({
-        type: "error",
-        title: "Upload failed",
-        message: "Server unreachable. Try again.",
-      });
+      setErrorMsg("Server unreachable. Try again.");
+      setErrorOpen(true);
     } finally {
       setUploading(false);
     }
@@ -303,14 +277,30 @@ export default function UploadPage() {
     <div className={`p-6 md:p-10 min-h-full ${dark ? "text-slate-100" : "text-slate-900"}`}>
       <ConfirmDialog
         open={successOpen}
-        title="Uploaded Successfully"
-        message={successMsg}
-        confirmText="OK"
+        title="Upload Complete"
+        message="Your document has been saved successfully to the repository."
+        confirmText="Go to Dashboard"
         oneButton
+        variant="success"
+        details={[
+          { label: "Category", value: category },
+          { label: "Year", value: year || "—" },
+          { label: folderLabel, value: finalFolder || "—" },
+        ]}
         onConfirm={() => {
           setSuccessOpen(false);
           router.push("/dashboard");
         }}
+      />
+
+      <ConfirmDialog
+        open={errorOpen}
+        title="Upload Failed"
+        message={errorMsg}
+        confirmText="OK"
+        oneButton
+        variant="warning"
+        onConfirm={() => setErrorOpen(false)}
       />
 
       <div className="max-w-[1250px] mx-auto">
@@ -330,7 +320,9 @@ export default function UploadPage() {
               <div className="flex items-center gap-2 flex-wrap">
                 <h1
                   className={`text-4xl md:text-5xl font-extrabold ${
-                    dark ? "text-white drop-shadow-[0_0_12px_rgba(34,211,238,0.12)]" : "text-slate-900"
+                    dark
+                      ? "text-white drop-shadow-[0_0_12px_rgba(34,211,238,0.12)]"
+                      : "text-slate-900"
                   }`}
                 >
                   Upload Document
@@ -345,7 +337,11 @@ export default function UploadPage() {
                   ADMIN ONLY
                 </span>
               </div>
-              <p className={`mt-2 text-sm md:text-base ${dark ? "text-cyan-100/70" : "text-slate-600"}`}>
+              <p
+                className={`mt-2 text-sm md:text-base ${
+                  dark ? "text-cyan-100/70" : "text-slate-600"
+                }`}
+              >
                 Add Academe, Stakeholder, or PAMO Activity records with Title + Date Received.
               </p>
             </div>
@@ -369,10 +365,18 @@ export default function UploadPage() {
                 {initials(me.name)}
               </div>
               <div className="min-w-0">
-                <div className={`text-sm font-semibold truncate ${dark ? "text-white" : "text-slate-900"}`}>
+                <div
+                  className={`text-sm font-semibold truncate ${
+                    dark ? "text-white" : "text-slate-900"
+                  }`}
+                >
                   {me.name}
                 </div>
-                <div className={`text-[12px] truncate ${dark ? "text-cyan-100/70" : "text-slate-500"}`}>
+                <div
+                  className={`text-[12px] truncate ${
+                    dark ? "text-cyan-100/70" : "text-slate-500"
+                  }`}
+                >
                   {me.email}
                 </div>
               </div>
@@ -418,7 +422,11 @@ export default function UploadPage() {
             <div className="p-6 space-y-5">
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
-                  <label className={`text-sm font-semibold flex items-center gap-2 ${dark ? "text-white" : "text-slate-800"}`}>
+                  <label
+                    className={`text-sm font-semibold flex items-center gap-2 ${
+                      dark ? "text-white" : "text-slate-800"
+                    }`}
+                  >
                     <TagIcon className={`w-4 h-4 ${dark ? "text-cyan-200" : "text-cyan-600"}`} />
                     Category <span className="text-rose-500">*</span>
                   </label>
@@ -448,8 +456,14 @@ export default function UploadPage() {
                 </div>
 
                 <div>
-                  <label className={`text-sm font-semibold flex items-center gap-2 ${dark ? "text-white" : "text-slate-800"}`}>
-                    <CalendarDaysIcon className={`w-4 h-4 ${dark ? "text-cyan-200" : "text-cyan-600"}`} />
+                  <label
+                    className={`text-sm font-semibold flex items-center gap-2 ${
+                      dark ? "text-white" : "text-slate-800"
+                    }`}
+                  >
+                    <CalendarDaysIcon
+                      className={`w-4 h-4 ${dark ? "text-cyan-200" : "text-cyan-600"}`}
+                    />
                     Date Received <span className="text-rose-500">*</span>
                   </label>
                   <input
@@ -468,8 +482,14 @@ export default function UploadPage() {
               </div>
 
               <div>
-                <label className={`text-sm font-semibold flex items-center gap-2 ${dark ? "text-white" : "text-slate-800"}`}>
-                  <DocumentTextIcon className={`w-4 h-4 ${dark ? "text-cyan-200" : "text-cyan-600"}`} />
+                <label
+                  className={`text-sm font-semibold flex items-center gap-2 ${
+                    dark ? "text-white" : "text-slate-800"
+                  }`}
+                >
+                  <DocumentTextIcon
+                    className={`w-4 h-4 ${dark ? "text-cyan-200" : "text-cyan-600"}`}
+                  />
                   Document Title <span className="text-rose-500">*</span>
                 </label>
                 <input
@@ -481,7 +501,11 @@ export default function UploadPage() {
               </div>
 
               <div>
-                <label className={`text-sm font-semibold flex items-center gap-2 ${dark ? "text-white" : "text-slate-800"}`}>
+                <label
+                  className={`text-sm font-semibold flex items-center gap-2 ${
+                    dark ? "text-white" : "text-slate-800"
+                  }`}
+                >
                   <FolderIcon className={`w-4 h-4 ${dark ? "text-cyan-200" : "text-cyan-600"}`} />
                   {folderLabel} {folderRequired && <span className="text-rose-500">*</span>}
                 </label>
@@ -571,7 +595,11 @@ export default function UploadPage() {
                     </div>
 
                     <div className="flex-1">
-                      <div className={`font-extrabold text-2xl leading-tight ${dark ? "text-white" : "text-slate-900"}`}>
+                      <div
+                        className={`font-extrabold text-2xl leading-tight ${
+                          dark ? "text-white" : "text-slate-900"
+                        }`}
+                      >
                         Drag & drop your file here
                       </div>
                       <div className={`text-base mt-1 ${dark ? "text-cyan-100/70" : "text-slate-600"}`}>
@@ -651,7 +679,11 @@ export default function UploadPage() {
             transition={{ duration: 0.18, delay: 0.03 }}
             className={`lg:col-span-2 ${sectionCard}`}
           >
-            <div className={`p-5 border-b ${dark ? "border-cyan-300/12 bg-white/[0.03]" : "border-slate-200 bg-slate-50"}`}>
+            <div
+              className={`p-5 border-b ${
+                dark ? "border-cyan-300/12 bg-white/[0.03]" : "border-slate-200 bg-slate-50"
+              }`}
+            >
               <div className={`text-lg font-extrabold ${dark ? "text-white" : "text-slate-900"}`}>
                 Preview Summary
               </div>
@@ -661,8 +693,14 @@ export default function UploadPage() {
             </div>
 
             <div className="p-6 space-y-4">
-              <div className={`rounded-3xl p-4 ${dark ? "border border-cyan-300/10 bg-white/[0.03]" : "border border-slate-200 bg-slate-50"}`}>
-                <div className={`text-[12px] ${dark ? "text-cyan-100/60" : "text-slate-500"}`}>Category</div>
+              <div
+                className={`rounded-3xl p-4 ${
+                  dark ? "border border-cyan-300/10 bg-white/[0.03]" : "border border-slate-200 bg-slate-50"
+                }`}
+              >
+                <div className={`text-[12px] ${dark ? "text-cyan-100/60" : "text-slate-500"}`}>
+                  Category
+                </div>
                 <div
                   className={`mt-2 inline-flex items-center px-2.5 py-1 rounded-full text-[12px] font-semibold border ${
                     dark
@@ -674,37 +712,67 @@ export default function UploadPage() {
                 </div>
               </div>
 
-              <div className={`rounded-3xl p-4 ${dark ? "border border-cyan-300/10 bg-white/[0.03]" : "border border-slate-200 bg-slate-50"}`}>
-                <div className={`text-[12px] ${dark ? "text-cyan-100/60" : "text-slate-500"}`}>Title</div>
+              <div
+                className={`rounded-3xl p-4 ${
+                  dark ? "border border-cyan-300/10 bg-white/[0.03]" : "border border-slate-200 bg-slate-50"
+                }`}
+              >
+                <div className={`text-[12px] ${dark ? "text-cyan-100/60" : "text-slate-500"}`}>
+                  Title
+                </div>
                 <div className={`mt-2 font-semibold break-words ${dark ? "text-white" : "text-slate-900"}`}>
                   {title.trim() || "—"}
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div className={`rounded-3xl p-4 ${dark ? "border border-cyan-300/10 bg-white/[0.03]" : "border border-slate-200 bg-slate-50"}`}>
-                  <div className={`text-[12px] ${dark ? "text-cyan-100/60" : "text-slate-500"}`}>Date Received</div>
+                <div
+                  className={`rounded-3xl p-4 ${
+                    dark ? "border border-cyan-300/10 bg-white/[0.03]" : "border border-slate-200 bg-slate-50"
+                  }`}
+                >
+                  <div className={`text-[12px] ${dark ? "text-cyan-100/60" : "text-slate-500"}`}>
+                    Date Received
+                  </div>
                   <div className={`mt-2 font-semibold ${dark ? "text-white" : "text-slate-900"}`}>
                     {dateReceived || "—"}
                   </div>
                 </div>
-                <div className={`rounded-3xl p-4 ${dark ? "border border-cyan-300/10 bg-white/[0.03]" : "border border-slate-200 bg-slate-50"}`}>
-                  <div className={`text-[12px] ${dark ? "text-cyan-100/60" : "text-slate-500"}`}>Year</div>
+                <div
+                  className={`rounded-3xl p-4 ${
+                    dark ? "border border-cyan-300/10 bg-white/[0.03]" : "border border-slate-200 bg-slate-50"
+                  }`}
+                >
+                  <div className={`text-[12px] ${dark ? "text-cyan-100/60" : "text-slate-500"}`}>
+                    Year
+                  </div>
                   <div className={`mt-2 font-semibold ${dark ? "text-white" : "text-slate-900"}`}>
                     {year || "—"}
                   </div>
                 </div>
               </div>
 
-              <div className={`rounded-3xl p-4 ${dark ? "border border-cyan-300/10 bg-white/[0.03]" : "border border-slate-200 bg-slate-50"}`}>
-                <div className={`text-[12px] ${dark ? "text-cyan-100/60" : "text-slate-500"}`}>{folderLabel}</div>
+              <div
+                className={`rounded-3xl p-4 ${
+                  dark ? "border border-cyan-300/10 bg-white/[0.03]" : "border border-slate-200 bg-slate-50"
+                }`}
+              >
+                <div className={`text-[12px] ${dark ? "text-cyan-100/60" : "text-slate-500"}`}>
+                  {folderLabel}
+                </div>
                 <div className={`mt-2 font-semibold break-words ${dark ? "text-white" : "text-slate-900"}`}>
                   {finalFolder || "—"}
                 </div>
               </div>
 
-              <div className={`rounded-3xl p-4 ${dark ? "border border-cyan-300/10 bg-white/[0.03]" : "border border-slate-200 bg-slate-50"}`}>
-                <div className={`text-[12px] ${dark ? "text-cyan-100/60" : "text-slate-500"}`}>File</div>
+              <div
+                className={`rounded-3xl p-4 ${
+                  dark ? "border border-cyan-300/10 bg-white/[0.03]" : "border border-slate-200 bg-slate-50"
+                }`}
+              >
+                <div className={`text-[12px] ${dark ? "text-cyan-100/60" : "text-slate-500"}`}>
+                  File
+                </div>
                 <div className={`mt-2 font-semibold break-words ${dark ? "text-white" : "text-slate-900"}`}>
                   {file?.name || "—"}
                 </div>
@@ -723,12 +791,18 @@ export default function UploadPage() {
                 }`}
               >
                 <div className="flex items-start gap-2">
-                  <CheckCircleIcon className={`w-5 h-5 mt-0.5 ${dark ? "text-emerald-300" : "text-emerald-600"}`} />
+                  <CheckCircleIcon
+                    className={`w-5 h-5 mt-0.5 ${dark ? "text-emerald-300" : "text-emerald-600"}`}
+                  />
                   <div>
                     <div className={`text-lg font-extrabold ${dark ? "text-emerald-200" : "text-emerald-700"}`}>
                       Tip
                     </div>
-                    <div className={`text-[13px] mt-1 leading-6 ${dark ? "text-emerald-100/85" : "text-emerald-700/90"}`}>
+                    <div
+                      className={`text-[13px] mt-1 leading-6 ${
+                        dark ? "text-emerald-100/85" : "text-emerald-700/90"
+                      }`}
+                    >
                       Use consistent folder names (e.g., <b>PAMB</b>, <b>DENR</b>, <b>LGU</b>, <b>UM</b>, <b>BMS</b>) so the Documents page groups files nicely.
                     </div>
                   </div>

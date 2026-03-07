@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
+import { useAuth } from "@/app/components/AuthProvider";
 import {
   KeyIcon,
   PaintBrushIcon,
@@ -17,9 +18,7 @@ type PageTheme = "dark" | "light";
 
 export default function SettingsPage() {
   const router = useRouter();
-
-  const [user, setUser] = useState<any>(null);
-  const [loadingUser, setLoadingUser] = useState(true);
+  const { user, loading: loadingUser } = useAuth();
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -40,24 +39,17 @@ export default function SettingsPage() {
   const [adminResultMsg, setAdminResultMsg] = useState("");
 
   useEffect(() => {
-    fetch("/api/me", { credentials: "include" })
-      .then((res) => {
-        if (!res.ok) {
-          router.replace("/login");
-          return null;
-        }
-        return res.json();
-      })
-      .then((data) => {
-        if (!data) return;
-        if (data.role !== "admin" && data.role !== "co_admin") {
-          router.replace("/dashboard");
-          return;
-        }
-        setUser(data);
-      })
-      .finally(() => setLoadingUser(false));
-  }, [router]);
+    if (loadingUser) return;
+
+    if (!user) {
+      router.replace("/login");
+      return;
+    }
+
+    if (user.role !== "admin" && user.role !== "co_admin") {
+      router.replace("/dashboard");
+    }
+  }, [loadingUser, user, router]);
 
   useEffect(() => {
     const saved =
@@ -74,6 +66,7 @@ export default function SettingsPage() {
     setPageTheme(theme);
     if (typeof window !== "undefined") {
       localStorage.setItem("page-theme", theme);
+      document.documentElement.dataset.pageTheme = theme;
       window.dispatchEvent(new Event("page-theme-changed"));
     }
   };
@@ -182,10 +175,7 @@ export default function SettingsPage() {
     }
   };
 
-  const pageWrap =
-    pageTheme === "dark"
-      ? "text-slate-100"
-      : "text-slate-900";
+  const pageWrap = pageTheme === "dark" ? "text-slate-100" : "text-slate-900";
 
   const cardCls =
     pageTheme === "dark"
@@ -217,7 +207,7 @@ export default function SettingsPage() {
       <ConfirmDialog
         open={showLogoutAfterChange}
         title="Logout"
-        message="Password changed successfully. Do you want to logout now?"
+        message="Your password has been changed successfully. For security, it is recommended to logout and sign in again."
         confirmText="Logout"
         cancelText="Stay"
         danger
@@ -231,17 +221,15 @@ export default function SettingsPage() {
         title="Change Password Failed"
         message={failMsg}
         confirmText="OK"
-        cancelText=""
-        loading={false}
+        oneButton
         onConfirm={() => setShowChangeFailed(false)}
-        onCancel={() => setShowChangeFailed(false)}
       />
 
       <ConfirmDialog
         open={showAdminConfirmReset}
         title="Reset Password"
         message={`Are you sure you want to reset password for: ${targetEmail.trim().toLowerCase()}?`}
-        confirmText={resetting ? "Resetting..." : "Reset"}
+        confirmText={resetting ? "Resetting..." : "Reset Password"}
         cancelText="Cancel"
         danger
         loading={resetting}
@@ -251,23 +239,23 @@ export default function SettingsPage() {
 
       <ConfirmDialog
         open={showAdminResult}
-        title="Admin"
+        title="Admin Result"
         message={adminResultMsg}
         confirmText="OK"
-        cancelText=""
-        loading={false}
+        oneButton
         onConfirm={() => setShowAdminResult(false)}
-        onCancel={() => setShowAdminResult(false)}
       />
 
       <div className="max-w-6xl mx-auto">
         <div className="mb-8">
-          <h1 className={`text-4xl md:text-5xl font-extrabold ${heading}`}>
-            Settings
-          </h1>
+          <h1 className={`text-4xl md:text-5xl font-extrabold ${heading}`}>Settings</h1>
           <p className={`mt-2 ${muted}`}>
             Signed in as{" "}
-            <span className={pageTheme === "dark" ? "font-semibold text-white" : "font-semibold text-slate-900"}>
+            <span
+              className={
+                pageTheme === "dark" ? "font-semibold text-white" : "font-semibold text-slate-900"
+              }
+            >
               {user.name}
             </span>{" "}
             <span className={muted}>({user.role})</span>
@@ -282,14 +270,25 @@ export default function SettingsPage() {
                   <KeyIcon className="w-6 h-6" />
                 </div>
                 <div>
-                  <h2 className={`text-2xl font-extrabold ${pageTheme === "dark" ? "text-emerald-200" : "text-emerald-700"}`}>
+                  <h2
+                    className={`text-2xl font-extrabold ${
+                      pageTheme === "dark" ? "text-emerald-200" : "text-emerald-700"
+                    }`}
+                  >
                     Change Password
                   </h2>
                   <p className={`mt-1 ${muted}`}>
                     Enter your current password and a new password{" "}
-                    <span className={pageTheme === "dark" ? "text-white font-semibold" : "text-slate-900 font-semibold"}>
+                    <span
+                      className={
+                        pageTheme === "dark"
+                          ? "text-white font-semibold"
+                          : "text-slate-900 font-semibold"
+                      }
+                    >
                       (min 8 characters)
-                    </span>.
+                    </span>
+                    .
                   </p>
                 </div>
               </div>
@@ -326,7 +325,7 @@ export default function SettingsPage() {
                 <button
                   onClick={changeMyPassword}
                   disabled={saving}
-                  className="mt-2 px-4 py-3 rounded-2xl bg-cyan-500/90 text-slate-950 font-extrabold hover:bg-cyan-400 transition shadow-[0_0_18px_rgba(34,211,238,0.18)] disabled:opacity-70"
+                  className="mt-2 px-4 py-3 rounded-2xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold hover:bg-cyan-400 transition shadow-[0_0_18px_rgba(34,211,238,0.18)] disabled:opacity-70"
                 >
                   {saving ? "Saving..." : "Save Password"}
                 </button>
@@ -340,7 +339,11 @@ export default function SettingsPage() {
                     <ShieldCheckIcon className="w-6 h-6" />
                   </div>
                   <div>
-                    <h2 className={`text-2xl font-extrabold ${pageTheme === "dark" ? "text-indigo-200" : "text-indigo-700"}`}>
+                    <h2
+                      className={`text-2xl font-extrabold ${
+                        pageTheme === "dark" ? "text-indigo-200" : "text-indigo-700"
+                      }`}
+                    >
                       Admin: Reset User Password
                     </h2>
                     <p className={`mt-1 ${muted}`}>
@@ -419,10 +422,18 @@ export default function SettingsPage() {
                     <MoonIcon className="w-7 h-7 text-cyan-200" />
                     {pageTheme === "dark" && <CheckCircleIcon className="w-5 h-5 text-cyan-200" />}
                   </div>
-                  <div className={`mt-4 text-lg font-extrabold ${pageTheme === "light" ? "text-slate-900" : "text-white"}`}>
+                  <div
+                    className={`mt-4 text-lg font-extrabold ${
+                      pageTheme === "light" ? "text-slate-900" : "text-white"
+                    }`}
+                  >
                     Dark Neon
                   </div>
-                  <div className={`mt-1 text-sm ${pageTheme === "light" ? "text-slate-600" : "text-cyan-100/65"}`}>
+                  <div
+                    className={`mt-1 text-sm ${
+                      pageTheme === "light" ? "text-slate-600" : "text-cyan-100/65"
+                    }`}
+                  >
                     Premium dark glass look with neon page cards.
                   </div>
                 </button>
@@ -438,23 +449,37 @@ export default function SettingsPage() {
                   }`}
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <SunIcon className={`w-7 h-7 ${pageTheme === "light" ? "text-amber-500" : "text-cyan-200"}`} />
+                    <SunIcon
+                      className={`w-7 h-7 ${
+                        pageTheme === "light" ? "text-amber-500" : "text-cyan-200"
+                      }`}
+                    />
                     {pageTheme === "light" && <CheckCircleIcon className="w-5 h-5 text-cyan-500" />}
                   </div>
-                  <div className={`mt-4 text-lg font-extrabold ${pageTheme === "dark" ? "text-white" : "text-slate-900"}`}>
+                  <div
+                    className={`mt-4 text-lg font-extrabold ${
+                      pageTheme === "dark" ? "text-white" : "text-slate-900"
+                    }`}
+                  >
                     Clean Light
                   </div>
-                  <div className={`mt-1 text-sm ${pageTheme === "dark" ? "text-cyan-100/65" : "text-slate-600"}`}>
+                  <div
+                    className={`mt-1 text-sm ${
+                      pageTheme === "dark" ? "text-cyan-100/65" : "text-slate-600"
+                    }`}
+                  >
                     Bright page background with cleaner reading feel.
                   </div>
                 </button>
               </div>
 
-              <div className={`mt-5 rounded-2xl border p-4 ${
-                pageTheme === "dark"
-                  ? "border-cyan-300/12 bg-white/[0.04]"
-                  : "border-slate-200 bg-slate-50"
-              }`}>
+              <div
+                className={`mt-5 rounded-2xl border p-4 ${
+                  pageTheme === "dark"
+                    ? "border-cyan-300/12 bg-white/[0.04]"
+                    : "border-slate-200 bg-slate-50"
+                }`}
+              >
                 <div className={`text-sm font-semibold ${heading}`}>Current page theme</div>
                 <div className={`mt-1 ${muted}`}>{themeLabel}</div>
               </div>
@@ -467,27 +492,31 @@ export default function SettingsPage() {
                 </div>
                 <div>
                   <h2 className={`text-2xl font-extrabold ${heading}`}>Interface Preview</h2>
-                  <p className={`mt-1 ${muted}`}>
-                    Quick preview of the current style.
-                  </p>
+                  <p className={`mt-1 ${muted}`}>Quick preview of the current style.</p>
                 </div>
               </div>
 
               <div className="mt-6 space-y-4">
-                <div className={`rounded-3xl p-5 border ${
-                  pageTheme === "dark"
-                    ? "border-cyan-300/12 bg-[#081522]"
-                    : "border-slate-200 bg-white"
-                }`}>
+                <div
+                  className={`rounded-3xl p-5 border ${
+                    pageTheme === "dark"
+                      ? "border-cyan-300/12 bg-[#081522]"
+                      : "border-slate-200 bg-white"
+                  }`}
+                >
                   <div className={`text-sm font-semibold ${heading}`}>Sample Header</div>
-                  <div className={`mt-2 text-xs ${muted}`}>This shows how text looks in the selected page theme.</div>
+                  <div className={`mt-2 text-xs ${muted}`}>
+                    This shows how text looks in the selected page theme.
+                  </div>
                 </div>
 
-                <div className={`rounded-3xl p-5 border ${
-                  pageTheme === "dark"
-                    ? "border-cyan-300/12 bg-white/[0.04]"
-                    : "border-slate-200 bg-slate-50"
-                }`}>
+                <div
+                  className={`rounded-3xl p-5 border ${
+                    pageTheme === "dark"
+                      ? "border-cyan-300/12 bg-white/[0.04]"
+                      : "border-slate-200 bg-slate-50"
+                  }`}
+                >
                   <div className={`text-sm font-semibold ${heading}`}>Sample Card</div>
                   <div className={`mt-2 text-xs ${muted}`}>
                     Cards can stay premium and slightly accented in both modes.

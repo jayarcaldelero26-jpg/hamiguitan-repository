@@ -1,6 +1,15 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  CheckIcon,
+  ExclamationTriangleIcon,
+  InformationCircleIcon,
+  TrashIcon,
+  XMarkIcon,
+} from "@heroicons/react/24/outline";
+
+type DialogVariant = "success" | "info" | "warning" | "danger";
 
 export type ConfirmDialogProps = {
   open: boolean;
@@ -14,9 +23,37 @@ export type ConfirmDialogProps = {
   loading?: boolean;
   oneButton?: boolean;
 
+  variant?: DialogVariant;
+  details?: Array<{ label: string; value: string }>;
+
   onConfirm: () => void;
   onCancel?: () => void;
 };
+
+function getVariant(variant?: DialogVariant, danger?: boolean): DialogVariant {
+  if (variant) return variant;
+  if (danger) return "danger";
+  return "success";
+}
+
+function VariantIcon({ variant }: { variant: DialogVariant }) {
+  const base =
+    "w-8 h-8";
+
+  if (variant === "success") {
+    return <CheckIcon className={base} />;
+  }
+
+  if (variant === "warning") {
+    return <ExclamationTriangleIcon className={base} />;
+  }
+
+  if (variant === "danger") {
+    return <TrashIcon className={base} />;
+  }
+
+  return <InformationCircleIcon className={base} />;
+}
 
 export default function ConfirmDialog({
   open,
@@ -27,52 +64,138 @@ export default function ConfirmDialog({
   danger = false,
   loading = false,
   oneButton = false,
+  variant,
+  details = [],
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
-  if (!open) return null;
+  const finalVariant = getVariant(variant, danger);
+
+  const iconWrapClass =
+    finalVariant === "success"
+      ? "bg-cyan-500 text-white shadow-[0_10px_24px_rgba(6,182,212,0.28)]"
+      : finalVariant === "warning"
+      ? "bg-amber-500 text-white shadow-[0_10px_24px_rgba(245,158,11,0.28)]"
+      : finalVariant === "danger"
+      ? "bg-slate-900 text-white shadow-[0_10px_24px_rgba(15,23,42,0.28)]"
+      : "bg-sky-500 text-white shadow-[0_10px_24px_rgba(14,165,233,0.28)]";
+
+  const confirmBtnClass =
+    finalVariant === "success"
+      ? "bg-cyan-600 hover:bg-cyan-500 text-white shadow-[0_10px_24px_rgba(6,182,212,0.24)]"
+      : finalVariant === "warning"
+      ? "bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-[0_10px_24px_rgba(245,158,11,0.24)]"
+      : finalVariant === "danger"
+      ? "bg-cyan-600 hover:bg-cyan-500 text-white shadow-[0_10px_24px_rgba(6,182,212,0.24)]"
+      : "bg-sky-600 hover:bg-sky-500 text-white shadow-[0_10px_24px_rgba(14,165,233,0.24)]";
+
+  const accentTextClass =
+    finalVariant === "success"
+      ? "text-cyan-600"
+      : finalVariant === "warning"
+      ? "text-amber-600"
+      : finalVariant === "danger"
+      ? "text-slate-800"
+      : "text-sky-600";
 
   return (
-    <div className="fixed inset-0 z-[200] bg-black/45 backdrop-blur-sm flex items-center justify-center p-4">
-      <motion.div
-        initial={{ scale: 0.92, opacity: 0, y: 8 }}
-        animate={{ scale: 1, opacity: 1, y: 0 }}
-        transition={{ duration: 0.16, ease: "easeOut" }}
-        className="bg-white rounded-[28px] shadow-[0_24px_70px_rgba(15,23,42,0.22)] max-w-md w-full p-6 border border-slate-200"
-      >
-        <div>
-          <h2 className="text-2xl font-extrabold text-slate-900">{title}</h2>
-          <p className="text-slate-600 mt-2 leading-relaxed whitespace-pre-line">
-            {message}
-          </p>
-        </div>
+    <AnimatePresence>
+      {open && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={() => {
+              if (!loading) onCancel?.();
+            }}
+          />
 
-        <div className={`flex gap-3 mt-7 ${oneButton ? "justify-center" : "justify-end"}`}>
-          {!oneButton && (
-            <button
-              type="button"
-              onClick={() => onCancel?.()}
-              disabled={loading}
-              className="px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-800 hover:bg-slate-50 font-bold transition disabled:opacity-70 disabled:cursor-not-allowed"
-            >
-              {cancelText}
-            </button>
-          )}
-
-          <button
-            type="button"
-            onClick={onConfirm}
-            disabled={loading}
-            className={`px-6 py-2.5 rounded-xl text-white font-extrabold shadow-[0_12px_28px_rgba(15,23,42,0.12)] transition disabled:opacity-70 disabled:cursor-not-allowed ${
-              danger
-                ? "bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700"
-                : "bg-gradient-to-r from-emerald-600 to-green-700 hover:from-emerald-700 hover:to-green-800"
-            }`}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.94, y: 18 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.96, y: 10 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
+            className="relative w-full max-w-[540px] rounded-[30px] bg-white border border-slate-200 shadow-[0_28px_80px_rgba(15,23,42,0.20)] px-6 py-7 sm:px-8"
           >
-            {loading ? "Please wait..." : confirmText}
-          </button>
+            {!oneButton && onCancel && (
+              <button
+                type="button"
+                onClick={() => !loading && onCancel()}
+                disabled={loading}
+                className="absolute right-4 top-4 h-10 w-10 rounded-xl border border-slate-200 bg-white text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition disabled:opacity-60 grid place-items-center"
+                aria-label="Close dialog"
+              >
+                <XMarkIcon className="w-5 h-5" />
+              </button>
+            )}
+
+            <div className="flex flex-col items-center text-center">
+              <div className="relative mb-5">
+                <div className={`h-16 w-16 rounded-full grid place-items-center ${iconWrapClass}`}>
+                  <VariantIcon variant={finalVariant} />
+                </div>
+
+                <span className="absolute -left-4 top-2 h-2.5 w-2.5 rounded-full bg-cyan-200" />
+                <span className="absolute -right-3 top-0 h-2 w-2 rounded-full bg-sky-300" />
+                <span className="absolute right-0 -bottom-1 h-2.5 w-2.5 rounded-full bg-emerald-200" />
+                <span className="absolute -left-1 -bottom-3 h-2 w-2 rounded-full bg-cyan-100" />
+              </div>
+
+              <h2 className="text-[30px] leading-tight font-extrabold text-slate-900">
+                {title}
+              </h2>
+
+              <p className="mt-3 max-w-[420px] text-[15px] leading-7 text-slate-500 whitespace-pre-line">
+                {message}
+              </p>
+
+              {details.length > 0 && (
+                <div className="mt-6 grid w-full grid-cols-1 sm:grid-cols-3 gap-3">
+                  {details.map((item, i) => (
+                    <div
+                      key={`${item.label}-${i}`}
+                      className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left"
+                    >
+                      <div className="text-[12px] text-slate-500">{item.label}</div>
+                      <div className={`mt-1 text-[15px] font-extrabold ${accentTextClass}`}>
+                        {item.value}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div
+                className={`mt-7 flex w-full gap-3 ${
+                  oneButton ? "justify-center" : "justify-center sm:justify-between"
+                } ${oneButton ? "max-w-[320px]" : ""}`}
+              >
+                {!oneButton && (
+                  <button
+                    type="button"
+                    onClick={() => onCancel?.()}
+                    disabled={loading}
+                    className="flex-1 sm:flex-none sm:min-w-[140px] px-5 py-3 rounded-2xl border border-slate-300 bg-white text-slate-700 font-bold hover:bg-slate-50 transition disabled:opacity-70 disabled:cursor-not-allowed"
+                  >
+                    {cancelText}
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={onConfirm}
+                  disabled={loading}
+                  className={`flex-1 sm:flex-none sm:min-w-[180px] px-6 py-3 rounded-2xl font-extrabold transition disabled:opacity-70 disabled:cursor-not-allowed ${confirmBtnClass}`}
+                >
+                  {loading ? "Please wait..." : confirmText}
+                </button>
+              </div>
+            </div>
+          </motion.div>
         </div>
-      </motion.div>
-    </div>
+      )}
+    </AnimatePresence>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import ConfirmDialog from "@/app/components/ConfirmDialog";
-import { useToast } from "@/app/components/ToastProvider";
+import { useAuth } from "@/app/components/AuthProvider";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -111,7 +111,7 @@ function Pill({
   dark,
 }: {
   tone: "green" | "blue" | "purple" | "slate" | "amber";
-  children: any;
+  children: React.ReactNode;
   dark: boolean;
 }) {
   const cls = dark
@@ -197,7 +197,7 @@ function IconButton({
 }: {
   onClick: () => void;
   title: string;
-  children: any;
+  children: React.ReactNode;
   dark: boolean;
 }) {
   return (
@@ -265,10 +265,8 @@ const EMPTY_USER: UserRow = {
 
 export default function RegisteredUsersPage() {
   const router = useRouter();
-  const { toast } = useToast();
+  const { user: me, loading: loadingMe } = useAuth();
 
-  const [me, setMe] = useState<any>(null);
-  const [loadingMe, setLoadingMe] = useState(true);
   const [pageTheme, setPageTheme] = useState<PageTheme>("dark");
 
   const [users, setUsers] = useState<UserRow[]>([]);
@@ -286,8 +284,15 @@ export default function RegisteredUsersPage() {
   const [saving, setSaving] = useState(false);
 
   const [deleteTarget, setDeleteTarget] = useState<UserRow | null>(null);
+
   const [successOpen, setSuccessOpen] = useState(false);
   const [successMsg, setSuccessMsg] = useState("Done.");
+
+  const [errorOpen, setErrorOpen] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("Something went wrong.");
+
+  const [infoOpen, setInfoOpen] = useState(false);
+  const [infoMsg, setInfoMsg] = useState("Done.");
 
   useEffect(() => {
     const syncTheme = () => {
@@ -305,28 +310,24 @@ export default function RegisteredUsersPage() {
   }, []);
 
   useEffect(() => {
-    fetch("/api/me", { credentials: "include" })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (!data) {
-          router.replace("/login");
-          return;
-        }
-        if (data.role !== "admin" && data.role !== "co_admin") {
-          router.replace("/dashboard");
-          return;
-        }
-        setMe(data);
-      })
-      .finally(() => setLoadingMe(false));
-  }, [router]);
+    if (loadingMe) return;
+
+    if (!me) {
+      router.replace("/login");
+      return;
+    }
+
+    if (me.role !== "admin" && me.role !== "co_admin") {
+      router.replace("/dashboard");
+    }
+  }, [loadingMe, me, router]);
 
   const isAdmin = me?.role === "admin";
   const canManage = isAdmin;
 
   const fetchUsers = () => {
     setLoadingUsers(true);
-    fetch("/api/admin/users", { credentials: "include" })
+    fetch("/api/admin/users", { credentials: "include", cache: "no-store" })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         setUsers(Array.isArray(data?.users) ? data.users : Array.isArray(data) ? data : []);
@@ -384,9 +385,11 @@ export default function RegisteredUsersPage() {
   const copyEmail = async (email: string) => {
     try {
       await navigator.clipboard.writeText(email);
-      toast({ type: "success", title: "Copied", message: "Email copied to clipboard." });
+      setInfoMsg("Email copied to clipboard.");
+      setInfoOpen(true);
     } catch {
-      toast({ type: "error", title: "Copy failed", message: "Clipboard not allowed." });
+      setErrorMsg("Clipboard not allowed.");
+      setErrorOpen(true);
     }
   };
 
@@ -420,8 +423,8 @@ export default function RegisteredUsersPage() {
     if (!hasUserChanges(selectedUser, draftUser)) {
       setEditMode(false);
       closeUser();
-      setSuccessMsg("No changes were made.");
-      setSuccessOpen(true);
+      setInfoMsg("No changes were made.");
+      setInfoOpen(true);
       return;
     }
 
@@ -437,11 +440,8 @@ export default function RegisteredUsersPage() {
       const data = await res.json().catch(() => null);
 
       if (!res.ok) {
-        toast({
-          type: "error",
-          title: "Update failed",
-          message: data?.error || "Could not update user.",
-        });
+        setErrorMsg(data?.error || "Could not update user.");
+        setErrorOpen(true);
         return;
       }
 
@@ -454,11 +454,8 @@ export default function RegisteredUsersPage() {
       setSuccessOpen(true);
       fetchUsers();
     } catch {
-      toast({
-        type: "error",
-        title: "Update failed",
-        message: "Server unreachable.",
-      });
+      setErrorMsg("Server unreachable.");
+      setErrorOpen(true);
     } finally {
       setSaving(false);
     }
@@ -477,29 +474,20 @@ export default function RegisteredUsersPage() {
       const data = await res.json().catch(() => null);
 
       if (!res.ok) {
-        toast({
-          type: "error",
-          title: "Delete failed",
-          message: data?.error || "Could not delete user.",
-        });
+        setErrorMsg(data?.error || "Could not delete user.");
+        setErrorOpen(true);
         return;
       }
 
-      toast({
-        type: "success",
-        title: "Deleted",
-        message: "User deleted successfully.",
-      });
+      setSuccessMsg("User deleted successfully.");
+      setSuccessOpen(true);
 
       setDeleteTarget(null);
       if (selectedUser?.id === deleteTarget.id) closeUser();
       fetchUsers();
     } catch {
-      toast({
-        type: "error",
-        title: "Delete failed",
-        message: "Server unreachable.",
-      });
+      setErrorMsg("Server unreachable.");
+      setErrorOpen(true);
     } finally {
       setSaving(false);
     }
@@ -515,7 +503,7 @@ export default function RegisteredUsersPage() {
     ? "mt-1 w-full h-11 rounded-xl border border-cyan-300/12 bg-white/[0.04] px-3 text-sm text-white outline-none focus:ring-4 focus:ring-cyan-400/10 focus:border-cyan-300/25 disabled:bg-white/[0.03] disabled:text-cyan-100/60"
     : "mt-1 w-full h-11 rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:ring-4 focus:ring-cyan-100 focus:border-cyan-400 disabled:bg-slate-50 disabled:text-slate-500";
 
-  if (loadingMe) {
+  if (loadingMe || !me) {
     return (
       <div className="min-h-full grid place-items-center">
         <div
@@ -530,8 +518,6 @@ export default function RegisteredUsersPage() {
       </div>
     );
   }
-
-  if (!me) return null;
 
   return (
     <div className={`h-full ${dark ? "text-slate-100" : "text-slate-900"}`}>
@@ -559,7 +545,9 @@ export default function RegisteredUsersPage() {
                 <div className="flex flex-wrap items-center gap-3">
                   <h1
                     className={`text-[2.5rem] leading-none tracking-tight font-extrabold ${
-                      dark ? "text-white drop-shadow-[0_0_12px_rgba(34,211,238,0.12)]" : "text-slate-900"
+                      dark
+                        ? "text-white drop-shadow-[0_0_12px_rgba(34,211,238,0.12)]"
+                        : "text-slate-900"
                     }`}
                   >
                     Registered Users
@@ -586,11 +574,8 @@ export default function RegisteredUsersPage() {
               <button
                 onClick={() => {
                   fetchUsers();
-                  toast({
-                    type: "success",
-                    title: "Refreshing",
-                    message: "Updating user list…",
-                  });
+                  setInfoMsg("Updating user list…");
+                  setInfoOpen(true);
                 }}
                 className={`h-12 px-6 rounded-2xl transition font-extrabold ${
                   dark
@@ -696,8 +681,15 @@ export default function RegisteredUsersPage() {
             </div>
 
             <div className={`mt-3 text-sm ${dark ? "text-cyan-100/60" : "text-slate-500"}`}>
-              Showing <span className={`font-semibold ${dark ? "text-white" : "text-slate-900"}`}>{filtered.length}</span> of{" "}
-              <span className={`font-semibold ${dark ? "text-white" : "text-slate-900"}`}>{users.length}</span> users
+              Showing{" "}
+              <span className={`font-semibold ${dark ? "text-white" : "text-slate-900"}`}>
+                {filtered.length}
+              </span>{" "}
+              of{" "}
+              <span className={`font-semibold ${dark ? "text-white" : "text-slate-900"}`}>
+                {users.length}
+              </span>{" "}
+              users
             </div>
           </div>
         </div>
@@ -735,13 +727,19 @@ export default function RegisteredUsersPage() {
               <tbody className={dark ? "divide-y divide-cyan-300/8" : "divide-y divide-slate-200"}>
                 {loadingUsers ? (
                   <tr>
-                    <td colSpan={8} className={`px-5 py-10 ${dark ? "text-cyan-100/60" : "text-slate-500"}`}>
+                    <td
+                      colSpan={8}
+                      className={`px-5 py-10 ${dark ? "text-cyan-100/60" : "text-slate-500"}`}
+                    >
                       Loading users…
                     </td>
                   </tr>
                 ) : filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className={`px-5 py-12 ${dark ? "text-cyan-100/60" : "text-slate-500"}`}>
+                    <td
+                      colSpan={8}
+                      className={`px-5 py-12 ${dark ? "text-cyan-100/60" : "text-slate-500"}`}
+                    >
                       No users found. Try changing search/filter.
                     </td>
                   </tr>
@@ -750,7 +748,9 @@ export default function RegisteredUsersPage() {
                     <tr
                       key={u.id}
                       onClick={() => openUser(u)}
-                      className={`transition-colors cursor-pointer ${dark ? "hover:bg-white/[0.035]" : "hover:bg-slate-50"}`}
+                      className={`transition-colors cursor-pointer ${
+                        dark ? "hover:bg-white/[0.035]" : "hover:bg-slate-50"
+                      }`}
                     >
                       <td className="px-5 py-4 align-middle">
                         <div className="flex items-center gap-4 min-w-[260px]">
@@ -765,10 +765,18 @@ export default function RegisteredUsersPage() {
                           </div>
 
                           <div className="min-w-0">
-                            <div className={`truncate text-[16px] font-semibold ${dark ? "text-white" : "text-slate-900"}`}>
+                            <div
+                              className={`truncate text-[16px] font-semibold ${
+                                dark ? "text-white" : "text-slate-900"
+                              }`}
+                            >
                               {u.name}
                             </div>
-                            <div className={`mt-0.5 text-xs ${dark ? "text-cyan-100/45" : "text-slate-400"}`}>
+                            <div
+                              className={`mt-0.5 text-xs ${
+                                dark ? "text-cyan-100/45" : "text-slate-400"
+                              }`}
+                            >
                               ID: {u.id}
                             </div>
                           </div>
@@ -776,7 +784,11 @@ export default function RegisteredUsersPage() {
                       </td>
 
                       <td className="px-5 py-4 align-middle">
-                        <div className={`max-w-[290px] truncate text-[15px] ${dark ? "text-cyan-100" : "text-slate-700"}`}>
+                        <div
+                          className={`max-w-[290px] truncate text-[15px] ${
+                            dark ? "text-cyan-100" : "text-slate-700"
+                          }`}
+                        >
                           {u.email}
                         </div>
                       </td>
@@ -799,7 +811,9 @@ export default function RegisteredUsersPage() {
 
                       <td className="px-5 py-4 align-middle">
                         <div
-                          className={`max-w-[220px] truncate text-[15px] ${dark ? "text-cyan-100/85" : "text-slate-700"}`}
+                          className={`max-w-[220px] truncate text-[15px] ${
+                            dark ? "text-cyan-100/85" : "text-slate-700"
+                          }`}
                           title={u.position ?? ""}
                         >
                           {u.position ?? "—"}
@@ -808,14 +822,20 @@ export default function RegisteredUsersPage() {
 
                       <td className="px-5 py-4 align-middle">
                         <div
-                          className={`max-w-[300px] truncate text-[15px] ${dark ? "text-cyan-100/85" : "text-slate-700"}`}
+                          className={`max-w-[300px] truncate text-[15px] ${
+                            dark ? "text-cyan-100/85" : "text-slate-700"
+                          }`}
                           title={u.department ?? ""}
                         >
                           {u.department ?? "—"}
                         </div>
                       </td>
 
-                      <td className={`px-5 py-4 align-middle whitespace-nowrap text-[15px] ${dark ? "text-cyan-100/75" : "text-slate-500"}`}>
+                      <td
+                        className={`px-5 py-4 align-middle whitespace-nowrap text-[15px] ${
+                          dark ? "text-cyan-100/75" : "text-slate-500"
+                        }`}
+                      >
                         {fmtDate(u.createdAt)}
                       </td>
 
@@ -911,7 +931,11 @@ export default function RegisteredUsersPage() {
             <div className="p-6 max-h-[78vh] overflow-auto">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className={dark ? "text-xs font-semibold text-cyan-100/55" : "text-xs font-semibold text-slate-500"}>
+                  <label
+                    className={
+                      dark ? "text-xs font-semibold text-cyan-100/55" : "text-xs font-semibold text-slate-500"
+                    }
+                  >
                     Full Name
                   </label>
                   <input
@@ -923,7 +947,11 @@ export default function RegisteredUsersPage() {
                 </div>
 
                 <div>
-                  <label className={dark ? "text-xs font-semibold text-cyan-100/55" : "text-xs font-semibold text-slate-500"}>
+                  <label
+                    className={
+                      dark ? "text-xs font-semibold text-cyan-100/55" : "text-xs font-semibold text-slate-500"
+                    }
+                  >
                     Email
                   </label>
                   <input
@@ -935,7 +963,11 @@ export default function RegisteredUsersPage() {
                 </div>
 
                 <div>
-                  <label className={dark ? "text-xs font-semibold text-cyan-100/55" : "text-xs font-semibold text-slate-500"}>
+                  <label
+                    className={
+                      dark ? "text-xs font-semibold text-cyan-100/55" : "text-xs font-semibold text-slate-500"
+                    }
+                  >
                     Role
                   </label>
                   <select
@@ -957,7 +989,11 @@ export default function RegisteredUsersPage() {
                 </div>
 
                 <div>
-                  <label className={dark ? "text-xs font-semibold text-cyan-100/55" : "text-xs font-semibold text-slate-500"}>
+                  <label
+                    className={
+                      dark ? "text-xs font-semibold text-cyan-100/55" : "text-xs font-semibold text-slate-500"
+                    }
+                  >
                     Employment Type
                   </label>
                   <select
@@ -990,7 +1026,11 @@ export default function RegisteredUsersPage() {
                 </div>
 
                 <div>
-                  <label className={dark ? "text-xs font-semibold text-cyan-100/55" : "text-xs font-semibold text-slate-500"}>
+                  <label
+                    className={
+                      dark ? "text-xs font-semibold text-cyan-100/55" : "text-xs font-semibold text-slate-500"
+                    }
+                  >
                     Position
                   </label>
                   <input
@@ -1002,7 +1042,11 @@ export default function RegisteredUsersPage() {
                 </div>
 
                 <div>
-                  <label className={dark ? "text-xs font-semibold text-cyan-100/55" : "text-xs font-semibold text-slate-500"}>
+                  <label
+                    className={
+                      dark ? "text-xs font-semibold text-cyan-100/55" : "text-xs font-semibold text-slate-500"
+                    }
+                  >
                     Department
                   </label>
                   <input
@@ -1014,7 +1058,11 @@ export default function RegisteredUsersPage() {
                 </div>
 
                 <div>
-                  <label className={dark ? "text-xs font-semibold text-cyan-100/55" : "text-xs font-semibold text-slate-500"}>
+                  <label
+                    className={
+                      dark ? "text-xs font-semibold text-cyan-100/55" : "text-xs font-semibold text-slate-500"
+                    }
+                  >
                     Contact
                   </label>
                   <input
@@ -1026,7 +1074,11 @@ export default function RegisteredUsersPage() {
                 </div>
 
                 <div>
-                  <label className={dark ? "text-xs font-semibold text-cyan-100/55" : "text-xs font-semibold text-slate-500"}>
+                  <label
+                    className={
+                      dark ? "text-xs font-semibold text-cyan-100/55" : "text-xs font-semibold text-slate-500"
+                    }
+                  >
                     Birthdate
                   </label>
                   <input
@@ -1039,7 +1091,11 @@ export default function RegisteredUsersPage() {
                 </div>
 
                 <div>
-                  <label className={dark ? "text-xs font-semibold text-cyan-100/55" : "text-xs font-semibold text-slate-500"}>
+                  <label
+                    className={
+                      dark ? "text-xs font-semibold text-cyan-100/55" : "text-xs font-semibold text-slate-500"
+                    }
+                  >
                     User Code
                   </label>
                   <input
@@ -1054,7 +1110,11 @@ export default function RegisteredUsersPage() {
                 </div>
 
                 <div>
-                  <label className={dark ? "text-xs font-semibold text-cyan-100/55" : "text-xs font-semibold text-slate-500"}>
+                  <label
+                    className={
+                      dark ? "text-xs font-semibold text-cyan-100/55" : "text-xs font-semibold text-slate-500"
+                    }
+                  >
                     Created
                   </label>
                   <input
@@ -1076,8 +1136,8 @@ export default function RegisteredUsersPage() {
                     onClick={() => setDeleteTarget(selectedUser)}
                     className={
                       dark
-                        ? "h-11 px-5 rounded-2xl border border-rose-300/15 bg-rose-500/10 text-rose-200 hover:bg-rose-500/15 transition font-semibold"
-                        : "h-11 px-5 rounded-2xl border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 transition font-semibold"
+                        ? "h-11 px-5 rounded-2xl border border-cyan-300/12 bg-white/[0.05] text-white hover:bg-white/[0.08] transition font-semibold"
+                        : "h-11 px-5 rounded-2xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition font-semibold"
                     }
                   >
                     Delete User
@@ -1155,15 +1215,15 @@ export default function RegisteredUsersPage() {
 
       <ConfirmDialog
         open={deleteTarget !== null}
-        title="Delete User"
+        title="Delete User?"
         message={
           deleteTarget
-            ? `Are you sure you want to delete ${deleteTarget.name}? This cannot be undone.`
+            ? `Are you sure you want to delete ${deleteTarget.name}? This action cannot be undone.`
             : "Are you sure?"
         }
         confirmText="Delete"
         cancelText="Cancel"
-        danger
+        variant="danger"
         onCancel={() => setDeleteTarget(null)}
         onConfirm={confirmDelete}
       />
@@ -1172,9 +1232,30 @@ export default function RegisteredUsersPage() {
         open={successOpen}
         title="Success"
         message={successMsg}
+        confirmText="Continue"
+        oneButton
+        variant="success"
+        onConfirm={() => setSuccessOpen(false)}
+      />
+
+      <ConfirmDialog
+        open={errorOpen}
+        title="Action Failed"
+        message={errorMsg}
         confirmText="OK"
         oneButton
-        onConfirm={() => setSuccessOpen(false)}
+        variant="warning"
+        onConfirm={() => setErrorOpen(false)}
+      />
+
+      <ConfirmDialog
+        open={infoOpen}
+        title="Notice"
+        message={infoMsg}
+        confirmText="OK"
+        oneButton
+        variant="info"
+        onConfirm={() => setInfoOpen(false)}
       />
     </div>
   );
