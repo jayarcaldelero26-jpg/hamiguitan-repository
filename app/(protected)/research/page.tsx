@@ -1,9 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState, useEffect, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
 import { useAuth } from "@/app/components/AuthProvider";
+import {
+  useDocuments,
+  type DocumentRow,
+} from "@/app/components/DocumentsProvider";
 import {
   MagnifyingGlassIcon,
   FolderIcon,
@@ -13,20 +18,8 @@ import {
   ChevronRightIcon,
 } from "@heroicons/react/24/outline";
 
-type DocRow = {
-  id: number;
-  fileId: string;
-  name: string;
-  type: string;
-  category: string;
-  year: string;
-  uploadedAt: string;
-  title?: string | null;
-  dateReceived?: string | null;
-  folder?: string | null;
-};
-
 type PageTheme = "dark" | "light";
+type CategoryFilter = "All" | "Academe" | "Stakeholders" | "PAMO Activity";
 
 function fmtDate(iso?: string | null) {
   if (!iso) return "—";
@@ -64,7 +57,7 @@ function Badge({
   tone = "gray",
   dark,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
   tone?: "gray" | "green" | "blue" | "amber";
   dark: boolean;
 }) {
@@ -94,6 +87,22 @@ function Badge({
   );
 }
 
+function SkeletonLine({
+  className = "",
+  dark,
+}: {
+  className?: string;
+  dark: boolean;
+}) {
+  return (
+    <div
+      className={`animate-pulse rounded-full ${
+        dark ? "bg-white/10" : "bg-slate-200"
+      } ${className}`}
+    />
+  );
+}
+
 function GroupCard({
   title,
   subtitle,
@@ -112,11 +121,11 @@ function GroupCard({
   subtitle: string;
   headerTone: "green" | "blue" | "amber";
   folders: string[];
-  groupedItems: Record<string, DocRow[]>;
+  groupedItems: Record<string, DocumentRow[]>;
   loading: boolean;
   isOpen: (folder: string) => boolean;
   toggleFolder: (folder: string) => void;
-  docUrl: (d: DocRow) => string;
+  docUrl: (d: DocumentRow) => string;
   onAskDelete: (id: number) => void;
   canDeleteDocs: boolean;
   dark: boolean;
@@ -190,17 +199,44 @@ function GroupCard({
             <h2 className={`text-2xl font-extrabold ${titleCls}`}>{title}</h2>
             <p className={`text-sm mt-1 ${textMuted}`}>{subtitle}</p>
           </div>
-          <div
-            className={`px-2.5 py-1 rounded-full border text-[11px] font-semibold ${subBg} ${subBorder} ${textMain}`}
-          >
-            {folders.reduce((sum, folder) => sum + (groupedItems[folder]?.length || 0), 0)}
-          </div>
+
+          {loading ? (
+            <SkeletonLine dark={dark} className="h-8 w-10 rounded-full" />
+          ) : (
+            <div
+              className={`px-2.5 py-1 rounded-full border text-[11px] font-semibold ${subBg} ${subBorder} ${textMain}`}
+            >
+              {folders.reduce((sum, folder) => sum + (groupedItems[folder]?.length || 0), 0)}
+            </div>
+          )}
         </div>
       </div>
 
       <div className="p-4 space-y-3 min-h-[260px]">
         {loading ? (
-          <div className={`${textMuted} px-2 py-6`}>Loading…</div>
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className={`border rounded-2xl p-4 ${subBg} ${subBorder}`}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 flex-1">
+                    <div
+                      className={`h-10 w-10 rounded-2xl animate-pulse ${
+                        dark ? "bg-white/10" : "bg-slate-200"
+                      }`}
+                    />
+                    <div className="flex-1 space-y-2">
+                      <SkeletonLine dark={dark} className="h-4 w-40" />
+                      <SkeletonLine dark={dark} className="h-3 w-20" />
+                    </div>
+                  </div>
+                  <SkeletonLine dark={dark} className="h-5 w-5 rounded-md" />
+                </div>
+              </div>
+            ))}
+          </div>
         ) : folders.length === 0 ? (
           <div className={`${textMuted} px-2 py-6`}>No folders found.</div>
         ) : (
@@ -214,6 +250,7 @@ function GroupCard({
                 className={`border rounded-2xl overflow-hidden ${subBg} ${subBorder}`}
               >
                 <button
+                  type="button"
                   onClick={() => toggleFolder(folder)}
                   className={`w-full flex items-center justify-between px-4 py-3 transition ${
                     dark ? "hover:bg-white/[0.04]" : "hover:bg-white"
@@ -274,12 +311,9 @@ function GroupCard({
 
                             {canDeleteDocs && (
                               <button
+                                type="button"
                                 onClick={() => onAskDelete(d.id)}
-                                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition shadow-sm ${
-                                  dark
-                                    ? "bg-slate-800 text-white hover:bg-slate-700"
-                                    : "bg-slate-800 text-white hover:bg-slate-700"
-                                }`}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition shadow-sm bg-slate-800 text-white hover:bg-slate-700"
                               >
                                 <TrashIcon className="w-4 h-4" />
                                 <span className="hidden sm:inline">Delete</span>
@@ -316,15 +350,25 @@ function GroupCard({
   );
 }
 
+const fadeUp = {
+  initial: { opacity: 0, y: 10 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.18 },
+};
+
+const fadeUpDelayed = (delay = 0) => ({
+  initial: { opacity: 0, y: 10 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.18, delay },
+});
+
 export default function ResearchPage() {
   const router = useRouter();
   const { user: me, loading: loadingMe } = useAuth();
-
-  const [docs, setDocs] = useState<DocRow[]>([]);
-  const [loadingDocs, setLoadingDocs] = useState(true);
+  const { documents: docs = [], loading: loadingDocs, refreshDocuments } = useDocuments();
 
   const [q, setQ] = useState("");
-  const [cat, setCat] = useState<"All" | "Academe" | "Stakeholder" | "PAMO Activity">("All");
+  const [cat, setCat] = useState<CategoryFilter>("All");
   const [successOpen, setSuccessOpen] = useState(false);
   const [successMsg, setSuccessMsg] = useState("Done.");
   const [errorOpen, setErrorOpen] = useState(false);
@@ -347,33 +391,6 @@ export default function ResearchPage() {
     return () => window.removeEventListener("page-theme-changed", syncTheme);
   }, []);
 
-  useEffect(() => {
-    let mounted = true;
-
-    setLoadingDocs(true);
-
-    fetch("/api/documents", {
-      credentials: "include",
-      cache: "no-store",
-    })
-      .then((res) => (res.ok ? res.json() : []))
-      .then((data) => {
-        if (!mounted) return;
-        setDocs(Array.isArray(data) ? data : []);
-      })
-      .catch(() => {
-        if (!mounted) return;
-        setDocs([]);
-      })
-      .finally(() => {
-        if (mounted) setLoadingDocs(false);
-      });
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
   const filteredDocs = useMemo(() => {
     const query = q.trim().toLowerCase();
 
@@ -382,7 +399,7 @@ export default function ResearchPage() {
 
       if (cat !== "All") {
         if (cat === "Academe" && ncat !== "academe") return false;
-        if (cat === "Stakeholder" && ncat !== "stakeholder") return false;
+        if (cat === "Stakeholders" && ncat !== "stakeholder") return false;
         if (cat === "PAMO Activity" && ncat !== "pamo") return false;
       }
 
@@ -405,7 +422,7 @@ export default function ResearchPage() {
   }, [docs, q, cat]);
 
   const grouped = useMemo(() => {
-    const out: Record<string, Record<string, DocRow[]>> = {
+    const out: Record<string, Record<string, DocumentRow[]>> = {
       Academe: {},
       Stakeholders: {},
       "PAMO Activity": {},
@@ -413,17 +430,15 @@ export default function ResearchPage() {
 
     for (const d of filteredDocs) {
       const ncat = normalizeCat(d.category);
-      const isAcademe = ncat === "academe";
-      const isStake = ncat === "stakeholder";
-      const isPamo = ncat === "pamo";
 
-      const groupKey = isPamo
-        ? "PAMO Activity"
-        : isAcademe
-        ? "Academe"
-        : isStake
-        ? "Stakeholders"
-        : "Academe";
+      const groupKey =
+        ncat === "pamo"
+          ? "PAMO Activity"
+          : ncat === "academe"
+          ? "Academe"
+          : ncat === "stakeholder"
+          ? "Stakeholders"
+          : "Academe";
 
       const folderKey = cleanFolder(d.folder);
 
@@ -444,7 +459,7 @@ export default function ResearchPage() {
     return out;
   }, [filteredDocs]);
 
-  const docUrl = (d: DocRow) => `/api/documents/download?id=${d.fileId}`;
+  const docUrl = (d: DocumentRow) => `/api/documents/download?id=${d.fileId}`;
 
   const onDelete = async (id: number) => {
     try {
@@ -461,7 +476,7 @@ export default function ResearchPage() {
         return;
       }
 
-      setDocs((prev) => prev.filter((x) => x.id !== id));
+      await refreshDocuments();
       setSuccessMsg("Document deleted successfully.");
       setSuccessOpen(true);
     } catch {
@@ -509,10 +524,10 @@ export default function ResearchPage() {
         cancelText="Cancel"
         variant="danger"
         onCancel={() => setDeleteId(null)}
-        onConfirm={() => {
+        onConfirm={async () => {
           const id = deleteId!;
           setDeleteId(null);
-          onDelete(id);
+          await onDelete(id);
         }}
       />
 
@@ -537,7 +552,12 @@ export default function ResearchPage() {
       />
 
       <div className="max-w-[1600px] mx-auto">
-        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.16 }}
+          className="flex flex-col md:flex-row md:items-end md:justify-between gap-4"
+        >
           <div>
             <h1 className={`text-4xl md:text-5xl font-extrabold ${textMain}`}>
               Documents/Records
@@ -552,6 +572,7 @@ export default function ResearchPage() {
           <div className="flex items-center gap-2">
             {canUpload(me.role) && (
               <button
+                type="button"
                 onClick={() => router.push("/upload")}
                 className={`px-4 py-2.5 rounded-2xl transition font-extrabold ${
                   dark
@@ -563,9 +584,12 @@ export default function ResearchPage() {
               </button>
             )}
           </div>
-        </div>
+        </motion.div>
 
-        <div className={`${cardCls} mt-6 rounded-3xl p-5`}>
+        <motion.div
+          {...fadeUpDelayed(0.04)}
+          className={`${cardCls} mt-6 rounded-3xl p-5`}
+        >
           <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
             <div className="flex-1">
               <div className="relative">
@@ -586,7 +610,7 @@ export default function ResearchPage() {
             <div className="flex items-center gap-2">
               <select
                 value={cat}
-                onChange={(e) => setCat(e.target.value as any)}
+                onChange={(e) => setCat(e.target.value as CategoryFilter)}
                 className={`px-4 py-3 rounded-2xl border shadow-sm outline-none ${
                   dark
                     ? "border-cyan-300/15 bg-white/[0.04] text-white focus:ring-4 focus:ring-cyan-400/10"
@@ -599,7 +623,7 @@ export default function ResearchPage() {
                 <option className="text-slate-900" value="Academe">
                   Academe
                 </option>
-                <option className="text-slate-900" value="Stakeholder">
+                <option className="text-slate-900" value="Stakeholders">
                   Stakeholders
                 </option>
                 <option className="text-slate-900" value="PAMO Activity">
@@ -608,6 +632,7 @@ export default function ResearchPage() {
               </select>
 
               <button
+                type="button"
                 onClick={() => {
                   setQ("");
                   setCat("All");
@@ -623,57 +648,69 @@ export default function ResearchPage() {
             </div>
           </div>
 
-          <div className={`text-sm mt-3 ${textMuted}`}>
-            Showing <span className={`font-bold ${textMain}`}>{filteredDocs.length}</span> of{" "}
-            <span className={`font-bold ${textMain}`}>{docs.length}</span> documents
+          <div className="text-sm mt-3">
+            {loadingDocs ? (
+              <SkeletonLine dark={dark} className="h-5 w-44" />
+            ) : (
+              <span className={textMuted}>
+                Showing <span className={`font-bold ${textMain}`}>{filteredDocs.length}</span> of{" "}
+                <span className={`font-bold ${textMain}`}>{docs.length}</span> documents
+              </span>
+            )}
           </div>
-        </div>
+        </motion.div>
 
         <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-5">
-          <GroupCard
-            title="Academe"
-            subtitle="Research studies and academic documents."
-            headerTone="green"
-            folders={academeFolders}
-            groupedItems={grouped.Academe}
-            loading={loadingDocs}
-            isOpen={(folder) => isOpen("Academe", folder)}
-            toggleFolder={(folder) => toggleFolder("Academe", folder)}
-            docUrl={docUrl}
-            onAskDelete={(id) => setDeleteId(id)}
-            canDeleteDocs={canDelete(me.role)}
-            dark={dark}
-          />
+          <motion.div {...fadeUpDelayed(0.06)}>
+            <GroupCard
+              title="Academe"
+              subtitle="Research studies and academic documents."
+              headerTone="green"
+              folders={academeFolders}
+              groupedItems={grouped.Academe}
+              loading={loadingDocs}
+              isOpen={(folder) => isOpen("Academe", folder)}
+              toggleFolder={(folder) => toggleFolder("Academe", folder)}
+              docUrl={docUrl}
+              onAskDelete={(id) => setDeleteId(id)}
+              canDeleteDocs={canDelete(me.role)}
+              dark={dark}
+            />
+          </motion.div>
 
-          <GroupCard
-            title="Stakeholders"
-            subtitle="PAMB members, LGU, DENR reports, letters, assessments."
-            headerTone="blue"
-            folders={stakeFolders}
-            groupedItems={grouped.Stakeholders}
-            loading={loadingDocs}
-            isOpen={(folder) => isOpen("Stakeholders", folder)}
-            toggleFolder={(folder) => toggleFolder("Stakeholders", folder)}
-            docUrl={docUrl}
-            onAskDelete={(id) => setDeleteId(id)}
-            canDeleteDocs={canDelete(me.role)}
-            dark={dark}
-          />
+          <motion.div {...fadeUpDelayed(0.09)}>
+            <GroupCard
+              title="Stakeholders"
+              subtitle="PAMB members, LGU, DENR reports, letters, assessments."
+              headerTone="blue"
+              folders={stakeFolders}
+              groupedItems={grouped.Stakeholders}
+              loading={loadingDocs}
+              isOpen={(folder) => isOpen("Stakeholders", folder)}
+              toggleFolder={(folder) => toggleFolder("Stakeholders", folder)}
+              docUrl={docUrl}
+              onAskDelete={(id) => setDeleteId(id)}
+              canDeleteDocs={canDelete(me.role)}
+              dark={dark}
+            />
+          </motion.div>
 
-          <GroupCard
-            title="PAMO Activity"
-            subtitle="Internal activities, reports, photos, and monitoring files."
-            headerTone="amber"
-            folders={pamoFolders}
-            groupedItems={grouped["PAMO Activity"]}
-            loading={loadingDocs}
-            isOpen={(folder) => isOpen("PAMO Activity", folder)}
-            toggleFolder={(folder) => toggleFolder("PAMO Activity", folder)}
-            docUrl={docUrl}
-            onAskDelete={(id) => setDeleteId(id)}
-            canDeleteDocs={canDelete(me.role)}
-            dark={dark}
-          />
+          <motion.div {...fadeUpDelayed(0.12)}>
+            <GroupCard
+              title="PAMO Activity"
+              subtitle="Internal activities, reports, photos, and monitoring files."
+              headerTone="amber"
+              folders={pamoFolders}
+              groupedItems={grouped["PAMO Activity"]}
+              loading={loadingDocs}
+              isOpen={(folder) => isOpen("PAMO Activity", folder)}
+              toggleFolder={(folder) => toggleFolder("PAMO Activity", folder)}
+              docUrl={docUrl}
+              onAskDelete={(id) => setDeleteId(id)}
+              canDeleteDocs={canDelete(me.role)}
+              dark={dark}
+            />
+          </motion.div>
         </div>
 
         <div className={`mt-6 text-xs ${textMuted}`}>

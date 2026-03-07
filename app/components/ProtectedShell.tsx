@@ -1,10 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
-import { motion } from "framer-motion";
-import { useAuth } from "@/app/components/AuthProvider";
 import {
   HomeIcon,
   DocumentTextIcon,
@@ -15,6 +13,7 @@ import {
   Cog6ToothIcon,
   ShieldCheckIcon,
 } from "@heroicons/react/24/outline";
+import { useAuth } from "@/app/components/AuthProvider";
 
 type PageTheme = "dark" | "light";
 
@@ -25,22 +24,29 @@ function initials(name: string) {
   return (a + b).toUpperCase();
 }
 
+function normalizeRole(role?: string) {
+  return (role || "").trim().toLowerCase();
+}
+
 function canAccessSettings(role?: string) {
-  return role === "admin" || role === "co_admin";
+  const r = normalizeRole(role);
+  return r === "admin" || r === "co_admin";
 }
 
 function canViewRegisteredStaff(role?: string) {
-  return role === "admin";
+  return normalizeRole(role) === "admin";
 }
 
 function canUpload(role?: string) {
-  return role === "admin" || role === "co_admin";
+  const r = normalizeRole(role);
+  return r === "admin" || r === "co_admin";
 }
 
 function roleLabel(role?: string) {
-  if (!role) return "USER";
-  if (role === "co_admin") return "CO-ADMIN";
-  return role.toUpperCase();
+  const r = normalizeRole(role);
+  if (!r) return "USER";
+  if (r === "co_admin") return "CO-ADMIN";
+  return r.toUpperCase();
 }
 
 function darkButtonStyle() {
@@ -76,10 +82,8 @@ export default function ProtectedShell({
 
     if (saved === "dark" || saved === "light") {
       setPageTheme(saved);
-      if (typeof document !== "undefined") {
-        document.documentElement.dataset.pageTheme = saved;
-      }
-    } else if (typeof document !== "undefined") {
+      document.documentElement.dataset.pageTheme = saved;
+    } else {
       document.documentElement.dataset.pageTheme = "dark";
     }
   }, []);
@@ -93,9 +97,7 @@ export default function ProtectedShell({
 
       if (saved === "dark" || saved === "light") {
         setPageTheme(saved);
-        if (typeof document !== "undefined") {
-          document.documentElement.dataset.pageTheme = saved;
-        }
+        document.documentElement.dataset.pageTheme = saved;
       }
     };
 
@@ -109,11 +111,104 @@ export default function ProtectedShell({
     }
   }, [loading, user, router]);
 
-  const handleNavigate = (href: string) => {
-    if (pathname === href) return;
-    router.prefetch(href);
-    router.push(href);
-  };
+  useEffect(() => {
+    router.prefetch("/dashboard");
+    router.prefetch("/research");
+    router.prefetch("/upload");
+    router.prefetch("/settings");
+    router.prefetch("/admin/users");
+  }, [router]);
+
+  const handleNavigate = useCallback(
+    (href: string) => {
+      if (pathname === href) return;
+      router.push(href);
+    },
+    [pathname, router]
+  );
+
+  const pageBg =
+    pageTheme === "dark"
+      ? "bg-[radial-gradient(circle_at_top_left,#0b2c3a_0%,#07131f_28%,#04101a_58%,#020817_100%)]"
+      : "bg-[linear-gradient(180deg,#eef6f7_0%,#f7fbfc_48%,#edf5f6_100%)]";
+
+  const navBtn = useCallback(
+    (href: string, label: string, icon: React.ReactNode) => {
+      const active = pathname === href;
+
+      return (
+        <button
+          key={href}
+          type="button"
+          onClick={() => handleNavigate(href)}
+          className={`group relative w-full flex items-center gap-3 px-3 py-3 rounded-2xl transition-all duration-200 border ${
+            collapsed ? "justify-center" : ""
+          } ${
+            active
+              ? "bg-cyan-400/12 text-white border-cyan-300/25"
+              : "text-white border-transparent hover:bg-cyan-400/8 hover:border-cyan-300/15"
+          }`}
+        >
+          {active && (
+            <span className="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-cyan-300" />
+          )}
+
+          <span className="shrink-0 text-white">{icon}</span>
+
+          {!collapsed && (
+            <span className="font-semibold text-[14px] tracking-[0.01em] text-white">
+              {label}
+            </span>
+          )}
+        </button>
+      );
+    },
+    [collapsed, handleNavigate, pathname]
+  );
+
+  const navItems = useMemo(() => {
+    if (!user) return [];
+
+    const items: Array<{
+      href: string;
+      label: string;
+      icon: React.ReactNode;
+      show: boolean;
+    }> = [
+      {
+        href: "/dashboard",
+        label: "Dashboard",
+        icon: <HomeIcon className="w-5 h-5" />,
+        show: true,
+      },
+      {
+        href: "/research",
+        label: "Documents",
+        icon: <DocumentTextIcon className="w-5 h-5" />,
+        show: true,
+      },
+      {
+        href: "/upload",
+        label: "Upload",
+        icon: <ArrowUpTrayIcon className="w-5 h-5" />,
+        show: canUpload(user.role),
+      },
+      {
+        href: "/admin/users",
+        label: "Registered Staff",
+        icon: <UserGroupIcon className="w-5 h-5" />,
+        show: canViewRegisteredStaff(user.role),
+      },
+      {
+        href: "/settings",
+        label: "Settings",
+        icon: <Cog6ToothIcon className="w-5 h-5" />,
+        show: canAccessSettings(user.role),
+      },
+    ];
+
+    return items.filter((item) => item.show);
+  }, [user]);
 
   if (loading) {
     return (
@@ -130,59 +225,21 @@ export default function ProtectedShell({
     );
   }
 
-  if (!user) {
-    return null;
-  }
-
-  const navBtn = (href: string, label: string, icon: React.ReactNode) => {
-    const active = pathname === href;
-
-    return (
-      <button
-        type="button"
-        onClick={() => handleNavigate(href)}
-        className={`group relative w-full flex items-center gap-3 px-3 py-3 rounded-2xl transition-all duration-200 border ${
-          collapsed ? "justify-center" : ""
-        } ${
-          active
-            ? "bg-cyan-400/12 text-white border-cyan-300/25"
-            : "text-white border-transparent hover:bg-cyan-400/8 hover:border-cyan-300/15"
-        }`}
-      >
-        {active && (
-          <span className="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-cyan-300" />
-        )}
-
-        <span className="shrink-0 text-white">{icon}</span>
-
-        {!collapsed && (
-          <span className="font-semibold text-[14px] tracking-[0.01em] text-white">
-            {label}
-          </span>
-        )}
-      </button>
-    );
-  };
-
-  const pageBg =
-    pageTheme === "dark"
-      ? "bg-[radial-gradient(circle_at_top_left,#0b2c3a_0%,#07131f_28%,#04101a_58%,#020817_100%)]"
-      : "bg-[linear-gradient(180deg,#eef6f7_0%,#f7fbfc_48%,#edf5f6_100%)]";
+  if (!user) return null;
 
   return (
     <>
       <div className="h-screen overflow-hidden bg-[#020817]">
         <div className="flex h-full">
-          <motion.aside
-            animate={{ width: collapsed ? 88 : 290 }}
-            transition={{ type: "tween", duration: 0.18, ease: "easeOut" }}
-            className="h-full shrink-0 overflow-hidden border-r p-5 flex flex-col bg-[linear-gradient(180deg,#03121d_0%,#071c2a_55%,#061724_100%)] border-cyan-400/15"
-            style={{ willChange: "width" }}
+          <aside
+            className={`h-full shrink-0 overflow-hidden border-r p-5 flex flex-col bg-[linear-gradient(180deg,#03121d_0%,#071c2a_55%,#061724_100%)] border-cyan-400/15 transition-all duration-200 ease-out ${
+              collapsed ? "w-[88px]" : "w-[290px]"
+            }`}
           >
             <div className="flex items-center justify-between">
               <button
                 type="button"
-                onClick={() => setCollapsed(!collapsed)}
+                onClick={() => setCollapsed((v) => !v)}
                 className="p-2.5 rounded-xl hover:bg-cyan-400/10 transition border border-transparent hover:border-cyan-300/15"
                 title="Toggle sidebar"
               >
@@ -230,30 +287,18 @@ export default function ProtectedShell({
             <div className="mt-7 mb-3 h-px bg-gradient-to-r from-transparent via-cyan-300/15 to-transparent" />
 
             <nav className="space-y-2">
-              {navBtn("/dashboard", "Dashboard", <HomeIcon className="w-5 h-5" />)}
-              {navBtn("/research", "Documents", <DocumentTextIcon className="w-5 h-5" />)}
-
-              {canUpload(user?.role) &&
-                navBtn("/upload", "Upload", <ArrowUpTrayIcon className="w-5 h-5" />)}
-
-              {canViewRegisteredStaff(user?.role) &&
-                navBtn("/admin/users", "Registered Staff", <UserGroupIcon className="w-5 h-5" />)}
-
-              {canAccessSettings(user?.role) &&
-                navBtn("/settings", "Settings", <Cog6ToothIcon className="w-5 h-5" />)}
+              {navItems.map((item) => navBtn(item.href, item.label, item.icon))}
             </nav>
 
             <div className="mt-auto pt-5">
-              <div
-                className={`rounded-2xl border p-3.5 ${
-                  collapsed ? "hidden" : ""
-                } bg-cyan-400/6 border-cyan-300/12`}
-              >
-                <div className="text-[11px] text-white/60">Signed in as</div>
-                <div className="font-semibold text-white truncate text-sm mt-1">
-                  {user.email}
+              {!collapsed && (
+                <div className="rounded-2xl border p-3.5 bg-cyan-400/6 border-cyan-300/12">
+                  <div className="text-[11px] text-white/60">Signed in as</div>
+                  <div className="font-semibold text-white truncate text-sm mt-1">
+                    {user.email}
+                  </div>
                 </div>
-              </div>
+              )}
 
               <button
                 type="button"
@@ -266,7 +311,7 @@ export default function ProtectedShell({
                 {!collapsed && <span className="font-semibold text-sm">Logout</span>}
               </button>
             </div>
-          </motion.aside>
+          </aside>
 
           <main
             className={`flex-1 h-full overflow-y-auto transition-colors duration-300 ${pageBg}`}

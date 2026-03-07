@@ -15,13 +15,23 @@ function requiredString(v: FormDataEntryValue | null) {
 
 function normalizeCategory(v: string) {
   const s = (v || "").trim().toLowerCase();
+
   if (s === "stakeholder" || s === "stakeholders") return "Stakeholders";
   if (s === "academe") return "Academe";
+  if (s === "pamo activity" || s === "pamo" || s === "activity" || s === "activities") {
+    return "PAMO Activity";
+  }
+
   return "Academe";
+}
+
+function normalizeRole(role?: string) {
+  return (role || "").trim().toLowerCase();
 }
 
 async function findOrCreateFolder(drive: any, name: string, parentId?: string) {
   const safeName = name.replace(/'/g, "\\'");
+
   const q = [
     `mimeType='application/vnd.google-apps.folder'`,
     `name='${safeName}'`,
@@ -57,31 +67,35 @@ function drivePreviewUrl(fileId: string) {
   return `https://drive.google.com/file/d/${fileId}/view?usp=drivesdk`;
 }
 
+function getTokenPayload(req: NextRequest) {
+  const token = req.cookies.get("auth_token")?.value;
+  if (!token) return null;
+
+  try {
+    return jwt.verify(token, SECRET) as any;
+  } catch {
+    return null;
+  }
+}
+
 /** GET documents */
 export async function GET(req: NextRequest) {
-  const token = req.cookies.get("auth_token")?.value;
-  if (!token) {
+  const payload = getTokenPayload(req);
+
+  if (!payload) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
-    jwt.verify(token, SECRET);
+    console.log("DOCUMENTS GET START");
 
     const { data: rows, error } = await supabaseAdmin
       .from("documents")
-      .select(`
-        id,
-        fileId,
-        name,
-        type,
-        category,
-        folder,
-        title,
-        dateReceived,
-        year,
-        uploadedAt
-      `)
-      .order("uploadedAt", { ascending: false });
+      .select(
+        "id,fileId,name,type,category,folder,title,dateReceived,year,uploadedAt"
+      )
+      .order("uploadedAt", { ascending: false })
+      .limit(500);
 
     if (error) {
       console.error("DOCUMENTS GET ERROR:", error);
@@ -94,23 +108,27 @@ export async function GET(req: NextRequest) {
       downloadUrl: d.fileId ? `/api/documents/download?id=${d.fileId}` : "",
     }));
 
+    console.log("DOCUMENTS GET DONE:", documents.length);
+
     return NextResponse.json(documents);
-  } catch {
-    return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+  } catch (e: any) {
+    console.error("DOCUMENTS GET FATAL:", e);
+    return NextResponse.json({ error: "Failed to load documents" }, { status: 500 });
   }
 }
 
-/** POST upload (admin only) */
+/** POST upload (admin + co_admin) */
 export async function POST(req: NextRequest) {
-  const token = req.cookies.get("auth_token")?.value;
-  if (!token) {
+  const payload = getTokenPayload(req);
+
+  if (!payload) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
-    const payload = jwt.verify(token, SECRET) as any;
+    const role = normalizeRole(payload?.role);
 
-    if ((payload?.role || "").toLowerCase() !== "admin") {
+    if (role !== "admin" && role !== "co_admin") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -127,11 +145,22 @@ export async function POST(req: NextRequest) {
     const folder = requiredString(formData.get("folder"));
     const title = requiredString(formData.get("title"));
     const dateReceived = requiredString(formData.get("dateReceived"));
-    const year = requiredString(formData.get("year"));
-    const type = requiredString(formData.get("type")) || "Document";
+    const year = requiredString(formData.get("year")) || new Date().getFullYear().toString();
 
     const originalName = (file as File).name || "upload";
     const finalName = originalName;
+    const mimeType = (file as File).type || "application/octet-stream";
+
+    console.log("DOCUMENT POST START:", {
+      role,
+      category,
+      folder,
+      title,
+      dateReceived,
+      year,
+      fileName: finalName,
+      mimeType,
+    });
 
     const drive = getDriveClient();
 
@@ -154,13 +183,17 @@ export async function POST(req: NextRequest) {
         parents: [targetParent],
       },
       media: {
-        mimeType: (file as File).type || "application/octet-stream",
+        mimeType,
         body: streamBody,
       },
       fields: "id,name",
     });
 
-    const fileId = uploaded.data.id!;
+    const fileId = uploaded.data.id;
+    if (!fileId) {
+      return NextResponse.json({ error: "Google Drive upload failed." }, { status: 500 });
+    }
+
     const uploadedAt = new Date().toISOString();
 
     const { data: insertedRow, error: insertError } = await supabaseAdmin
@@ -169,12 +202,12 @@ export async function POST(req: NextRequest) {
         {
           fileId,
           name: finalName,
-          type,
+          type: mimeType,
           category,
           folder: folder || "",
           title: title || "",
           dateReceived: dateReceived || "",
-          year: year || "",
+          year,
           uploadedAt,
         },
       ])
@@ -189,11 +222,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    console.log("DOCUMENT POST DONE:", {
+      id: insertedRow?.id,
+      fileId,
+      name: finalName,
+    });
+
     return NextResponse.json({
       ok: true,
       id: insertedRow?.id,
       fileId,
       name: finalName,
+      type: mimeType,
       category,
       folder: folder || "",
     });

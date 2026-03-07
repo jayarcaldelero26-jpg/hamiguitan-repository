@@ -46,6 +46,26 @@ function classNames(...xs: Array<string | false | null | undefined>) {
   return xs.filter(Boolean).join(" ");
 }
 
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function Skeleton({
+  className,
+  dark,
+}: {
+  className: string;
+  dark: boolean;
+}) {
+  return (
+    <div
+      className={`animate-pulse rounded-2xl ${
+        dark ? "bg-white/10" : "bg-slate-200"
+      } ${className}`}
+    />
+  );
+}
+
 export default function UploadPage() {
   const router = useRouter();
   const { user: me, loading: loadingMe } = useAuth();
@@ -61,12 +81,18 @@ export default function UploadPage() {
     stakeholders: [],
     pamo: [],
   });
+  const [loadingFolders, setLoadingFolders] = useState(true);
+
   const [selectedFolder, setSelectedFolder] = useState("");
   const [newFolder, setNewFolder] = useState("");
 
   const [file, setFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
+
   const [uploading, setUploading] = useState(false);
+  const [uploadStage, setUploadStage] = useState("");
+  const [uploadDetail, setUploadDetail] = useState("");
+  const [uploadPercent, setUploadPercent] = useState(0);
 
   const [successOpen, setSuccessOpen] = useState(false);
   const [errorOpen, setErrorOpen] = useState(false);
@@ -103,26 +129,50 @@ export default function UploadPage() {
   }, [loadingMe, me, router]);
 
   useEffect(() => {
-    let mounted = true;
+    if (loadingMe) return;
+    if (!me) return;
+    if (me.role !== "admin" && me.role !== "co_admin") return;
 
-    fetch("/api/folders", { credentials: "include", cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (!mounted || !data) return;
-        setFolders({
-          academe: safeArray(data.academe),
-          stakeholders: safeArray(data.stakeholders ?? data.stakeholder ?? data.stakeholders),
-          pamo: safeArray(data.pamo),
+    const controller = new AbortController();
+
+    async function loadFolders() {
+      try {
+        setLoadingFolders(true);
+
+        const r = await fetch("/api/folders", {
+          credentials: "include",
+          cache: "no-store",
+          signal: controller.signal,
         });
-      })
-      .catch(() => {
-        if (!mounted) return;
-      });
 
-    return () => {
-      mounted = false;
-    };
-  }, []);
+        const data = r.ok ? await r.json() : null;
+
+        if (controller.signal.aborted) return;
+
+        setFolders({
+          academe: safeArray(data?.academe),
+          stakeholders: safeArray(data?.stakeholders ?? data?.stakeholder),
+          pamo: safeArray(data?.pamo),
+        });
+      } catch (err: any) {
+        if (err?.name === "AbortError") return;
+
+        setFolders({
+          academe: [],
+          stakeholders: [],
+          pamo: [],
+        });
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoadingFolders(false);
+        }
+      }
+    }
+
+    loadFolders();
+
+    return () => controller.abort();
+  }, [loadingMe, me]);
 
   useEffect(() => {
     setSelectedFolder("");
@@ -222,8 +272,77 @@ export default function UploadPage() {
     fd.append("year", year || new Date().getFullYear().toString());
 
     setUploading(true);
+    setUploadPercent(6);
+    setUploadStage("Validating upload request");
+    setUploadDetail("Checking required fields and preparing document information.");
+
+    let stageTimer: ReturnType<typeof setInterval> | null = null;
 
     try {
+      await wait(200);
+
+      setUploadPercent(12);
+      setUploadStage("Reading selected file");
+      setUploadDetail("Preparing the selected file before upload.");
+
+      await wait(250);
+
+      const rotatingStages = [
+        {
+          percent: 24,
+          title: "Connecting to Google Drive",
+          detail: "Establishing secure cloud connection.",
+        },
+        {
+          percent: 36,
+          title: "Creating main repository folder",
+          detail: "Ensuring the Hamiguitan Repository folder exists in Google Drive.",
+        },
+        {
+          percent: 48,
+          title: "Creating category folder",
+          detail: `Checking the ${category} folder in Google Drive.`,
+        },
+        {
+          percent: 60,
+          title: "Creating document subfolder",
+          detail: finalFolder
+            ? `Ensuring the folder "${finalFolder}" exists before file upload.`
+            : "Preparing the destination folder for this document.",
+        },
+        {
+          percent: 74,
+          title: "Submitting document to Google Drive",
+          detail: "Uploading the selected file to cloud storage.",
+        },
+        {
+          percent: 86,
+          title: "Setting file access permission",
+          detail: "Applying file access permission after upload.",
+        },
+        {
+          percent: 94,
+          title: "Saving document record",
+          detail: "Saving file details to the repository database.",
+        },
+      ];
+
+      let idx = 0;
+      const applyStage = () => {
+        const s = rotatingStages[Math.min(idx, rotatingStages.length - 1)];
+        setUploadPercent(s.percent);
+        setUploadStage(s.title);
+        setUploadDetail(s.detail);
+        idx += 1;
+      };
+
+      applyStage();
+      stageTimer = setInterval(() => {
+        if (idx < rotatingStages.length) {
+          applyStage();
+        }
+      }, 800);
+
       const res = await fetch("/api/upload", {
         method: "POST",
         body: fd,
@@ -232,17 +351,46 @@ export default function UploadPage() {
 
       const data = await res.json().catch(() => null);
 
+      if (stageTimer) {
+        clearInterval(stageTimer);
+        stageTimer = null;
+      }
+
       if (!res.ok) {
+        setUploadPercent(0);
+        setUploadStage("Upload failed");
+        setUploadDetail(data?.error || "Please try again.");
         setErrorMsg(data?.error || "Please try again.");
         setErrorOpen(true);
         return;
       }
 
+      setUploadPercent(97);
+      setUploadStage("Finalizing upload");
+      setUploadDetail("Completing upload and preparing success response.");
+
+      await wait(250);
+
+      setUploadPercent(100);
+      setUploadStage("Upload complete");
+      setUploadDetail("Your document has been uploaded successfully.");
+
+      await wait(300);
+
       setSuccessOpen(true);
     } catch {
+      if (stageTimer) {
+        clearInterval(stageTimer);
+        stageTimer = null;
+      }
+
+      setUploadPercent(0);
+      setUploadStage("Upload failed");
+      setUploadDetail("Server unreachable. Try again.");
       setErrorMsg("Server unreachable. Try again.");
       setErrorOpen(true);
     } finally {
+      if (stageTimer) clearInterval(stageTimer);
       setUploading(false);
     }
   }
@@ -257,21 +405,111 @@ export default function UploadPage() {
     ? "bg-white/[0.04] border border-cyan-300/12 rounded-3xl shadow-[0_8px_30px_rgba(0,0,0,0.18)] backdrop-blur-md overflow-hidden"
     : "bg-white/85 border border-slate-200 rounded-3xl shadow-[0_10px_28px_rgba(15,23,42,0.08)] overflow-hidden";
 
-  if (loadingMe || !me) {
+  if (loadingMe) {
     return (
-      <div className="min-h-full grid place-items-center p-6">
-        <div
-          className={`rounded-2xl p-6 w-[360px] ${
-            dark
-              ? "bg-white/[0.05] border border-cyan-300/10 shadow-[0_0_25px_rgba(34,211,238,0.08)] text-cyan-100/80"
-              : "bg-white border border-slate-200 shadow-sm text-slate-600"
-          }`}
-        >
-          Loading…
+      <div className={`p-6 md:p-10 min-h-full ${dark ? "text-slate-100" : "text-slate-900"}`}>
+        <div className="max-w-[1250px] mx-auto">
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div
+                className={`h-14 w-14 rounded-3xl grid place-items-center ${
+                  dark
+                    ? "bg-cyan-400/12 border border-cyan-300/20 text-cyan-100"
+                    : "bg-cyan-50 border border-cyan-200 text-cyan-700"
+                }`}
+              >
+                <ArrowUpTrayIcon className="w-7 h-7" />
+              </div>
+
+              <div>
+                <Skeleton className="h-12 w-72" dark={dark} />
+                <Skeleton className="h-4 w-96 mt-3 rounded-full" dark={dark} />
+              </div>
+            </div>
+
+            <div
+              className={`hidden md:flex items-center gap-3 rounded-3xl px-4 py-3 ${
+                dark
+                  ? "bg-white/[0.05] border border-cyan-300/12"
+                  : "bg-white border border-slate-200"
+              }`}
+            >
+              <Skeleton className="h-11 w-11 rounded-full" dark={dark} />
+              <div className="min-w-0">
+                <Skeleton className="h-4 w-28" dark={dark} />
+                <Skeleton className="h-3 w-40 mt-2 rounded-full" dark={dark} />
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mt-6">
+            <div className={`lg:col-span-3 ${sectionCard}`}>
+              <div
+                className={`p-5 border-b ${
+                  dark ? "border-cyan-300/12 bg-white/[0.03]" : "border-slate-200 bg-slate-50"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`h-11 w-11 rounded-2xl grid place-items-center ${
+                      dark
+                        ? "bg-cyan-400/10 border border-cyan-300/15 text-cyan-100"
+                        : "bg-cyan-50 border border-cyan-200 text-cyan-700"
+                    }`}
+                  >
+                    <DocumentArrowUpIcon className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <Skeleton className="h-5 w-40" dark={dark} />
+                    <Skeleton className="h-3 w-56 mt-2 rounded-full" dark={dark} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6 space-y-5">
+                <div className="grid md:grid-cols-2 gap-4">
+                  <Skeleton className="h-24 w-full" dark={dark} />
+                  <Skeleton className="h-24 w-full" dark={dark} />
+                </div>
+
+                <Skeleton className="h-20 w-full" dark={dark} />
+                <Skeleton className="h-28 w-full" dark={dark} />
+                <Skeleton className="h-48 w-full" dark={dark} />
+                <Skeleton className="h-14 w-full rounded-2xl" dark={dark} />
+                <Skeleton className="h-4 w-44 rounded-full" dark={dark} />
+              </div>
+            </div>
+
+            <div className={`lg:col-span-2 ${sectionCard}`}>
+              <div
+                className={`p-5 border-b ${
+                  dark ? "border-cyan-300/12 bg-white/[0.03]" : "border-slate-200 bg-slate-50"
+                }`}
+              >
+                <Skeleton className="h-5 w-36" dark={dark} />
+                <Skeleton className="h-3 w-52 mt-2 rounded-full" dark={dark} />
+              </div>
+
+              <div className="p-6 space-y-4">
+                <Skeleton className="h-20 w-full" dark={dark} />
+                <Skeleton className="h-20 w-full" dark={dark} />
+                <div className="grid grid-cols-2 gap-3">
+                  <Skeleton className="h-20 w-full" dark={dark} />
+                  <Skeleton className="h-20 w-full" dark={dark} />
+                </div>
+                <Skeleton className="h-20 w-full" dark={dark} />
+                <Skeleton className="h-24 w-full" dark={dark} />
+                <Skeleton className="h-28 w-full" dark={dark} />
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );
   }
+
+  if (!me) return null;
+  if (me.role !== "admin" && me.role !== "co_admin") return null;
 
   return (
     <div className={`p-6 md:p-10 min-h-full ${dark ? "text-slate-100" : "text-slate-900"}`}>
@@ -289,6 +527,14 @@ export default function UploadPage() {
         ]}
         onConfirm={() => {
           setSuccessOpen(false);
+          setTitle("");
+          setDateReceived("");
+          setSelectedFolder("");
+          setNewFolder("");
+          setFile(null);
+          setUploadStage("");
+          setUploadDetail("");
+          setUploadPercent(0);
           router.push("/dashboard");
         }}
       />
@@ -386,9 +632,9 @@ export default function UploadPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mt-6">
           <motion.div
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.18 }}
+            transition={{ duration: 0.16 }}
             className={`lg:col-span-3 ${sectionCard}`}
           >
             <div
@@ -517,9 +763,10 @@ export default function UploadPage() {
                     if (e.target.value) setNewFolder("");
                   }}
                   className={inputBase}
+                  disabled={loadingFolders}
                 >
                   <option className="text-slate-900" value="">
-                    Select existing folder (optional)
+                    {loadingFolders ? "Loading folders..." : "Select existing folder (optional)"}
                   </option>
                   {folderOptions.map((f) => (
                     <option className="text-slate-900" key={f} value={f}>
@@ -653,6 +900,7 @@ export default function UploadPage() {
 
               <div className="pt-1">
                 <button
+                  type="button"
                   onClick={handleUpload}
                   disabled={uploading || !requiredOk}
                   className={classNames(
@@ -663,8 +911,51 @@ export default function UploadPage() {
                   )}
                 >
                   <DocumentArrowUpIcon className="w-5 h-5" />
-                  {uploading ? "Uploading…" : "Upload Document"}
+                  {uploading ? uploadStage || "Uploading..." : "Upload Document"}
                 </button>
+
+                {uploading && (
+                  <div
+                    className={`mt-4 rounded-3xl p-4 ${
+                      dark
+                        ? "border border-cyan-300/15 bg-cyan-400/5"
+                        : "border border-cyan-200 bg-cyan-50"
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div
+                        className={`mt-1 h-4 w-4 rounded-full border-2 animate-spin ${
+                          dark
+                            ? "border-cyan-300 border-t-transparent"
+                            : "border-cyan-600 border-t-transparent"
+                        }`}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className={`text-sm font-extrabold ${dark ? "text-white" : "text-slate-900"}`}>
+                            {uploadStage || "Uploading document"}
+                          </p>
+                          <span className={`text-xs font-bold ${dark ? "text-cyan-100/75" : "text-slate-600"}`}>
+                            {uploadPercent}%
+                          </span>
+                        </div>
+
+                        <p className={`mt-1 text-[12px] leading-5 ${dark ? "text-cyan-100/70" : "text-slate-600"}`}>
+                          {uploadDetail || "Please wait while your document is being processed."}
+                        </p>
+
+                        <div className={`mt-3 h-2 w-full overflow-hidden rounded-full ${dark ? "bg-white/10" : "bg-cyan-100"}`}>
+                          <div
+                            className={`h-full rounded-full transition-all duration-500 ${
+                              dark ? "bg-cyan-300" : "bg-cyan-600"
+                            }`}
+                            style={{ width: `${uploadPercent}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className={`text-[12px] ${dark ? "text-cyan-100/60" : "text-slate-500"}`}>
@@ -674,9 +965,9 @@ export default function UploadPage() {
           </motion.div>
 
           <motion.div
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.18, delay: 0.03 }}
+            transition={{ duration: 0.16, delay: 0.02 }}
             className={`lg:col-span-2 ${sectionCard}`}
           >
             <div
@@ -818,6 +1109,18 @@ export default function UploadPage() {
                   }`}
                 >
                   Please complete required fields before uploading.
+                </div>
+              )}
+
+              {loadingFolders && (
+                <div
+                  className={`text-[12px] rounded-2xl p-3 ${
+                    dark
+                      ? "text-cyan-100/80 bg-cyan-400/10 border border-cyan-300/15"
+                      : "text-cyan-700 bg-cyan-50 border border-cyan-200"
+                  }`}
+                >
+                  Loading folder list...
                 </div>
               )}
             </div>
