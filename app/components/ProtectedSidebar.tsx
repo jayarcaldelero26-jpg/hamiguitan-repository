@@ -35,7 +35,7 @@ function normalizeRole(role?: string) {
 
 function canAccessSettings(role?: string) {
   const r = normalizeRole(role);
-  return r === "admin" || r === "co_admin";
+  return r === "admin" || r === "co_admin" || r === "staff";
 }
 
 function canViewRegisteredStaff(role?: string) {

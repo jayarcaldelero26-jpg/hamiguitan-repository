@@ -17,6 +17,8 @@ import {
   Squares2X2Icon,
   ClockIcon,
   DocumentTextIcon,
+  FolderIcon,
+  ChartBarIcon,
 } from "@heroicons/react/24/outline";
 
 type PageTheme = "dark" | "light";
@@ -48,7 +50,12 @@ function normalizeCat(cat?: string | null) {
   const c = (cat || "").toLowerCase().trim();
   if (c === "stakeholders" || c === "stakeholder") return "stakeholder";
   if (c === "academe") return "academe";
-  if (c === "pamo activity" || c === "pamo" || c === "activity" || c === "activities") {
+  if (
+    c === "pamo activity" ||
+    c === "pamo" ||
+    c === "activity" ||
+    c === "activities"
+  ) {
     return "pamo";
   }
   return c || "other";
@@ -117,8 +124,8 @@ function StatSkeleton({ dark }: { dark: boolean }) {
           : "bg-white/85 border border-slate-200 shadow-[0_10px_28px_rgba(15,23,42,0.08)]"
       }`}
     >
-      <SkeletonBlock dark={dark} className="h-3 w-28 rounded-full" />
-      <SkeletonBlock dark={dark} className="h-12 w-24 mt-4" />
+      <SkeletonBlock dark={dark} className="h-3 w-24 rounded-full" />
+      <SkeletonBlock dark={dark} className="h-11 w-24 mt-4" />
       <div className="mt-5 flex flex-wrap gap-2">
         <SkeletonBlock dark={dark} className="h-7 w-24 rounded-full" />
         <SkeletonBlock dark={dark} className="h-7 w-24 rounded-full" />
@@ -138,7 +145,7 @@ function RecentUploadsSkeleton({ dark }: { dark: boolean }) {
       }`}
     >
       <div className="flex items-center justify-between">
-        <SkeletonBlock dark={dark} className="h-6 w-36" />
+        <SkeletonBlock dark={dark} className="h-6 w-32" />
         <SkeletonBlock dark={dark} className="h-4 w-14 rounded-full" />
       </div>
 
@@ -147,7 +154,9 @@ function RecentUploadsSkeleton({ dark }: { dark: boolean }) {
           <div
             key={i}
             className={`rounded-2xl border px-4 py-4 ${
-              dark ? "bg-white/[0.05] border-cyan-300/10" : "bg-slate-50 border-slate-200"
+              dark
+                ? "bg-white/[0.05] border-cyan-300/10"
+                : "bg-slate-50 border-slate-200"
             }`}
           >
             <SkeletonBlock dark={dark} className="h-4 w-2/3" />
@@ -156,7 +165,10 @@ function RecentUploadsSkeleton({ dark }: { dark: boolean }) {
               <SkeletonBlock dark={dark} className="h-6 w-16 rounded-full" />
               <SkeletonBlock dark={dark} className="h-6 w-20 rounded-full" />
             </div>
-            <SkeletonBlock dark={dark} className="h-3 w-24 mt-3 rounded-full" />
+            <SkeletonBlock
+              dark={dark}
+              className="h-3 w-24 mt-3 rounded-full"
+            />
           </div>
         ))}
       </div>
@@ -167,15 +179,21 @@ function RecentUploadsSkeleton({ dark }: { dark: boolean }) {
 function TableRowsSkeleton({ dark }: { dark: boolean }) {
   return (
     <div className={dark ? "divide-y divide-cyan-300/8" : "divide-y divide-slate-200"}>
-      {[1, 2, 3, 4, 5].map((i) => (
+      {[1, 2, 3, 4].map((i) => (
         <div key={i} className="px-4 py-4 lg:px-5">
-          <div className="grid grid-cols-1 lg:grid-cols-[1.35fr_0.9fr_0.9fr_260px] gap-4 items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr_1fr_260px] gap-4 items-start">
             <div className="min-w-0">
               <div className="flex items-start gap-3">
-                <SkeletonBlock dark={dark} className="h-9 w-9 rounded-xl shrink-0" />
+                <SkeletonBlock
+                  dark={dark}
+                  className="h-10 w-10 rounded-xl shrink-0"
+                />
                 <div className="min-w-0 flex-1">
                   <SkeletonBlock dark={dark} className="h-4 w-2/3" />
-                  <SkeletonBlock dark={dark} className="h-3 w-1/2 mt-2 rounded-full" />
+                  <SkeletonBlock
+                    dark={dark}
+                    className="h-3 w-1/2 mt-2 rounded-full"
+                  />
                 </div>
               </div>
             </div>
@@ -185,7 +203,6 @@ function TableRowsSkeleton({ dark }: { dark: boolean }) {
                 <SkeletonBlock dark={dark} className="h-6 w-20 rounded-full" />
                 <SkeletonBlock dark={dark} className="h-6 w-24 rounded-full" />
                 <SkeletonBlock dark={dark} className="h-6 w-14 rounded-full" />
-                <SkeletonBlock dark={dark} className="h-6 w-16 rounded-full" />
               </div>
             </div>
 
@@ -206,11 +223,42 @@ function TableRowsSkeleton({ dark }: { dark: boolean }) {
   );
 }
 
-const fadeUp = {
-  initial: { opacity: 0, y: 10 },
-  animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.18 },
-};
+function Pill({
+  children,
+  dark,
+  tone = "cyan",
+}: {
+  children: React.ReactNode;
+  dark: boolean;
+  tone?: "cyan" | "emerald" | "indigo" | "amber" | "slate";
+}) {
+  const cls =
+    tone === "emerald"
+      ? dark
+        ? "bg-emerald-400/10 text-emerald-200 border-emerald-300/20"
+        : "bg-emerald-50 text-emerald-700 border-emerald-200"
+      : tone === "indigo"
+      ? dark
+        ? "bg-indigo-400/10 text-indigo-200 border-indigo-300/20"
+        : "bg-indigo-50 text-indigo-700 border-indigo-200"
+      : tone === "amber"
+      ? dark
+        ? "bg-amber-400/10 text-amber-200 border-amber-300/20"
+        : "bg-amber-50 text-amber-700 border-amber-200"
+      : tone === "slate"
+      ? dark
+        ? "bg-white/[0.05] text-cyan-100 border-cyan-300/12"
+        : "bg-white text-slate-700 border-slate-200"
+      : dark
+      ? "bg-cyan-400/8 text-cyan-100 border-cyan-300/20"
+      : "bg-cyan-50 text-cyan-700 border-cyan-200";
+
+  return (
+    <span className={`px-2.5 py-1 rounded-full text-[10px] font-semibold border ${cls}`}>
+      {children}
+    </span>
+  );
+}
 
 const fadeUpDelayed = (delay = 0) => ({
   initial: { opacity: 0, y: 10 },
@@ -220,13 +268,17 @@ const fadeUpDelayed = (delay = 0) => ({
 
 export default function Dashboard() {
   const { user, loading: loadingUser } = useAuth();
-  const { documents: docs = [], loading: loadingDocs, refreshDocuments } = useDocuments();
+  const {
+    documents: docs = [],
+    loading: loadingDocs,
+    refreshDocuments,
+  } = useDocuments();
 
   const [pageTheme, setPageTheme] = useState<PageTheme>("dark");
   const [query, setQuery] = useState("");
-  const [activeTab, setActiveTab] = useState<"all" | "academe" | "stakeholder" | "pamo">(
-    "all"
-  );
+  const [activeTab, setActiveTab] = useState<
+    "all" | "academe" | "stakeholder" | "pamo"
+  >("all");
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [successOpen, setSuccessOpen] = useState(false);
@@ -256,8 +308,8 @@ export default function Dashboard() {
     let pamo = 0;
 
     for (const d of docs) {
-      const t = d.type || "Unknown";
-      byType[t] = (byType[t] || 0) + 1;
+      const label = typeLabel(d.type);
+      byType[label] = (byType[label] || 0) + 1;
 
       const c = normalizeCat(d.category);
       if (c === "academe") academe++;
@@ -265,8 +317,11 @@ export default function Dashboard() {
       else if (c === "pamo") pamo++;
     }
 
-    const topType = Object.entries(byType).sort((a, b) => b[1] - a[1])[0]?.[0] || "—";
-    return { total, topType, academe, stake, pamo };
+    const topEntry = Object.entries(byType).sort((a, b) => b[1] - a[1])[0];
+    const topType = topEntry?.[0] || "—";
+    const topTypeCount = topEntry?.[1] || 0;
+
+    return { total, topType, topTypeCount, academe, stake, pamo };
   }, [docs]);
 
   const filteredDocs = useMemo(() => {
@@ -329,7 +384,7 @@ export default function Dashboard() {
   };
 
   const btnSm =
-    "px-2.5 py-1.5 rounded-xl text-[11px] font-semibold transition inline-flex items-center gap-1.5 shrink-0 whitespace-nowrap";
+    "px-2.5 py-1.5 rounded-xl text-[11px] font-medium transition inline-flex items-center gap-1.5 shrink-0 whitespace-nowrap";
 
   const dark = pageTheme === "dark";
 
@@ -339,6 +394,7 @@ export default function Dashboard() {
 
   const textMain = dark ? "text-white" : "text-slate-900";
   const textMuted = dark ? "text-cyan-100/65" : "text-slate-600";
+  const textSoft = dark ? "text-cyan-100/45" : "text-slate-500";
   const subBg = dark ? "bg-white/[0.05]" : "bg-slate-50";
   const subBorder = dark ? "border-cyan-300/10" : "border-slate-200";
   const inputCls = dark
@@ -355,7 +411,11 @@ export default function Dashboard() {
                 dark ? "bg-cyan-300/20" : "bg-slate-200"
               }`}
             />
-            <div className={`h-4 rounded mb-2 ${dark ? "bg-cyan-300/10" : "bg-slate-200"}`} />
+            <div
+              className={`h-4 rounded mb-2 ${
+                dark ? "bg-cyan-300/10" : "bg-slate-200"
+              }`}
+            />
             <div
               className={`h-4 rounded w-2/3 mx-auto ${
                 dark ? "bg-cyan-300/10" : "bg-slate-200"
@@ -377,16 +437,23 @@ export default function Dashboard() {
         className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between mb-6"
       >
         <div>
-          <h1 className={`text-4xl md:text-5xl font-extrabold tracking-tight ${textMain}`}>
+          <div className={`text-[11px] uppercase tracking-[0.18em] font-semibold ${textSoft}`}>
+            Repository Overview
+          </div>
+          <h1 className={`text-3xl md:text-4xl font-bold tracking-tight mt-2 ${textMain}`}>
             Dashboard
           </h1>
-          <p className={`${textMuted} mt-2 text-sm md:text-base`}>
-            Welcome, <span className={`font-semibold ${textMain}`}>{user.name}</span>{" "}
-            <span className={dark ? "text-cyan-200/90" : "text-slate-500"}>({user.role})</span>
+          <p className={`${textMuted} mt-2 text-sm`}>
+            Welcome, <span className={`font-medium ${textMain}`}>{user.name}</span>{" "}
+            <span className={dark ? "text-cyan-200/90" : "text-slate-500"}>
+              ({user.role})
+            </span>
           </p>
         </div>
 
-        <div className={`flex items-center gap-3 rounded-3xl border px-4 py-3 ${subBg} ${subBorder}`}>
+        <div
+          className={`flex items-center gap-3 rounded-3xl border px-4 py-3 ${subBg} ${subBorder}`}
+        >
           <div
             className={`h-11 w-11 rounded-full grid place-items-center font-bold ${
               dark
@@ -397,8 +464,10 @@ export default function Dashboard() {
             {initials(user.name)}
           </div>
           <div className="hidden sm:block">
-            <div className={`text-sm font-semibold ${textMain}`}>{user.name}</div>
-            <div className={`text-[11px] font-semibold ${textMuted}`}>{user.role.toUpperCase()}</div>
+            <div className={`text-sm font-medium ${textMain}`}>{user.name}</div>
+            <div className={`text-[11px] font-semibold ${textMuted}`}>
+              {user.role.toUpperCase()}
+            </div>
           </div>
         </div>
       </motion.div>
@@ -431,7 +500,7 @@ export default function Dashboard() {
               <button
                 type="button"
                 disabled
-                className={`px-5 py-3 rounded-2xl border font-semibold text-sm opacity-70 ${
+                className={`px-5 py-3 rounded-2xl border font-medium text-sm opacity-70 ${
                   dark
                     ? "border-cyan-300/15 bg-white/[0.05] text-white"
                     : "border-slate-300 bg-white text-slate-900"
@@ -454,34 +523,36 @@ export default function Dashboard() {
           <div className={`${cardCls} p-6`}>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <Squares2X2Icon className={`w-6 h-6 ${dark ? "text-cyan-200" : "text-cyan-600"}`} />
+                <Squares2X2Icon
+                  className={`w-6 h-6 ${dark ? "text-cyan-200" : "text-cyan-600"}`}
+                />
                 <SkeletonBlock dark={dark} className="h-7 w-32" />
               </div>
               <SkeletonBlock dark={dark} className="h-4 w-16 rounded-full" />
             </div>
 
             <div
-              className={`mt-2 max-h-[62vh] overflow-y-auto rounded-2xl border ${
+              className={`mt-2 rounded-2xl border overflow-hidden ${
                 dark ? "border-cyan-300/10 bg-[#07131f]/70" : "border-slate-200 bg-white"
               }`}
             >
               <div
-                className={`hidden lg:grid sticky top-0 z-30 backdrop-blur border-b grid-cols-[1.35fr_0.9fr_0.9fr_260px] gap-4 px-5 py-3 text-[11px] font-bold uppercase tracking-[0.06em] ${
+                className={`hidden lg:grid border-b grid-cols-[1.4fr_1fr_1fr_260px] gap-4 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.06em] ${
                   dark
                     ? "bg-[#0a1825]/95 border-cyan-300/10 text-cyan-100/55"
                     : "bg-slate-50/95 border-slate-200 text-slate-500"
                 }`}
               >
                 <div>Title / File</div>
-                <div>Folder</div>
+                <div>Folder / Type</div>
                 <div>Dates</div>
                 <div className="text-right">Actions</div>
               </div>
 
-              <TableRowsSkeleton dark={dark} />
+              <div className="max-h-[430px] overflow-y-auto">
+                <TableRowsSkeleton dark={dark} />
+              </div>
             </div>
-
-            <SkeletonBlock dark={dark} className="h-4 w-60 mt-4 rounded-full" />
           </div>
         </>
       ) : (
@@ -489,54 +560,74 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 xl:grid-cols-[1fr_1fr_1.2fr] gap-4 mb-5">
             <motion.div {...fadeUpDelayed(0)}>
               <div className={`${cardCls} p-6 min-h-[220px]`}>
-                <div className={`text-[12px] uppercase tracking-[0.08em] ${textMuted}`}>
-                  Total Documents
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className={`text-[11px] uppercase tracking-[0.16em] font-semibold ${textSoft}`}>
+                      Total Documents
+                    </div>
+                    <div className={`text-4xl md:text-5xl font-bold mt-3 ${textMain}`}>
+                      {stats.total}
+                    </div>
+                    <div className={`text-sm mt-2 ${textMuted}`}>
+                      Current repository volume across all categories.
+                    </div>
+                  </div>
+
+                  <div
+                    className={`h-12 w-12 rounded-2xl grid place-items-center border ${
+                      dark
+                        ? "bg-cyan-400/10 border-cyan-300/15 text-cyan-100"
+                        : "bg-cyan-50 border-cyan-200 text-cyan-700"
+                    }`}
+                  >
+                    <FolderIcon className="w-6 h-6" />
+                  </div>
                 </div>
-                <div className={`text-5xl font-extrabold mt-3 ${textMain}`}>{stats.total}</div>
 
                 <div className="mt-5 flex flex-wrap gap-2">
-                  <span
-                    className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border ${
-                      dark
-                        ? "bg-emerald-400/12 text-emerald-200 border-emerald-300/20"
-                        : "bg-emerald-50 text-emerald-700 border-emerald-200"
-                    }`}
-                  >
+                  <Pill dark={dark} tone="emerald">
                     Academe: {stats.academe}
-                  </span>
-                  <span
-                    className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border ${
-                      dark
-                        ? "bg-indigo-400/12 text-indigo-200 border-indigo-300/20"
-                        : "bg-indigo-50 text-indigo-700 border-indigo-200"
-                    }`}
-                  >
-                    Stake: {stats.stake}
-                  </span>
-                  <span
-                    className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border ${
-                      dark
-                        ? "bg-amber-400/12 text-amber-200 border-amber-300/20"
-                        : "bg-amber-50 text-amber-700 border-amber-200"
-                    }`}
-                  >
+                  </Pill>
+                  <Pill dark={dark} tone="indigo">
+                    Stakeholders: {stats.stake}
+                  </Pill>
+                  <Pill dark={dark} tone="amber">
                     PAMO: {stats.pamo}
-                  </span>
+                  </Pill>
                 </div>
               </div>
             </motion.div>
 
             <motion.div {...fadeUpDelayed(0.03)}>
               <div className={`${cardCls} p-6 min-h-[220px]`}>
-                <div className={`text-[12px] uppercase tracking-[0.08em] ${textMuted}`}>
-                  Most Common Type
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className={`text-[11px] uppercase tracking-[0.16em] font-semibold ${textSoft}`}>
+                      Most Common Type
+                    </div>
+                    <div className={`text-2xl md:text-3xl font-semibold mt-3 break-words ${textMain}`}>
+                      {stats.topType}
+                    </div>
+                    <div className={`text-sm mt-2 ${textMuted}`}>
+                      {stats.topTypeCount} file
+                      {stats.topTypeCount === 1 ? "" : "s"} in the current library.
+                    </div>
+                  </div>
+
+                  <div
+                    className={`h-12 w-12 rounded-2xl grid place-items-center border ${
+                      dark
+                        ? "bg-indigo-400/10 border-indigo-300/15 text-indigo-200"
+                        : "bg-indigo-50 border-indigo-200 text-indigo-700"
+                    }`}
+                  >
+                    <ChartBarIcon className="w-6 h-6" />
+                  </div>
                 </div>
-                <div className={`text-2xl font-extrabold mt-4 break-words ${textMain}`}>
-                  {stats.topType}
-                </div>
+
                 <div className={`mt-5 text-[12px] flex items-center gap-2 ${textMuted}`}>
                   <ClockIcon className="w-4 h-4" />
-                  Tip: PDFs + Sheets are easiest to preview.
+                  PDF and spreadsheets are usually the easiest to review quickly.
                 </div>
               </div>
             </motion.div>
@@ -544,8 +635,15 @@ export default function Dashboard() {
             <motion.div {...fadeUpDelayed(0.06)}>
               <div className={`${cardCls} p-6`}>
                 <div className="flex items-center justify-between">
-                  <div className={`text-lg font-extrabold ${textMain}`}>Recent uploads</div>
-                  <div className={`text-[12px] ${textMuted}`}>latest 3</div>
+                  <div>
+                    <div className={`text-lg font-semibold ${textMain}`}>
+                      Recent uploads
+                    </div>
+                    <div className={`text-[12px] mt-1 ${textMuted}`}>
+                      Latest 3 uploaded documents
+                    </div>
+                  </div>
+                  <div className={`text-[12px] ${textMuted}`}>live</div>
                 </div>
 
                 <div className="mt-4 space-y-3">
@@ -553,43 +651,20 @@ export default function Dashboard() {
                     <div className={`text-sm ${textMuted}`}>No uploads yet.</div>
                   ) : (
                     recentUploads.map((d) => (
-                      <div key={d.id} className={`rounded-2xl border px-4 py-4 ${subBg} ${subBorder}`}>
-                        <div className={`font-bold text-sm truncate ${textMain}`}>
+                      <div
+                        key={d.id}
+                        className={`rounded-2xl border px-4 py-4 ${subBg} ${subBorder}`}
+                      >
+                        <div className={`font-medium text-sm truncate ${textMain}`}>
                           {d.title?.trim() ? d.title : d.name}
                         </div>
 
                         <div className="mt-2 flex flex-wrap gap-2">
-                          {d.folder && (
-                            <span
-                              className={`px-2.5 py-1 rounded-full text-[10px] font-semibold border ${
-                                dark
-                                  ? "bg-cyan-400/8 text-cyan-100 border-cyan-300/20"
-                                  : "bg-cyan-50 text-cyan-700 border-cyan-200"
-                              }`}
-                            >
-                              {d.folder}
-                            </span>
-                          )}
-                          {d.year && (
-                            <span
-                              className={`px-2.5 py-1 rounded-full text-[10px] font-semibold border ${
-                                dark
-                                  ? "bg-cyan-400/8 text-cyan-100 border-cyan-300/20"
-                                  : "bg-cyan-50 text-cyan-700 border-cyan-200"
-                              }`}
-                            >
-                              {d.year}
-                            </span>
-                          )}
-                          <span
-                            className={`px-2.5 py-1 rounded-full text-[10px] font-semibold border ${
-                              dark
-                                ? "bg-cyan-400/8 text-cyan-100 border-cyan-300/20"
-                                : "bg-cyan-50 text-cyan-700 border-cyan-200"
-                            }`}
-                          >
+                          {d.folder && <Pill dark={dark}>{d.folder}</Pill>}
+                          {d.year && <Pill dark={dark} tone="slate">{d.year}</Pill>}
+                          <Pill dark={dark} tone="slate">
                             {typeLabel(d.type)}
-                          </span>
+                          </Pill>
                         </div>
 
                         <div className={`mt-3 text-[11px] flex items-center gap-2 ${textMuted}`}>
@@ -623,7 +698,7 @@ export default function Dashboard() {
               <button
                 type="button"
                 onClick={() => setQuery("")}
-                className={`px-5 py-3 rounded-2xl border transition font-semibold text-sm ${
+                className={`px-5 py-3 rounded-2xl border transition font-medium text-sm ${
                   dark
                     ? "border-cyan-300/15 bg-white/[0.05] hover:bg-white/[0.08] text-white"
                     : "border-slate-300 bg-white hover:bg-slate-50 text-slate-900"
@@ -690,20 +765,29 @@ export default function Dashboard() {
             </div>
 
             <div className={`mt-3 text-[12px] ${textMuted}`}>
-              Showing <span className={`font-semibold ${textMain}`}>{filteredDocs.length}</span> of{" "}
-              <span className={`font-semibold ${textMain}`}>{docs.length}</span> documents
+              Showing <span className={`font-medium ${textMain}`}>{filteredDocs.length}</span> of{" "}
+              <span className={`font-medium ${textMain}`}>{docs.length}</span> documents
             </div>
           </motion.div>
 
           <motion.div {...fadeUpDelayed(0.1)} className={`${cardCls} p-6`}>
             <div className="flex items-center justify-between mb-4">
-              <h2 className={`text-2xl font-extrabold flex items-center gap-2 ${textMain}`}>
-                <Squares2X2Icon className={`w-6 h-6 ${dark ? "text-cyan-200" : "text-cyan-600"}`} />
-                Documents
-              </h2>
+              <div>
+                <h2
+                  className={`text-xl md:text-2xl font-semibold flex items-center gap-2 ${textMain}`}
+                >
+                  <Squares2X2Icon
+                    className={`w-6 h-6 ${dark ? "text-cyan-200" : "text-cyan-600"}`}
+                  />
+                  Documents
+                </h2>
+                <div className={`text-[12px] mt-1 ${textMuted}`}>
+                  Browse, preview, download, and manage repository files.
+                </div>
+              </div>
             </div>
 
-            {filteredDocs.length === 0 && (
+            {filteredDocs.length === 0 ? (
               <div className="text-center py-14">
                 <div
                   className={`mx-auto h-12 w-12 rounded-2xl grid place-items-center mb-3 border ${subBg} ${subBorder}`}
@@ -712,168 +796,147 @@ export default function Dashboard() {
                     className={`w-7 h-7 ${dark ? "text-cyan-200" : "text-cyan-600"}`}
                   />
                 </div>
-                <p className={`${textMain} font-semibold`}>No documents found.</p>
+                <p className={`${textMain} font-medium`}>No documents found.</p>
                 <p className={`${textMuted} text-sm mt-1`}>Try another keyword.</p>
+              </div>
+            ) : (
+              <div
+                className={`mt-2 rounded-2xl border overflow-hidden ${
+                  dark ? "border-cyan-300/10 bg-[#07131f]/70" : "border-slate-200 bg-white"
+                }`}
+              >
+                <div
+                  className={`hidden lg:grid border-b grid-cols-[1.4fr_1fr_1fr_260px] gap-4 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.06em] ${
+                    dark
+                      ? "bg-[#0a1825]/95 border-cyan-300/10 text-cyan-100/55"
+                      : "bg-slate-50/95 border-slate-200 text-slate-500"
+                  }`}
+                >
+                  <div>Title / File</div>
+                  <div>Folder / Type</div>
+                  <div>Dates</div>
+                  <div className="text-right">Actions</div>
+                </div>
+
+                <div
+                  className={`scroll-docs overflow-y-auto ${
+                    filteredDocs.length > 4 ? "max-h-[430px]" : ""
+                  }`}
+                >
+                  <div
+                    className={dark ? "divide-y divide-cyan-300/8" : "divide-y divide-slate-200"}
+                  >
+                    {filteredDocs.map((doc) => (
+                      <div
+                        key={doc.id}
+                        className={`px-4 py-4 lg:px-5 transition ${
+                          dark ? "hover:bg-white/[0.03]" : "hover:bg-slate-50"
+                        }`}
+                      >
+                        <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr_1fr_260px] gap-4 items-start">
+                          <div className="min-w-0">
+                            <div className="flex items-start gap-3">
+                              <div
+                                className={`h-10 w-10 rounded-xl border grid place-items-center shrink-0 ${subBg} ${subBorder}`}
+                              >
+                                <DocumentTextIcon
+                                  className={`w-5 h-5 ${
+                                    dark ? "text-cyan-200" : "text-cyan-600"
+                                  }`}
+                                />
+                              </div>
+
+                              <div className="min-w-0">
+                                <p className={`font-medium text-sm truncate ${textMain}`}>
+                                  {doc.title?.trim() ? doc.title : doc.name}
+                                </p>
+                                <p className={`text-[12px] truncate mt-0.5 ${textMuted}`}>
+                                  {doc.name}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="hidden lg:block">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Pill dark={dark}>{doc.category || "—"}</Pill>
+                              <Pill dark={dark} tone="slate">
+                                {doc.folder ? doc.folder : "—"}
+                              </Pill>
+                              {doc.year && (
+                                <Pill dark={dark} tone="slate">
+                                  {doc.year}
+                                </Pill>
+                              )}
+                              <Pill dark={dark} tone="slate">
+                                {typeLabel(doc.type)}
+                              </Pill>
+                            </div>
+                          </div>
+
+                          <div className={`text-[12px] space-y-1.5 ${textMuted}`}>
+                            <div>
+                              <span className={textSoft}>Received:</span>{" "}
+                              <span className={`font-medium ${textMain}`}>
+                                {fmtDate(doc.dateReceived)}
+                              </span>
+                            </div>
+                            <div>
+                              <span className={textSoft}>Uploaded:</span>{" "}
+                              <span className={`font-medium ${textMain}`}>
+                                {fmtDate(doc.uploadedAt)}
+                              </span>{" "}
+                              <span className={textSoft}>({timeAgo(doc.uploadedAt)})</span>
+                            </div>
+                          </div>
+
+                          <div className="flex lg:justify-end gap-2 flex-nowrap">
+                            <button
+                              type="button"
+                              onClick={() => setPreviewDoc(doc)}
+                              className={`${btnSm} border ${
+                                dark
+                                  ? "border-cyan-300/12 bg-white/[0.05] hover:bg-white/[0.08] text-white"
+                                  : "border-slate-300 bg-white hover:bg-slate-50 text-slate-900"
+                              }`}
+                            >
+                              <EyeIcon className="w-3.5 h-3.5" />
+                              View
+                            </button>
+
+                            <a
+                              href={downloadUrl(doc.fileId)}
+                              className={`${btnSm} ${
+                                dark
+                                  ? "bg-cyan-500/85 text-slate-950 hover:bg-cyan-400 font-semibold"
+                                  : "bg-cyan-600 text-white hover:bg-cyan-500 font-medium"
+                              }`}
+                            >
+                              <CloudArrowDownIcon className="w-3.5 h-3.5" />
+                              Download
+                            </a>
+
+                            {canDeleteDocuments(user?.role) && (
+                              <button
+                                type="button"
+                                onClick={() => setConfirmDeleteId(doc.id)}
+                                className={`${btnSm} bg-slate-800 text-white hover:bg-slate-700`}
+                              >
+                                <TrashIcon className="w-3.5 h-3.5" />
+                                Delete
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             )}
 
-            <div
-              className={`mt-2 max-h-[62vh] overflow-y-auto rounded-2xl border ${
-                dark ? "border-cyan-300/10 bg-[#07131f]/70" : "border-slate-200 bg-white"
-              }`}
-            >
-              <div
-                className={`hidden lg:grid sticky top-0 z-30 backdrop-blur border-b grid-cols-[1.35fr_0.9fr_0.9fr_260px] gap-4 px-5 py-3 text-[11px] font-bold uppercase tracking-[0.06em] ${
-                  dark
-                    ? "bg-[#0a1825]/95 border-cyan-300/10 text-cyan-100/55"
-                    : "bg-slate-50/95 border-slate-200 text-slate-500"
-                }`}
-              >
-                <div>Title / File</div>
-                <div>Folder</div>
-                <div>Dates</div>
-                <div className="text-right">Actions</div>
-              </div>
-
-              <div className={dark ? "divide-y divide-cyan-300/8" : "divide-y divide-slate-200"}>
-                {filteredDocs.map((doc) => (
-                  <div
-                    key={doc.id}
-                    className={`px-4 py-4 lg:px-5 transition ${
-                      dark ? "hover:bg-white/[0.03]" : "hover:bg-slate-50"
-                    }`}
-                  >
-                    <div className="grid grid-cols-1 lg:grid-cols-[1.35fr_0.9fr_0.9fr_260px] gap-4 items-start">
-                      <div className="min-w-0">
-                        <div className="flex items-start gap-3">
-                          <div
-                            className={`h-9 w-9 rounded-xl border grid place-items-center shrink-0 ${subBg} ${subBorder}`}
-                          >
-                            <DocumentTextIcon
-                              className={`w-5 h-5 ${dark ? "text-cyan-200" : "text-cyan-600"}`}
-                            />
-                          </div>
-
-                          <div className="min-w-0">
-                            <p className={`font-extrabold text-sm truncate ${textMain}`}>
-                              {doc.title?.trim() ? doc.title : doc.name}
-                            </p>
-                            <p className={`text-[12px] truncate mt-0.5 ${textMuted}`}>{doc.name}</p>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="hidden lg:block">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span
-                            className={`px-2 py-1 rounded-full text-[10px] font-semibold border ${
-                              dark
-                                ? "bg-cyan-400/8 text-cyan-100 border-cyan-300/20"
-                                : "bg-cyan-50 text-cyan-700 border-cyan-200"
-                            }`}
-                          >
-                            {doc.category || "—"}
-                          </span>
-                          <span
-                            className={`px-2 py-1 rounded-full text-[10px] font-semibold border ${
-                              dark
-                                ? "bg-cyan-400/8 text-cyan-100 border-cyan-300/20"
-                                : "bg-cyan-50 text-cyan-700 border-cyan-200"
-                            }`}
-                          >
-                            {doc.folder ? doc.folder : "—"}
-                          </span>
-                          {doc.year && (
-                            <span
-                              className={`px-2 py-1 rounded-full text-[10px] font-semibold border ${
-                                dark
-                                  ? "bg-cyan-400/8 text-cyan-100 border-cyan-300/20"
-                                  : "bg-cyan-50 text-cyan-700 border-cyan-200"
-                              }`}
-                            >
-                              {doc.year}
-                            </span>
-                          )}
-                          <span
-                            className={`px-2 py-1 rounded-full text-[10px] font-semibold border ${
-                              dark
-                                ? "bg-cyan-400/8 text-cyan-100 border-cyan-300/20"
-                                : "bg-cyan-50 text-cyan-700 border-cyan-200"
-                            }`}
-                          >
-                            {typeLabel(doc.type)}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className={`text-[12px] space-y-1 ${textMuted}`}>
-                        <div>
-                          <span className={dark ? "text-cyan-100/45" : "text-slate-500"}>
-                            Received:
-                          </span>{" "}
-                          <span className={`font-semibold ${textMain}`}>
-                            {fmtDate(doc.dateReceived)}
-                          </span>
-                        </div>
-                        <div>
-                          <span className={dark ? "text-cyan-100/45" : "text-slate-500"}>
-                            Uploaded:
-                          </span>{" "}
-                          <span className={`font-semibold ${textMain}`}>
-                            {fmtDate(doc.uploadedAt)}
-                          </span>{" "}
-                          <span className={dark ? "text-cyan-100/40" : "text-slate-400"}>
-                            ({timeAgo(doc.uploadedAt)})
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="flex lg:justify-end gap-2 flex-nowrap">
-                        <button
-                          type="button"
-                          onClick={() => setPreviewDoc(doc)}
-                          className={`${btnSm} border ${
-                            dark
-                              ? "border-cyan-300/12 bg-white/[0.05] hover:bg-white/[0.08] text-white"
-                              : "border-slate-300 bg-white hover:bg-slate-50 text-slate-900"
-                          }`}
-                        >
-                          <EyeIcon className="w-3.5 h-3.5" />
-                          View
-                        </button>
-
-                        <a
-                          href={downloadUrl(doc.fileId)}
-                          className={`${btnSm} ${
-                            dark
-                              ? "bg-cyan-500/85 text-slate-950 hover:bg-cyan-400 font-bold"
-                              : "bg-cyan-600 text-white hover:bg-cyan-500"
-                          }`}
-                        >
-                          <CloudArrowDownIcon className="w-3.5 h-3.5" />
-                          Download
-                        </a>
-
-                        {canDeleteDocuments(user?.role) && (
-                          <button
-                            type="button"
-                            onClick={() => setConfirmDeleteId(doc.id)}
-                            className={`${btnSm} bg-slate-800 text-white hover:bg-slate-700`}
-                          >
-                            <TrashIcon className="w-3.5 h-3.5" />
-                            Delete
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
             <div className={`mt-4 text-[11px] ${textMuted}`}>
-              Tip: Use tabs + search to filter quickly. Click{" "}
-              <span className={`font-semibold ${textMain}`}>View</span> to preview.
+              Tip: Use tabs and search together for faster filtering.
             </div>
           </motion.div>
         </>
@@ -903,7 +966,7 @@ export default function Dashboard() {
                 }`}
               >
                 <div className="min-w-0">
-                  <div className={`font-extrabold truncate text-sm ${textMain}`}>
+                  <div className={`font-medium truncate text-sm ${textMain}`}>
                     {previewDoc.title?.trim() ? previewDoc.title : previewDoc.name}
                   </div>
                   <div className={`text-[11px] mt-1 truncate ${textMuted}`}>
@@ -916,8 +979,8 @@ export default function Dashboard() {
                     href={downloadUrl(previewDoc.fileId)}
                     className={`${btnSm} ${
                       dark
-                        ? "bg-cyan-500/90 text-slate-950 hover:bg-cyan-400 font-bold"
-                        : "bg-cyan-600 text-white hover:bg-cyan-500"
+                        ? "bg-cyan-500/90 text-slate-950 hover:bg-cyan-400 font-semibold"
+                        : "bg-cyan-600 text-white hover:bg-cyan-500 font-medium"
                     }`}
                   >
                     <CloudArrowDownIcon className="w-3.5 h-3.5" />
@@ -933,7 +996,9 @@ export default function Dashboard() {
                         : "hover:bg-white border-slate-300 bg-white"
                     }`}
                   >
-                    <XMarkIcon className={`w-5 h-5 ${dark ? "text-cyan-100" : "text-slate-700"}`} />
+                    <XMarkIcon
+                      className={`w-5 h-5 ${dark ? "text-cyan-100" : "text-slate-700"}`}
+                    />
                   </button>
                 </div>
               </div>

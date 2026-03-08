@@ -129,7 +129,7 @@ function Pill({
 
   return (
     <span
-      className={`inline-flex w-fit max-w-full items-center whitespace-nowrap rounded-full border px-3 py-1 text-[11px] font-semibold leading-none ${cls}`}
+      className={`inline-flex w-fit max-w-full items-center whitespace-nowrap rounded-full border px-3 py-1 text-[10px] font-semibold leading-none ${cls}`}
     >
       {children}
     </span>
@@ -171,13 +171,13 @@ function StatCard({
       <div
         className={
           dark
-            ? "text-xs font-semibold uppercase tracking-[0.08em] text-cyan-100/55"
-            : "text-xs font-semibold uppercase tracking-[0.08em] text-slate-500"
+            ? "text-[11px] font-semibold uppercase tracking-[0.08em] text-cyan-100/55"
+            : "text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500"
         }
       >
         {label}
       </div>
-      <div className={`mt-2 text-4xl font-extrabold tracking-tight ${valueCls}`}>{value}</div>
+      <div className={`mt-2 text-4xl font-bold tracking-tight ${valueCls}`}>{value}</div>
     </div>
   );
 }
@@ -274,12 +274,6 @@ const EMPTY_USER: UserRow = {
   position: "",
   department: "",
   createdAt: "",
-};
-
-const fadeUp = {
-  initial: { opacity: 0, y: 10 },
-  animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.18 },
 };
 
 const fadeUpDelayed = (delay = 0) => ({
@@ -526,8 +520,8 @@ export default function RegisteredUsersPage() {
   const dark = pageTheme === "dark";
 
   const inputCls = dark
-    ? "w-full h-12 rounded-2xl border border-cyan-300/12 bg-white/[0.04] px-4 text-[15px] text-white placeholder:text-cyan-100/35 shadow-sm outline-none focus:ring-4 focus:ring-cyan-400/10 focus:border-cyan-300/25"
-    : "w-full h-12 rounded-2xl border border-slate-300 bg-white px-4 text-[15px] text-slate-900 placeholder:text-slate-400 shadow-sm outline-none focus:ring-4 focus:ring-cyan-100 focus:border-cyan-400";
+    ? "w-full h-12 rounded-2xl border border-cyan-300/12 bg-white/[0.04] px-4 text-sm text-white placeholder:text-cyan-100/35 shadow-sm outline-none focus:ring-4 focus:ring-cyan-400/10 focus:border-cyan-300/25"
+    : "w-full h-12 rounded-2xl border border-slate-300 bg-white px-4 text-sm text-slate-900 placeholder:text-slate-400 shadow-sm outline-none focus:ring-4 focus:ring-cyan-100 focus:border-cyan-400";
 
   const modalInputCls = dark
     ? "mt-1 w-full h-11 rounded-xl border border-cyan-300/12 bg-white/[0.04] px-3 text-sm text-white outline-none focus:ring-4 focus:ring-cyan-400/10 focus:border-cyan-300/25 disabled:bg-white/[0.03] disabled:text-cyan-100/60"
@@ -598,7 +592,7 @@ export default function RegisteredUsersPage() {
               <div>
                 <div className="flex flex-wrap items-center gap-3">
                   <h1
-                    className={`text-[2.5rem] leading-none tracking-tight font-extrabold ${
+                    className={`text-3xl md:text-4xl leading-none tracking-tight font-bold ${
                       dark
                         ? "text-white drop-shadow-[0_0_12px_rgba(34,211,238,0.12)]"
                         : "text-slate-900"
@@ -607,7 +601,7 @@ export default function RegisteredUsersPage() {
                     Registered Users
                   </h1>
                   <span
-                    className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-bold tracking-wide border ${
+                    className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide border ${
                       dark
                         ? "bg-cyan-400/10 border-cyan-300/18 text-cyan-100"
                         : "bg-cyan-50 border-cyan-200 text-cyan-700"
@@ -616,7 +610,7 @@ export default function RegisteredUsersPage() {
                     {isAdmin ? "ADMIN ACCESS" : "CO-ADMIN VIEW ONLY"}
                   </span>
                 </div>
-                <p className={`mt-2 text-[15px] ${dark ? "text-cyan-100/70" : "text-slate-600"}`}>
+                <p className={`mt-2 text-sm ${dark ? "text-cyan-100/70" : "text-slate-600"}`}>
                   {isAdmin
                     ? "Click a user row to view, edit, update, delete, or assign co-admin."
                     : "View-only mode. Co-admin can inspect user information but cannot edit, delete, or assign roles."}
@@ -633,7 +627,7 @@ export default function RegisteredUsersPage() {
                   setInfoOpen(true);
                 }}
                 disabled={refreshing}
-                className={`h-12 px-6 rounded-2xl transition font-extrabold ${
+                className={`h-12 px-6 rounded-2xl transition font-semibold ${
                   dark
                     ? "bg-cyan-500/90 hover:bg-cyan-400 text-slate-950 shadow-[0_0_18px_rgba(34,211,238,0.18)] disabled:opacity-70"
                     : "bg-cyan-600 hover:bg-cyan-700 text-white shadow-sm disabled:opacity-70"
@@ -681,7 +675,7 @@ export default function RegisteredUsersPage() {
                     value={q}
                     onChange={(e) => setQ(e.target.value)}
                     placeholder="Search name, email, position, department, code, contact…"
-                    className={`w-full h-12 rounded-2xl pl-11 pr-4 text-[15px] shadow-sm outline-none ${
+                    className={`w-full h-12 rounded-2xl pl-11 pr-4 text-sm shadow-sm outline-none ${
                       dark
                         ? "border border-cyan-300/12 bg-white/[0.04] text-white placeholder:text-cyan-100/35 focus:ring-4 focus:ring-cyan-400/10 focus:border-cyan-300/25"
                         : "border border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 focus:ring-4 focus:ring-cyan-100 focus:border-cyan-400"
@@ -739,7 +733,7 @@ export default function RegisteredUsersPage() {
                 <button
                   type="button"
                   onClick={clear}
-                  className={`h-12 px-5 rounded-2xl border transition font-semibold shadow-sm ${
+                  className={`h-12 px-5 rounded-2xl border transition font-medium shadow-sm text-sm ${
                     dark
                       ? "border-cyan-300/12 bg-white/[0.05] text-white hover:bg-white/[0.08]"
                       : "border-slate-300 bg-white text-slate-800 hover:bg-slate-50"
@@ -752,11 +746,11 @@ export default function RegisteredUsersPage() {
 
             <div className={`mt-3 text-sm ${dark ? "text-cyan-100/60" : "text-slate-500"}`}>
               Showing{" "}
-              <span className={`font-semibold ${dark ? "text-white" : "text-slate-900"}`}>
+              <span className={`font-medium ${dark ? "text-white" : "text-slate-900"}`}>
                 {filtered.length}
               </span>{" "}
               of{" "}
-              <span className={`font-semibold ${dark ? "text-white" : "text-slate-900"}`}>
+              <span className={`font-medium ${dark ? "text-white" : "text-slate-900"}`}>
                 {users.length}
               </span>{" "}
               users
@@ -780,18 +774,18 @@ export default function RegisteredUsersPage() {
                 }`}
               >
                 <tr
-                  className={`text-left text-[12px] uppercase tracking-[0.08em] ${
+                  className={`text-left text-[11px] uppercase tracking-[0.08em] ${
                     dark ? "text-cyan-100/55" : "text-slate-500"
                   }`}
                 >
-                  <th className="px-5 py-4 font-bold">User</th>
-                  <th className="px-5 py-4 font-bold">Email</th>
-                  <th className="px-5 py-4 font-bold">Role</th>
-                  <th className="px-5 py-4 font-bold">Employment</th>
-                  <th className="px-5 py-4 font-bold">Position</th>
-                  <th className="px-5 py-4 font-bold">Department</th>
-                  <th className="px-5 py-4 font-bold">Created</th>
-                  <th className="px-5 py-4 font-bold text-right">Action</th>
+                  <th className="px-5 py-4 font-semibold">User</th>
+                  <th className="px-5 py-4 font-semibold">Email</th>
+                  <th className="px-5 py-4 font-semibold">Role</th>
+                  <th className="px-5 py-4 font-semibold">Employment</th>
+                  <th className="px-5 py-4 font-semibold">Position</th>
+                  <th className="px-5 py-4 font-semibold">Department</th>
+                  <th className="px-5 py-4 font-semibold">Created</th>
+                  <th className="px-5 py-4 font-semibold text-right">Action</th>
                 </tr>
               </thead>
 
@@ -800,7 +794,7 @@ export default function RegisteredUsersPage() {
                   <tr>
                     <td
                       colSpan={8}
-                      className={`px-5 py-12 ${dark ? "text-cyan-100/60" : "text-slate-500"}`}
+                      className={`px-5 py-12 text-sm ${dark ? "text-cyan-100/60" : "text-slate-500"}`}
                     >
                       No users found. Try changing search/filter.
                     </td>
@@ -828,21 +822,21 @@ export default function RegisteredUsersPage() {
 
                           <div className="min-w-0">
                             <div
-                              className={`truncate text-[16px] font-semibold ${
+                              className={`truncate text-[15px] font-medium ${
                                 dark ? "text-white" : "text-slate-900"
                               }`}
                             >
                               {safeText(u.name)}
                             </div>
                             <div
-                              className={`mt-0.5 text-xs ${
+                              className={`mt-0.5 text-[11px] ${
                                 dark ? "text-cyan-100/45" : "text-slate-400"
                               }`}
                             >
                               ID: {String(u.id)}
                             </div>
                             <div
-                              className={`mt-0.5 text-xs ${
+                              className={`mt-0.5 text-[11px] ${
                                 dark ? "text-cyan-100/45" : "text-slate-400"
                               }`}
                             >
@@ -854,7 +848,7 @@ export default function RegisteredUsersPage() {
 
                       <td className="px-5 py-4 align-middle">
                         <div
-                          className={`max-w-[290px] truncate text-[15px] ${
+                          className={`max-w-[290px] truncate text-sm ${
                             dark ? "text-cyan-100" : "text-slate-700"
                           }`}
                         >
@@ -880,7 +874,7 @@ export default function RegisteredUsersPage() {
 
                       <td className="px-5 py-4 align-middle">
                         <div
-                          className={`max-w-[220px] truncate text-[15px] ${
+                          className={`max-w-[220px] truncate text-sm ${
                             dark ? "text-cyan-100/85" : "text-slate-700"
                           }`}
                           title={safeText(u.position)}
@@ -891,7 +885,7 @@ export default function RegisteredUsersPage() {
 
                       <td className="px-5 py-4 align-middle">
                         <div
-                          className={`max-w-[300px] truncate text-[15px] ${
+                          className={`max-w-[300px] truncate text-sm ${
                             dark ? "text-cyan-100/85" : "text-slate-700"
                           }`}
                           title={safeText(u.department)}
@@ -901,7 +895,7 @@ export default function RegisteredUsersPage() {
                       </td>
 
                       <td
-                        className={`px-5 py-4 align-middle whitespace-nowrap text-[15px] ${
+                        className={`px-5 py-4 align-middle whitespace-nowrap text-sm ${
                           dark ? "text-cyan-100/75" : "text-slate-500"
                         }`}
                       >
@@ -930,7 +924,7 @@ export default function RegisteredUsersPage() {
           </div>
 
           <div
-            className={`border-t px-5 py-3 text-xs ${
+            className={`border-t px-5 py-3 text-[11px] ${
               dark
                 ? "border-cyan-300/10 bg-white/[0.03] text-cyan-100/50"
                 : "border-slate-200 bg-slate-50 text-slate-500"
@@ -940,7 +934,7 @@ export default function RegisteredUsersPage() {
           </div>
         </motion.div>
 
-        <div className={`text-center text-xs ${dark ? "text-cyan-100/35" : "text-slate-400"}`}>
+        <div className={`text-center text-[11px] ${dark ? "text-cyan-100/35" : "text-slate-400"}`}>
           © {new Date().getFullYear()} MHRWS Repository • Admin Panel
         </div>
       </div>
@@ -982,7 +976,7 @@ export default function RegisteredUsersPage() {
                   </div>
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <h2 className={`text-xl font-bold ${dark ? "text-white" : "text-slate-900"}`}>
+                      <h2 className={`text-xl font-semibold ${dark ? "text-white" : "text-slate-900"}`}>
                         User Manager
                       </h2>
                       <Pill tone={roleTone(draftUser.role)} dark={dark}>
@@ -1012,7 +1006,7 @@ export default function RegisteredUsersPage() {
               <div className="p-6 max-h-[78vh] overflow-auto">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className={dark ? "text-xs font-semibold text-cyan-100/55" : "text-xs font-semibold text-slate-500"}>
+                    <label className={dark ? "text-[11px] font-semibold text-cyan-100/55" : "text-[11px] font-semibold text-slate-500"}>
                       Full Name
                     </label>
                     <input
@@ -1024,7 +1018,7 @@ export default function RegisteredUsersPage() {
                   </div>
 
                   <div>
-                    <label className={dark ? "text-xs font-semibold text-cyan-100/55" : "text-xs font-semibold text-slate-500"}>
+                    <label className={dark ? "text-[11px] font-semibold text-cyan-100/55" : "text-[11px] font-semibold text-slate-500"}>
                       Email
                     </label>
                     <input
@@ -1036,7 +1030,7 @@ export default function RegisteredUsersPage() {
                   </div>
 
                   <div>
-                    <label className={dark ? "text-xs font-semibold text-cyan-100/55" : "text-xs font-semibold text-slate-500"}>
+                    <label className={dark ? "text-[11px] font-semibold text-cyan-100/55" : "text-[11px] font-semibold text-slate-500"}>
                       Role
                     </label>
                     <select
@@ -1058,7 +1052,7 @@ export default function RegisteredUsersPage() {
                   </div>
 
                   <div>
-                    <label className={dark ? "text-xs font-semibold text-cyan-100/55" : "text-xs font-semibold text-slate-500"}>
+                    <label className={dark ? "text-[11px] font-semibold text-cyan-100/55" : "text-[11px] font-semibold text-slate-500"}>
                       Employment Type
                     </label>
                     <select
@@ -1091,7 +1085,7 @@ export default function RegisteredUsersPage() {
                   </div>
 
                   <div>
-                    <label className={dark ? "text-xs font-semibold text-cyan-100/55" : "text-xs font-semibold text-slate-500"}>
+                    <label className={dark ? "text-[11px] font-semibold text-cyan-100/55" : "text-[11px] font-semibold text-slate-500"}>
                       Position
                     </label>
                     <input
@@ -1103,7 +1097,7 @@ export default function RegisteredUsersPage() {
                   </div>
 
                   <div>
-                    <label className={dark ? "text-xs font-semibold text-cyan-100/55" : "text-xs font-semibold text-slate-500"}>
+                    <label className={dark ? "text-[11px] font-semibold text-cyan-100/55" : "text-[11px] font-semibold text-slate-500"}>
                       Department
                     </label>
                     <input
@@ -1115,7 +1109,7 @@ export default function RegisteredUsersPage() {
                   </div>
 
                   <div>
-                    <label className={dark ? "text-xs font-semibold text-cyan-100/55" : "text-xs font-semibold text-slate-500"}>
+                    <label className={dark ? "text-[11px] font-semibold text-cyan-100/55" : "text-[11px] font-semibold text-slate-500"}>
                       Contact
                     </label>
                     <input
@@ -1127,7 +1121,7 @@ export default function RegisteredUsersPage() {
                   </div>
 
                   <div>
-                    <label className={dark ? "text-xs font-semibold text-cyan-100/55" : "text-xs font-semibold text-slate-500"}>
+                    <label className={dark ? "text-[11px] font-semibold text-cyan-100/55" : "text-[11px] font-semibold text-slate-500"}>
                       Birthdate
                     </label>
                     <input
@@ -1140,7 +1134,7 @@ export default function RegisteredUsersPage() {
                   </div>
 
                   <div>
-                    <label className={dark ? "text-xs font-semibold text-cyan-100/55" : "text-xs font-semibold text-slate-500"}>
+                    <label className={dark ? "text-[11px] font-semibold text-cyan-100/55" : "text-[11px] font-semibold text-slate-500"}>
                       User Code
                     </label>
                     <input
@@ -1152,7 +1146,7 @@ export default function RegisteredUsersPage() {
                   </div>
 
                   <div>
-                    <label className={dark ? "text-xs font-semibold text-cyan-100/55" : "text-xs font-semibold text-slate-500"}>
+                    <label className={dark ? "text-[11px] font-semibold text-cyan-100/55" : "text-[11px] font-semibold text-slate-500"}>
                       Created
                     </label>
                     <input
@@ -1174,8 +1168,8 @@ export default function RegisteredUsersPage() {
                       onClick={() => setDeleteTarget(selectedUser)}
                       className={
                         dark
-                          ? "h-11 px-5 rounded-2xl border border-cyan-300/12 bg-white/[0.05] text-white hover:bg-white/[0.08] transition font-semibold"
-                          : "h-11 px-5 rounded-2xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition font-semibold"
+                          ? "h-11 px-5 rounded-2xl border border-cyan-300/12 bg-white/[0.05] text-white hover:bg-white/[0.08] transition font-medium"
+                          : "h-11 px-5 rounded-2xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition font-medium"
                       }
                     >
                       Delete User
@@ -1194,8 +1188,8 @@ export default function RegisteredUsersPage() {
                           onClick={() => setEditMode(true)}
                           className={
                             dark
-                              ? "h-11 px-5 rounded-2xl border border-cyan-300/12 bg-white/[0.05] text-white hover:bg-white/[0.08] transition font-semibold"
-                              : "h-11 px-5 rounded-2xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition font-semibold"
+                              ? "h-11 px-5 rounded-2xl border border-cyan-300/12 bg-white/[0.05] text-white hover:bg-white/[0.08] transition font-medium"
+                              : "h-11 px-5 rounded-2xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition font-medium"
                           }
                         >
                           Edit
@@ -1218,8 +1212,8 @@ export default function RegisteredUsersPage() {
                             }}
                             className={
                               dark
-                                ? "h-11 px-5 rounded-2xl border border-cyan-300/12 bg-white/[0.05] text-white hover:bg-white/[0.08] transition font-semibold"
-                                : "h-11 px-5 rounded-2xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition font-semibold"
+                                ? "h-11 px-5 rounded-2xl border border-cyan-300/12 bg-white/[0.05] text-white hover:bg-white/[0.08] transition font-medium"
+                                : "h-11 px-5 rounded-2xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition font-medium"
                             }
                           >
                             Cancel
@@ -1231,8 +1225,8 @@ export default function RegisteredUsersPage() {
                             disabled={saving || !hasChanges}
                             className={
                               dark
-                                ? "h-11 px-5 rounded-2xl bg-cyan-500/90 hover:bg-cyan-400 text-slate-950 transition font-extrabold shadow-[0_0_18px_rgba(34,211,238,0.18)] disabled:opacity-70"
-                                : "h-11 px-5 rounded-2xl bg-cyan-600 hover:bg-cyan-700 text-white transition font-extrabold shadow-sm disabled:opacity-70"
+                                ? "h-11 px-5 rounded-2xl bg-cyan-500/90 hover:bg-cyan-400 text-slate-950 transition font-semibold shadow-[0_0_18px_rgba(34,211,238,0.18)] disabled:opacity-70"
+                                : "h-11 px-5 rounded-2xl bg-cyan-600 hover:bg-cyan-700 text-white transition font-semibold shadow-sm disabled:opacity-70"
                             }
                           >
                             {saving ? "Saving..." : !hasChanges ? "No Changes" : "Save Changes"}
@@ -1245,8 +1239,8 @@ export default function RegisteredUsersPage() {
                         onClick={closeUser}
                         className={
                           dark
-                            ? "h-11 px-5 rounded-2xl border border-cyan-300/12 bg-white/[0.05] text-white hover:bg-white/[0.08] transition font-semibold"
-                            : "h-11 px-5 rounded-2xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition font-semibold"
+                            ? "h-11 px-5 rounded-2xl border border-cyan-300/12 bg-white/[0.05] text-white hover:bg-white/[0.08] transition font-medium"
+                            : "h-11 px-5 rounded-2xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition font-medium"
                         }
                       >
                         Close

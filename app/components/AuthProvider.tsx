@@ -9,7 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 export type AuthUser = {
   id: number;
@@ -36,12 +36,16 @@ export function AuthProvider({
   redirectTo?: string;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
 
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   const mountedRef = useRef(true);
   const fetchedOnceRef = useRef(false);
+
+  const isPublicRoute =
+    pathname === "/login" || pathname === "/register" || pathname === "/";
 
   const fetchMe = useCallback(
     async ({
@@ -66,7 +70,7 @@ export function AuthProvider({
             setUser(null);
           }
 
-          if (redirectOnFail) {
+          if (redirectOnFail && !isPublicRoute) {
             router.replace(redirectTo);
           }
           return;
@@ -82,7 +86,7 @@ export function AuthProvider({
           setUser(null);
         }
 
-        if (redirectOnFail) {
+        if (redirectOnFail && !isPublicRoute) {
           router.replace(redirectTo);
         }
       } finally {
@@ -91,11 +95,18 @@ export function AuthProvider({
         }
       }
     },
-    [router, redirectTo]
+    [router, redirectTo, isPublicRoute]
   );
 
   useEffect(() => {
     mountedRef.current = true;
+
+    if (isPublicRoute) {
+      setLoading(false);
+      return () => {
+        mountedRef.current = false;
+      };
+    }
 
     if (!fetchedOnceRef.current) {
       fetchedOnceRef.current = true;
@@ -105,7 +116,7 @@ export function AuthProvider({
     return () => {
       mountedRef.current = false;
     };
-  }, [fetchMe]);
+  }, [fetchMe, isPublicRoute]);
 
   const refreshUser = useCallback(async () => {
     await fetchMe({ silent: true, redirectOnFail: false });

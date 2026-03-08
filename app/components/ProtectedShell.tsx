@@ -30,7 +30,7 @@ function normalizeRole(role?: string) {
 
 function canAccessSettings(role?: string) {
   const r = normalizeRole(role);
-  return r === "admin" || r === "co_admin";
+  return r === "admin" || r === "co_admin" || r === "staff";
 }
 
 function canViewRegisteredStaff(role?: string) {
@@ -102,7 +102,8 @@ export default function ProtectedShell({
     };
 
     window.addEventListener("page-theme-changed", onThemeChanged);
-    return () => window.removeEventListener("page-theme-changed", onThemeChanged);
+    return () =>
+      window.removeEventListener("page-theme-changed", onThemeChanged);
   }, []);
 
   useEffect(() => {
@@ -112,12 +113,15 @@ export default function ProtectedShell({
   }, [loading, user, router]);
 
   useEffect(() => {
+    if (!user) return;
+
     router.prefetch("/dashboard");
     router.prefetch("/research");
-    router.prefetch("/upload");
-    router.prefetch("/settings");
-    router.prefetch("/admin/users");
-  }, [router]);
+
+    if (canUpload(user.role)) router.prefetch("/upload");
+    if (canAccessSettings(user.role)) router.prefetch("/settings");
+    if (canViewRegisteredStaff(user.role)) router.prefetch("/admin/users");
+  }, [router, user]);
 
   const handleNavigate = useCallback(
     (href: string) => {
@@ -275,7 +279,9 @@ export default function ProtectedShell({
                 <div className="mt-4 rounded-2xl border border-cyan-300/12 bg-cyan-400/5 px-3 py-3">
                   <div className="flex items-center gap-2 text-white">
                     <ShieldCheckIcon className="w-4 h-4 text-white" />
-                    <span className="text-[12px] font-semibold">Secure Access Panel</span>
+                    <span className="text-[12px] font-semibold">
+                      Secure Access Panel
+                    </span>
                   </div>
                   <p className="mt-1 text-[11px] leading-5 text-white/65">
                     Manage documents, uploads, settings, and staff records.
@@ -308,7 +314,9 @@ export default function ProtectedShell({
                 } ${darkButtonStyle()}`}
               >
                 <ArrowRightOnRectangleIcon className="w-5 h-5" />
-                {!collapsed && <span className="font-semibold text-sm">Logout</span>}
+                {!collapsed && (
+                  <span className="font-semibold text-sm">Logout</span>
+                )}
               </button>
             </div>
           </aside>

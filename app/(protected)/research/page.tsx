@@ -44,6 +44,17 @@ function normalizeCat(raw?: string | null) {
   return c;
 }
 
+function typeLabel(mime?: string | null) {
+  const t = (mime || "").toLowerCase();
+  if (!t) return "File";
+  if (t.includes("pdf")) return "PDF";
+  if (t.includes("spreadsheet") || t.includes("excel")) return "Spreadsheet";
+  if (t.includes("word")) return "Word";
+  if (t.includes("presentation") || t.includes("powerpoint")) return "Slides";
+  if (t.includes("image/")) return "Image";
+  return "File";
+}
+
 function canUpload(role?: string) {
   return role === "admin" || role === "co_admin";
 }
@@ -64,15 +75,15 @@ function Badge({
   const cls =
     tone === "green"
       ? dark
-        ? "bg-emerald-400/12 text-emerald-200 border-emerald-300/20"
+        ? "bg-emerald-400/10 text-emerald-200 border-emerald-300/20"
         : "bg-emerald-50 text-emerald-700 border-emerald-200"
       : tone === "blue"
       ? dark
-        ? "bg-indigo-400/12 text-indigo-200 border-indigo-300/20"
+        ? "bg-indigo-400/10 text-indigo-200 border-indigo-300/20"
         : "bg-indigo-50 text-indigo-700 border-indigo-200"
       : tone === "amber"
       ? dark
-        ? "bg-amber-400/12 text-amber-200 border-amber-300/20"
+        ? "bg-amber-400/10 text-amber-200 border-amber-300/20"
         : "bg-amber-50 text-amber-700 border-amber-200"
       : dark
       ? "bg-cyan-400/8 text-cyan-100 border-cyan-300/15"
@@ -80,7 +91,7 @@ function Badge({
 
   return (
     <span
-      className={`inline-flex items-center px-2.5 py-1 rounded-full border text-[11px] font-semibold ${cls}`}
+      className={`inline-flex items-center px-2.5 py-1 rounded-full border text-[10px] font-semibold ${cls}`}
     >
       {children}
     </span>
@@ -137,14 +148,14 @@ function GroupCard({
   const headerCls =
     headerTone === "green"
       ? dark
-        ? "bg-emerald-400/8 border-emerald-300/12"
+        ? "bg-emerald-400/6 border-emerald-300/10"
         : "bg-emerald-50 border-emerald-200"
       : headerTone === "blue"
       ? dark
-        ? "bg-indigo-400/8 border-indigo-300/12"
+        ? "bg-indigo-400/6 border-indigo-300/10"
         : "bg-indigo-50 border-indigo-200"
       : dark
-      ? "bg-amber-400/8 border-amber-300/12"
+      ? "bg-amber-400/6 border-amber-300/10"
       : "bg-amber-50 border-amber-200";
 
   const titleCls =
@@ -188,16 +199,17 @@ function GroupCard({
 
   const textMain = dark ? "text-white" : "text-slate-900";
   const textMuted = dark ? "text-cyan-100/65" : "text-slate-600";
+  const textSoft = dark ? "text-cyan-100/45" : "text-slate-500";
   const subBg = dark ? "bg-white/[0.03]" : "bg-slate-50";
   const subBorder = dark ? "border-cyan-300/10" : "border-slate-200";
 
   return (
     <div className={`${cardCls} rounded-3xl overflow-hidden`}>
-      <div className={`px-5 py-5 border-b ${headerCls}`}>
+      <div className={`px-5 py-4 border-b ${headerCls}`}>
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h2 className={`text-2xl font-extrabold ${titleCls}`}>{title}</h2>
-            <p className={`text-sm mt-1 ${textMuted}`}>{subtitle}</p>
+            <h2 className={`text-xl md:text-2xl font-semibold ${titleCls}`}>{title}</h2>
+            <p className={`text-[12px] mt-1 ${textMuted}`}>{subtitle}</p>
           </div>
 
           {loading ? (
@@ -212,7 +224,7 @@ function GroupCard({
         </div>
       </div>
 
-      <div className="p-4 space-y-3 min-h-[260px]">
+      <div className="p-4 space-y-3 min-h-[280px]">
         {loading ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
@@ -238,7 +250,7 @@ function GroupCard({
             ))}
           </div>
         ) : folders.length === 0 ? (
-          <div className={`${textMuted} px-2 py-6`}>No folders found.</div>
+          <div className={`${textMuted} px-2 py-6 text-sm`}>No folders found.</div>
         ) : (
           folders.map((folder) => {
             const open = isOpen(folder);
@@ -257,10 +269,10 @@ function GroupCard({
                   }`}
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <FolderIcon className={`w-6 h-6 ${folderIconCls}`} />
+                    <FolderIcon className={`w-5 h-5 ${folderIconCls}`} />
                     <div className="min-w-0 text-left">
-                      <div className={`font-extrabold truncate ${textMain}`}>{folder}</div>
-                      <div className={`text-xs ${textMuted}`}>
+                      <div className={`font-medium truncate ${textMain}`}>{folder}</div>
+                      <div className={`text-[11px] ${textMuted}`}>
                         {items.length} file{items.length === 1 ? "" : "s"}
                       </div>
                     </div>
@@ -290,11 +302,14 @@ function GroupCard({
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
-                            <div className={`font-extrabold truncate ${textMain}`}>
+                            <div className={`font-medium truncate ${textMain}`}>
                               {d.title?.trim() ? d.title : d.name}
                             </div>
-                            <div className={`text-xs mt-0.5 truncate ${textMuted}`}>
-                              {d.type || "Unknown"}
+                            <div className={`text-[11px] mt-1 truncate ${textMuted}`}>
+                              {d.name}
+                            </div>
+                            <div className={`text-[11px] mt-1 truncate ${textSoft}`}>
+                              {typeLabel(d.type)}
                             </div>
                           </div>
 
@@ -303,7 +318,7 @@ function GroupCard({
                               href={docUrl(d)}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold shadow-sm transition ${actionBtnCls}`}
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-medium shadow-sm transition ${actionBtnCls}`}
                             >
                               <CloudArrowDownIcon className="w-4 h-4" />
                               <span className="hidden sm:inline">Download</span>
@@ -313,7 +328,7 @@ function GroupCard({
                               <button
                                 type="button"
                                 onClick={() => onAskDelete(d.id)}
-                                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition shadow-sm bg-slate-800 text-white hover:bg-slate-700"
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-medium transition shadow-sm bg-slate-800 text-white hover:bg-slate-700"
                               >
                                 <TrashIcon className="w-4 h-4" />
                                 <span className="hidden sm:inline">Delete</span>
@@ -333,10 +348,6 @@ function GroupCard({
                             Uploaded: {fmtDate(d.uploadedAt)}
                           </Badge>
                         </div>
-
-                        <div className={`mt-2 text-xs break-words ${textMuted}`}>
-                          <span className={`font-semibold ${textMain}`}>File:</span> {d.name}
-                        </div>
                       </div>
                     ))}
                   </div>
@@ -349,12 +360,6 @@ function GroupCard({
     </div>
   );
 }
-
-const fadeUp = {
-  initial: { opacity: 0, y: 10 },
-  animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.18 },
-};
 
 const fadeUpDelayed = (delay = 0) => ({
   initial: { opacity: 0, y: 10 },
@@ -491,9 +496,10 @@ export default function ResearchPage() {
     : "bg-white/85 border border-slate-200 shadow-[0_10px_28px_rgba(15,23,42,0.08)]";
   const textMain = dark ? "text-white" : "text-slate-900";
   const textMuted = dark ? "text-cyan-100/65" : "text-slate-600";
+  const textSoft = dark ? "text-cyan-100/45" : "text-slate-500";
   const inputCls = dark
-    ? "w-full pl-10 pr-4 py-3 rounded-2xl border border-cyan-300/15 bg-white/[0.04] text-white placeholder-cyan-100/40 shadow-sm outline-none focus:ring-4 focus:ring-cyan-400/10 focus:border-cyan-300/30 caret-cyan-200"
-    : "w-full pl-10 pr-4 py-3 rounded-2xl border border-slate-300 bg-white text-slate-900 placeholder-slate-400 shadow-sm outline-none focus:ring-4 focus:ring-cyan-100 focus:border-cyan-400 caret-cyan-700";
+    ? "w-full pl-10 pr-4 py-3 rounded-2xl border border-cyan-300/15 bg-white/[0.04] text-white placeholder-cyan-100/40 shadow-sm outline-none focus:ring-4 focus:ring-cyan-400/10 focus:border-cyan-300/30 caret-cyan-200 text-sm"
+    : "w-full pl-10 pr-4 py-3 rounded-2xl border border-slate-300 bg-white text-slate-900 placeholder-slate-400 shadow-sm outline-none focus:ring-4 focus:ring-cyan-100 focus:border-cyan-400 caret-cyan-700 text-sm";
 
   if (loadingMe || !me) {
     return (
@@ -559,13 +565,16 @@ export default function ResearchPage() {
           className="flex flex-col md:flex-row md:items-end md:justify-between gap-4"
         >
           <div>
-            <h1 className={`text-4xl md:text-5xl font-extrabold ${textMain}`}>
-              Documents/Records
+            <div className={`text-[11px] uppercase tracking-[0.18em] font-semibold ${textSoft}`}>
+              Repository Browser
+            </div>
+            <h1 className={`text-3xl md:text-4xl font-bold mt-2 ${textMain}`}>
+              Documents & Records
             </h1>
-            <p className={`${textMuted} mt-2`}>
-              Browse documents by <span className={`font-semibold ${textMain}`}>Academe</span>,{" "}
-              <span className={`font-semibold ${textMain}`}>Stakeholders</span>, and{" "}
-              <span className={`font-semibold ${textMain}`}>PAMO Activity</span>.
+            <p className={`${textMuted} mt-2 text-sm`}>
+              Browse files by <span className={`font-medium ${textMain}`}>Academe</span>,{" "}
+              <span className={`font-medium ${textMain}`}>Stakeholders</span>, and{" "}
+              <span className={`font-medium ${textMain}`}>PAMO Activity</span>.
             </p>
           </div>
 
@@ -574,13 +583,13 @@ export default function ResearchPage() {
               <button
                 type="button"
                 onClick={() => router.push("/upload")}
-                className={`px-4 py-2.5 rounded-2xl transition font-extrabold ${
+                className={`px-4 py-2.5 rounded-2xl transition font-medium text-sm ${
                   dark
                     ? "bg-cyan-500/90 text-slate-950 hover:bg-cyan-400"
                     : "bg-cyan-600 text-white hover:bg-cyan-500"
                 }`}
               >
-                Upload
+                Upload Document
               </button>
             )}
           </div>
@@ -611,7 +620,7 @@ export default function ResearchPage() {
               <select
                 value={cat}
                 onChange={(e) => setCat(e.target.value as CategoryFilter)}
-                className={`px-4 py-3 rounded-2xl border shadow-sm outline-none ${
+                className={`px-4 py-3 rounded-2xl border shadow-sm outline-none text-sm ${
                   dark
                     ? "border-cyan-300/15 bg-white/[0.04] text-white focus:ring-4 focus:ring-cyan-400/10"
                     : "border-slate-300 bg-white text-slate-900 focus:ring-4 focus:ring-cyan-100"
@@ -637,7 +646,7 @@ export default function ResearchPage() {
                   setQ("");
                   setCat("All");
                 }}
-                className={`px-4 py-3 rounded-2xl border transition font-semibold shadow-sm ${
+                className={`px-4 py-3 rounded-2xl border transition font-medium shadow-sm text-sm ${
                   dark
                     ? "border-cyan-300/15 bg-white/[0.05] text-white hover:bg-white/[0.08]"
                     : "border-slate-300 bg-white text-slate-900 hover:bg-slate-50"
@@ -653,14 +662,14 @@ export default function ResearchPage() {
               <SkeletonLine dark={dark} className="h-5 w-44" />
             ) : (
               <span className={textMuted}>
-                Showing <span className={`font-bold ${textMain}`}>{filteredDocs.length}</span> of{" "}
-                <span className={`font-bold ${textMain}`}>{docs.length}</span> documents
+                Showing <span className={`font-medium ${textMain}`}>{filteredDocs.length}</span> of{" "}
+                <span className={`font-medium ${textMain}`}>{docs.length}</span> documents
               </span>
             )}
           </div>
         </motion.div>
 
-        <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div className="mt-6 grid grid-cols-1 xl:grid-cols-3 gap-5">
           <motion.div {...fadeUpDelayed(0.06)}>
             <GroupCard
               title="Academe"
@@ -681,7 +690,7 @@ export default function ResearchPage() {
           <motion.div {...fadeUpDelayed(0.09)}>
             <GroupCard
               title="Stakeholders"
-              subtitle="PAMB members, LGU, DENR reports, letters, assessments."
+              subtitle="PAMB, LGU, DENR, NGO letters, reports, and assessments."
               headerTone="blue"
               folders={stakeFolders}
               groupedItems={grouped.Stakeholders}
@@ -713,9 +722,8 @@ export default function ResearchPage() {
           </motion.div>
         </div>
 
-        <div className={`mt-6 text-xs ${textMuted}`}>
-          Tip: Upload documents with Category + Folder (School/Project, Stakeholder name, or
-          Activity group) to keep this view organized.
+        <div className={`mt-6 text-[12px] ${textMuted}`}>
+          Tip: Keep folder names consistent so grouped records stay clean and easy to browse.
         </div>
       </div>
     </div>

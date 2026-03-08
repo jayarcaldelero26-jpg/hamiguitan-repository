@@ -1,9 +1,10 @@
 "use client";
 
 import ConfirmDialog from "@/app/components/ConfirmDialog";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/app/components/AuthProvider";
+import { useDocuments } from "@/app/components/DocumentsProvider";
 import { motion } from "framer-motion";
 import {
   ArrowUpTrayIcon,
@@ -69,7 +70,8 @@ function Skeleton({
 export default function UploadPage() {
   const router = useRouter();
   const { user: me, loading: loadingMe } = useAuth();
-
+  const { refreshDocuments } = useDocuments();
+  
   const [pageTheme, setPageTheme] = useState<PageTheme>("dark");
 
   const [category, setCategory] = useState<Category>("Academe");
@@ -128,6 +130,22 @@ export default function UploadPage() {
     }
   }, [loadingMe, me, router]);
 
+  const fetchFolders = useCallback(async (signal?: AbortSignal) => {
+    const r = await fetch("/api/folders", {
+      credentials: "include",
+      cache: "no-store",
+      signal,
+    });
+
+    const data = r.ok ? await r.json() : null;
+
+    setFolders({
+      academe: safeArray(data?.academe),
+      stakeholders: safeArray(data?.stakeholders ?? data?.stakeholder),
+      pamo: safeArray(data?.pamo),
+    });
+  }, []);
+
   useEffect(() => {
     if (loadingMe) return;
     if (!me) return;
@@ -138,22 +156,7 @@ export default function UploadPage() {
     async function loadFolders() {
       try {
         setLoadingFolders(true);
-
-        const r = await fetch("/api/folders", {
-          credentials: "include",
-          cache: "no-store",
-          signal: controller.signal,
-        });
-
-        const data = r.ok ? await r.json() : null;
-
-        if (controller.signal.aborted) return;
-
-        setFolders({
-          academe: safeArray(data?.academe),
-          stakeholders: safeArray(data?.stakeholders ?? data?.stakeholder),
-          pamo: safeArray(data?.pamo),
-        });
+        await fetchFolders(controller.signal);
       } catch (err: any) {
         if (err?.name === "AbortError") return;
 
@@ -172,7 +175,7 @@ export default function UploadPage() {
     loadFolders();
 
     return () => controller.abort();
-  }, [loadingMe, me]);
+  }, [loadingMe, me, fetchFolders]);
 
   useEffect(() => {
     setSelectedFolder("");
@@ -210,7 +213,8 @@ export default function UploadPage() {
   }, [category, folders]);
 
   const folderRequired = category === "Stakeholder" || category === "PAMO Activity";
-
+  const fileSize = file?.size ?? 0;
+  const fileType = file?.type || "unknown";
   const requiredOk = useMemo(() => {
     if (!title.trim()) return false;
     if (!dateReceived) return false;
@@ -221,6 +225,28 @@ export default function UploadPage() {
 
   function pickFile() {
     inputRef.current?.click();
+  }
+
+  function clearFile() {
+    setFile(null);
+    if (inputRef.current) {
+      inputRef.current.value = "";
+    }
+  }
+
+  function resetForm() {
+    setTitle("");
+    setDateReceived("");
+    setSelectedFolder("");
+    setNewFolder("");
+    setFile(null);
+    setUploadStage("");
+    setUploadDetail("");
+    setUploadPercent(0);
+
+    if (inputRef.current) {
+      inputRef.current.value = "";
+    }
   }
 
   function onFileSelected(f: File | null) {
@@ -271,6 +297,17 @@ export default function UploadPage() {
     fd.append("folder", finalFolder);
     fd.append("year", year || new Date().getFullYear().toString());
 
+    console.log("UPLOAD REQUEST:", {
+      fileName: file.name,
+      fileSize: file.size,
+      fileType: file.type,
+      category,
+      title: title.trim(),
+      dateReceived,
+      folder: finalFolder,
+      year: year || new Date().getFullYear().toString(),
+    });
+
     setUploading(true);
     setUploadPercent(6);
     setUploadStage("Validating upload request");
@@ -294,35 +331,25 @@ export default function UploadPage() {
           detail: "Establishing secure cloud connection.",
         },
         {
-          percent: 36,
-          title: "Creating main repository folder",
-          detail: "Ensuring the Hamiguitan Repository folder exists in Google Drive.",
-        },
-        {
-          percent: 48,
-          title: "Creating category folder",
-          detail: `Checking the ${category} folder in Google Drive.`,
-        },
-        {
-          percent: 60,
-          title: "Creating document subfolder",
+          percent: 38,
+          title: "Preparing destination folder",
           detail: finalFolder
-            ? `Ensuring the folder "${finalFolder}" exists before file upload.`
-            : "Preparing the destination folder for this document.",
+            ? `Checking the folder "${finalFolder}" before upload.`
+            : `Using the ${category} destination folder.`,
         },
         {
-          percent: 74,
-          title: "Submitting document to Google Drive",
-          detail: "Uploading the selected file to cloud storage.",
+          percent: 58,
+          title: "Uploading file to Google Drive",
+          detail: "Submitting the selected file to cloud storage.",
         },
         {
-          percent: 86,
-          title: "Setting file access permission",
-          detail: "Applying file access permission after upload.",
+          percent: 82,
+          title: "Applying file permission",
+          detail: "Setting document access after upload.",
         },
         {
           percent: 94,
-          title: "Saving document record",
+          title: "Saving repository record",
           detail: "Saving file details to the repository database.",
         },
       ];
@@ -351,6 +378,11 @@ export default function UploadPage() {
 
       const data = await res.json().catch(() => null);
 
+      console.log("UPLOAD RESPONSE:", {
+        status: res.status,
+        data,
+      });
+
       if (stageTimer) {
         clearInterval(stageTimer);
         stageTimer = null;
@@ -367,7 +399,16 @@ export default function UploadPage() {
 
       setUploadPercent(97);
       setUploadStage("Finalizing upload");
-      setUploadDetail("Completing upload and preparing success response.");
+      setUploadDetail("Refreshing repository data and preparing success response.");
+
+      try {
+        setLoadingFolders(true);
+        await Promise.all([fetchFolders(), refreshDocuments()]);
+      } catch (refreshErr) {
+        console.error("POST-UPLOAD REFRESH ERROR:", refreshErr);
+      } finally {
+        setLoadingFolders(false);
+      }
 
       await wait(250);
 
@@ -378,7 +419,9 @@ export default function UploadPage() {
       await wait(300);
 
       setSuccessOpen(true);
-    } catch {
+    } catch (err) {
+      console.error("UPLOAD PAGE ERROR:", err);
+
       if (stageTimer) {
         clearInterval(stageTimer);
         stageTimer = null;
@@ -422,8 +465,8 @@ export default function UploadPage() {
               </div>
 
               <div>
-                <Skeleton className="h-12 w-72" dark={dark} />
-                <Skeleton className="h-4 w-96 mt-3 rounded-full" dark={dark} />
+                <Skeleton className="h-10 w-64" dark={dark} />
+                <Skeleton className="h-4 w-80 mt-3 rounded-full" dark={dark} />
               </div>
             </div>
 
@@ -527,14 +570,7 @@ export default function UploadPage() {
         ]}
         onConfirm={() => {
           setSuccessOpen(false);
-          setTitle("");
-          setDateReceived("");
-          setSelectedFolder("");
-          setNewFolder("");
-          setFile(null);
-          setUploadStage("");
-          setUploadDetail("");
-          setUploadPercent(0);
+          resetForm();
           router.push("/dashboard");
         }}
       />
@@ -565,7 +601,7 @@ export default function UploadPage() {
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h1
-                  className={`text-4xl md:text-5xl font-extrabold ${
+                  className={`text-3xl md:text-4xl font-bold tracking-tight ${
                     dark
                       ? "text-white drop-shadow-[0_0_12px_rgba(34,211,238,0.12)]"
                       : "text-slate-900"
@@ -574,21 +610,21 @@ export default function UploadPage() {
                   Upload Document
                 </h1>
                 <span
-                  className={`text-[11px] font-semibold px-2.5 py-1 rounded-full border ${
+                  className={`text-[10px] font-semibold uppercase tracking-wide px-2.5 py-1 rounded-full border ${
                     dark
                       ? "bg-cyan-400/10 text-cyan-100 border-cyan-300/20"
                       : "bg-cyan-50 text-cyan-700 border-cyan-200"
                   }`}
                 >
-                  ADMIN ONLY
+                  Admin Only
                 </span>
               </div>
               <p
-                className={`mt-2 text-sm md:text-base ${
+                className={`mt-2 text-sm ${
                   dark ? "text-cyan-100/70" : "text-slate-600"
                 }`}
               >
-                Add Academe, Stakeholder, or PAMO Activity records with Title + Date Received.
+                Add Academe, Stakeholder, or PAMO Activity records with title and date received.
               </p>
             </div>
           </div>
@@ -612,14 +648,14 @@ export default function UploadPage() {
               </div>
               <div className="min-w-0">
                 <div
-                  className={`text-sm font-semibold truncate ${
+                  className={`text-sm font-medium truncate ${
                     dark ? "text-white" : "text-slate-900"
                   }`}
                 >
                   {me.name}
                 </div>
                 <div
-                  className={`text-[12px] truncate ${
+                  className={`text-[11px] truncate ${
                     dark ? "text-cyan-100/70" : "text-slate-500"
                   }`}
                 >
@@ -655,12 +691,17 @@ export default function UploadPage() {
                   <DocumentArrowUpIcon className="w-6 h-6" />
                 </div>
                 <div>
-                  <div className={`text-lg font-extrabold ${dark ? "text-white" : "text-slate-900"}`}>
+                  <div className={`text-lg font-semibold ${dark ? "text-white" : "text-slate-900"}`}>
                     Document Details
                   </div>
                   <div className={`text-[12px] ${dark ? "text-cyan-100/65" : "text-slate-500"}`}>
-                    Fill in the metadata before uploading.
-                  </div>
+                  {formatBytes(fileSize)} • {fileType}
+                  {fileSize > 20 * 1024 * 1024 && (
+                    <span className="block mt-1">
+                      Large files may take longer to upload.
+                    </span>
+                  )}
+                </div>
                 </div>
               </div>
             </div>
@@ -669,7 +710,7 @@ export default function UploadPage() {
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <label
-                    className={`text-sm font-semibold flex items-center gap-2 ${
+                    className={`text-sm font-medium flex items-center gap-2 ${
                       dark ? "text-white" : "text-slate-800"
                     }`}
                   >
@@ -703,7 +744,7 @@ export default function UploadPage() {
 
                 <div>
                   <label
-                    className={`text-sm font-semibold flex items-center gap-2 ${
+                    className={`text-sm font-medium flex items-center gap-2 ${
                       dark ? "text-white" : "text-slate-800"
                     }`}
                   >
@@ -720,7 +761,7 @@ export default function UploadPage() {
                   />
                   <div className={`mt-2 text-[12px] ${dark ? "text-cyan-100/60" : "text-slate-500"}`}>
                     Auto Year:{" "}
-                    <span className={`font-semibold ${dark ? "text-white" : "text-slate-900"}`}>
+                    <span className={`font-medium ${dark ? "text-white" : "text-slate-900"}`}>
                       {year || "—"}
                     </span>
                   </div>
@@ -729,7 +770,7 @@ export default function UploadPage() {
 
               <div>
                 <label
-                  className={`text-sm font-semibold flex items-center gap-2 ${
+                  className={`text-sm font-medium flex items-center gap-2 ${
                     dark ? "text-white" : "text-slate-800"
                   }`}
                 >
@@ -748,7 +789,7 @@ export default function UploadPage() {
 
               <div>
                 <label
-                  className={`text-sm font-semibold flex items-center gap-2 ${
+                  className={`text-sm font-medium flex items-center gap-2 ${
                     dark ? "text-white" : "text-slate-800"
                   }`}
                 >
@@ -791,7 +832,7 @@ export default function UploadPage() {
               </div>
 
               <div>
-                <label className={`text-sm font-semibold ${dark ? "text-white" : "text-slate-800"}`}>
+                <label className={`text-sm font-medium ${dark ? "text-white" : "text-slate-800"}`}>
                   Upload File <span className="text-rose-500">*</span>
                 </label>
 
@@ -843,13 +884,13 @@ export default function UploadPage() {
 
                     <div className="flex-1">
                       <div
-                        className={`font-extrabold text-2xl leading-tight ${
+                        className={`font-semibold text-xl leading-tight ${
                           dark ? "text-white" : "text-slate-900"
                         }`}
                       >
                         Drag & drop your file here
                       </div>
-                      <div className={`text-base mt-1 ${dark ? "text-cyan-100/70" : "text-slate-600"}`}>
+                      <div className={`text-sm mt-1 ${dark ? "text-cyan-100/70" : "text-slate-600"}`}>
                         or{" "}
                         <button
                           type="button"
@@ -872,7 +913,7 @@ export default function UploadPage() {
                           }`}
                         >
                           <div className="min-w-0">
-                            <div className={`font-bold truncate ${dark ? "text-white" : "text-slate-900"}`}>
+                            <div className={`font-medium truncate ${dark ? "text-white" : "text-slate-900"}`}>
                               {file.name}
                             </div>
                             <div className={`text-[12px] ${dark ? "text-cyan-100/65" : "text-slate-500"}`}>
@@ -881,7 +922,7 @@ export default function UploadPage() {
                           </div>
                           <button
                             type="button"
-                            onClick={() => setFile(null)}
+                            onClick={clearFile}
                             className={`h-9 w-9 rounded-xl grid place-items-center ${
                               dark
                                 ? "border border-cyan-300/12 bg-white/[0.04] hover:bg-white/[0.08] text-cyan-100"
@@ -904,7 +945,7 @@ export default function UploadPage() {
                   onClick={handleUpload}
                   disabled={uploading || !requiredOk}
                   className={classNames(
-                    "w-full inline-flex items-center justify-center gap-2 px-5 py-4 rounded-2xl transition text-base font-extrabold disabled:opacity-60 disabled:cursor-not-allowed",
+                    "w-full inline-flex items-center justify-center gap-2 px-5 py-4 rounded-2xl transition text-sm font-semibold disabled:opacity-60 disabled:cursor-not-allowed",
                     dark
                       ? "bg-cyan-500/90 text-slate-950 hover:bg-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.15)]"
                       : "bg-cyan-600 text-white hover:bg-cyan-700 shadow-sm"
@@ -932,10 +973,10 @@ export default function UploadPage() {
                       />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-3">
-                          <p className={`text-sm font-extrabold ${dark ? "text-white" : "text-slate-900"}`}>
+                          <p className={`text-sm font-semibold ${dark ? "text-white" : "text-slate-900"}`}>
                             {uploadStage || "Uploading document"}
                           </p>
-                          <span className={`text-xs font-bold ${dark ? "text-cyan-100/75" : "text-slate-600"}`}>
+                          <span className={`text-[11px] font-semibold ${dark ? "text-cyan-100/75" : "text-slate-600"}`}>
                             {uploadPercent}%
                           </span>
                         </div>
@@ -975,7 +1016,7 @@ export default function UploadPage() {
                 dark ? "border-cyan-300/12 bg-white/[0.03]" : "border-slate-200 bg-slate-50"
               }`}
             >
-              <div className={`text-lg font-extrabold ${dark ? "text-white" : "text-slate-900"}`}>
+              <div className={`text-lg font-semibold ${dark ? "text-white" : "text-slate-900"}`}>
                 Preview Summary
               </div>
               <div className={`text-[12px] mt-1 ${dark ? "text-cyan-100/65" : "text-slate-500"}`}>
@@ -993,7 +1034,7 @@ export default function UploadPage() {
                   Category
                 </div>
                 <div
-                  className={`mt-2 inline-flex items-center px-2.5 py-1 rounded-full text-[12px] font-semibold border ${
+                  className={`mt-2 inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold border ${
                     dark
                       ? "bg-cyan-400/10 text-cyan-100 border-cyan-300/18"
                       : "bg-cyan-50 text-cyan-700 border-cyan-200"
@@ -1011,7 +1052,7 @@ export default function UploadPage() {
                 <div className={`text-[12px] ${dark ? "text-cyan-100/60" : "text-slate-500"}`}>
                   Title
                 </div>
-                <div className={`mt-2 font-semibold break-words ${dark ? "text-white" : "text-slate-900"}`}>
+                <div className={`mt-2 text-sm font-medium break-words ${dark ? "text-white" : "text-slate-900"}`}>
                   {title.trim() || "—"}
                 </div>
               </div>
@@ -1025,7 +1066,7 @@ export default function UploadPage() {
                   <div className={`text-[12px] ${dark ? "text-cyan-100/60" : "text-slate-500"}`}>
                     Date Received
                   </div>
-                  <div className={`mt-2 font-semibold ${dark ? "text-white" : "text-slate-900"}`}>
+                  <div className={`mt-2 text-sm font-medium ${dark ? "text-white" : "text-slate-900"}`}>
                     {dateReceived || "—"}
                   </div>
                 </div>
@@ -1037,7 +1078,7 @@ export default function UploadPage() {
                   <div className={`text-[12px] ${dark ? "text-cyan-100/60" : "text-slate-500"}`}>
                     Year
                   </div>
-                  <div className={`mt-2 font-semibold ${dark ? "text-white" : "text-slate-900"}`}>
+                  <div className={`mt-2 text-sm font-medium ${dark ? "text-white" : "text-slate-900"}`}>
                     {year || "—"}
                   </div>
                 </div>
@@ -1051,7 +1092,7 @@ export default function UploadPage() {
                 <div className={`text-[12px] ${dark ? "text-cyan-100/60" : "text-slate-500"}`}>
                   {folderLabel}
                 </div>
-                <div className={`mt-2 font-semibold break-words ${dark ? "text-white" : "text-slate-900"}`}>
+                <div className={`mt-2 text-sm font-medium break-words ${dark ? "text-white" : "text-slate-900"}`}>
                   {finalFolder || "—"}
                 </div>
               </div>
@@ -1064,7 +1105,7 @@ export default function UploadPage() {
                 <div className={`text-[12px] ${dark ? "text-cyan-100/60" : "text-slate-500"}`}>
                   File
                 </div>
-                <div className={`mt-2 font-semibold break-words ${dark ? "text-white" : "text-slate-900"}`}>
+                <div className={`mt-2 text-sm font-medium break-words ${dark ? "text-white" : "text-slate-900"}`}>
                   {file?.name || "—"}
                 </div>
                 {file && (
@@ -1086,11 +1127,11 @@ export default function UploadPage() {
                     className={`w-5 h-5 mt-0.5 ${dark ? "text-emerald-300" : "text-emerald-600"}`}
                   />
                   <div>
-                    <div className={`text-lg font-extrabold ${dark ? "text-emerald-200" : "text-emerald-700"}`}>
+                    <div className={`text-base font-semibold ${dark ? "text-emerald-200" : "text-emerald-700"}`}>
                       Tip
                     </div>
                     <div
-                      className={`text-[13px] mt-1 leading-6 ${
+                      className={`text-[12px] mt-1 leading-6 ${
                         dark ? "text-emerald-100/85" : "text-emerald-700/90"
                       }`}
                     >

@@ -1,73 +1,41 @@
 export const runtime = "nodejs";
 
-import { supabaseAdmin } from "@/app/lib/db";
 import { NextRequest, NextResponse } from "next/server";
-import { google } from "googleapis";
-import { createOAuthClient } from "@/app/lib/googleDrive";
 import { Readable } from "stream";
+import { supabaseAdmin } from "@/app/lib/db";
 import { getCurrentUser } from "@/app/lib/auth";
+import {
+  getDriveClient,
+  findOrCreateFolder,
+  normalizeDriveCategory,
+  normalizeFolderName,
+} from "@/app/lib/googleDrive";
+
+const ACADEME_ID = process.env.DRIVE_ACADEME_FOLDER_ID!;
+const STAKEHOLDERS_ID = process.env.DRIVE_STAKEHOLDERS_FOLDER_ID!;
+const PAMO_ID = process.env.DRIVE_PAMO_FOLDER_ID!;
+
+const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100 MB
 
 function requiredString(v: FormDataEntryValue | null) {
   if (!v || typeof v !== "string") return "";
   return v.trim();
 }
 
-function normalizeSpaces(s: string) {
-  return s.replace(/\s+/g, " ").trim();
-}
-
-function normalizeCategoryFolderName(category: string) {
-  const c = (category || "").trim().toLowerCase();
-
-  if (c === "academe") return "Academe";
-  if (c === "stakeholder" || c === "stakeholders") return "Stakeholders";
-  if (c === "pamo activity" || c === "pamo" || c === "activity" || c === "activities") {
-    return "PAMO Activity";
-  }
-  if (c === "general") return "General";
-  return "General";
-}
-
-async function findOrCreateFolder(
-  drive: any,
-  name: string,
-  parentId?: string
-): Promise<string> {
-  const safeName = name.replace(/'/g, "\\'");
-
-  const q = [
-    `mimeType='application/vnd.google-apps.folder'`,
-    `name='${safeName}'`,
-    `trashed=false`,
-    parentId ? `'${parentId}' in parents` : null,
-  ]
-    .filter(Boolean)
-    .join(" and ");
-
-  const existing = await drive.files.list({
-    q,
-    fields: "files(id,name)",
-    spaces: "drive",
-    pageSize: 1,
-  });
-
-  const found = existing.data.files?.[0];
-  if (found?.id) return found.id;
-
-  const created = await drive.files.create({
-    requestBody: {
-      name,
-      mimeType: "application/vnd.google-apps.folder",
-      parents: parentId ? [parentId] : undefined,
-    },
-    fields: "id",
-  });
-
-  return created.data.id!;
+function getCategoryFolderId(category: string) {
+  if (category === "Academe") return ACADEME_ID;
+  if (category === "Stakeholders") return STAKEHOLDERS_ID;
+  if (category === "PAMO Activity") return PAMO_ID;
+  return "";
 }
 
 export async function POST(req: NextRequest) {
+  let uploadTotalStarted = false;
+
   try {
+    console.time("upload-total");
+    uploadTotalStarted = true;
+
     const me = await getCurrentUser();
 
     if (!me) {
@@ -78,6 +46,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    if (!ACADEME_ID || !STAKEHOLDERS_ID || !PAMO_ID) {
+      return NextResponse.json(
+        { error: "Drive folder IDs are not configured." },
+        { status: 500 }
+      );
+    }
+
     const formData = await req.formData();
 
     const file = formData.get("file");
@@ -85,29 +60,36 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
     }
 
-    let category = requiredString(formData.get("category")) || "General";
+    const rawCategory = requiredString(formData.get("category"));
     const title = requiredString(formData.get("title"));
     const dateReceived = requiredString(formData.get("dateReceived"));
-    let folder = requiredString(formData.get("folder"));
-    const year = requiredString(formData.get("year")) || new Date().getFullYear().toString();
-
-    category = normalizeSpaces(category);
-    folder = normalizeSpaces(folder);
-
-    const catLower = category.toLowerCase();
+    let folder = normalizeFolderName(requiredString(formData.get("folder")));
+    const year =
+      requiredString(formData.get("year")) || new Date().getFullYear().toString();
 
     if (!title) {
       return NextResponse.json({ error: "Title is required." }, { status: 400 });
     }
 
     if (!dateReceived) {
-      return NextResponse.json({ error: "Date received is required." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Date received is required." },
+        { status: 400 }
+      );
     }
 
-    const isStakeholder = catLower === "stakeholder" || catLower === "stakeholders";
-    if (isStakeholder && !folder) {
+    const category = normalizeDriveCategory(rawCategory);
+    const isStakeholder = category === "Stakeholders";
+    const isPamo = category === "PAMO Activity";
+
+    if ((isStakeholder || isPamo) && !folder) {
       return NextResponse.json(
-        { error: "Stakeholder folder/name is required." },
+        {
+          error:
+            category === "Stakeholders"
+              ? "Stakeholder folder/name is required."
+              : "Activity group is required.",
+        },
         { status: 400 }
       );
     }
@@ -116,85 +98,150 @@ export async function POST(req: NextRequest) {
       folder = folder.toUpperCase();
     }
 
-    const stream = (file as File).stream();
-    const chunks: Uint8Array[] = [];
-    for await (const chunk of stream as any) chunks.push(chunk);
-    const buffer = Buffer.concat(chunks);
-
-    const oauth2Client = createOAuthClient();
-    oauth2Client.setCredentials({ refresh_token: process.env.GOOGLE_REFRESH_TOKEN });
-
-    const drive = google.drive({ version: "v3", auth: oauth2Client });
-
-    const ROOT = "Hamiguitan Repository";
-    const rootId = await findOrCreateFolder(drive, ROOT);
-
-    const categoryFolderName = normalizeCategoryFolderName(category);
-    const categoryFolderId = await findOrCreateFolder(drive, categoryFolderName, rootId);
-
-    let targetFolderId = categoryFolderId;
-    if (folder) {
-      targetFolderId = await findOrCreateFolder(drive, folder, categoryFolderId);
-    }
-
-    const readableStream = Readable.from(buffer);
-
-    const uploaded = await drive.files.create({
-      requestBody: {
-        name: (file as File).name,
-        parents: [targetFolderId],
-      },
-      media: {
-        mimeType: (file as File).type || "application/octet-stream",
-        body: readableStream,
-      },
-      fields: "id",
-    });
-
-    const fileId = uploaded.data.id;
-    if (!fileId) {
-      return NextResponse.json({ error: "Google Drive upload failed." }, { status: 500 });
-    }
-
-    await drive.permissions.create({
-      fileId,
-      requestBody: {
-        type: "anyone",
-        role: "reader",
-      },
-    });
-
-    const fileName = (file as File).name;
-    const fileType = (file as File).type || "unknown";
-    const uploadedAt = new Date().toISOString();
-
-    const { error: insertError } = await supabaseAdmin.from("documents").insert([
-      {
-        fileId,
-        name: fileName,
-        type: fileType,
-        category: categoryFolderName,
-        folder: folder || "",
-        title,
-        dateReceived,
-        year,
-        uploadedAt,
-      },
-    ]);
-
-    if (insertError) {
-      console.error("UPLOAD DB INSERT ERROR:", insertError);
+    const categoryFolderId = getCategoryFolderId(category);
+    if (!categoryFolderId) {
       return NextResponse.json(
-        { error: insertError.message || "Failed to save metadata" },
+        { error: "Invalid category folder configuration." },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({ success: true, fileId });
-  } catch (error) {
+    const fileObj = file as File;
+    const fileName = fileObj.name || "upload";
+    const mimeType = fileObj.type || "application/octet-stream";
+
+    const arrayBuffer = await fileObj.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    if (!buffer.length) {
+      return NextResponse.json(
+        { error: "Selected file is empty." },
+        { status: 400 }
+      );
+    }
+
+    if (buffer.length > MAX_FILE_SIZE) {
+      return NextResponse.json(
+        { error: "Maximum file size is 100MB." },
+        { status: 400 }
+      );
+    }
+
+    console.log("UPLOAD START:", {
+      userId: me.id,
+      role: me.role,
+      category,
+      folder,
+      title,
+      dateReceived,
+      year,
+      fileName,
+      mimeType,
+      size: buffer.length,
+    });
+
+    const drive = getDriveClient();
+
+    console.time("resolve-folder");
+    let targetFolderId = categoryFolderId;
+
+    if (folder) {
+      targetFolderId = await findOrCreateFolder(drive, folder, categoryFolderId);
+    }
+    console.timeEnd("resolve-folder");
+
+    console.time("drive-upload");
+    const uploaded = await drive.files.create({
+      requestBody: {
+        name: fileName,
+        parents: [targetFolderId],
+      },
+      media: {
+        mimeType,
+        body: Readable.from(buffer),
+      },
+      fields: "id,name,webViewLink",
+      supportsAllDrives: true,
+    });
+    console.timeEnd("drive-upload");
+
+    const fileId = uploaded.data.id;
+    if (!fileId) {
+      throw new Error("Google Drive did not return a file ID.");
+    }
+
+    console.time("drive-permission");
+    try {
+      await drive.permissions.create({
+        fileId,
+        requestBody: {
+          type: "anyone",
+          role: "reader",
+        },
+        supportsAllDrives: true,
+      });
+    } catch (permError) {
+      console.error("UPLOAD PERMISSION WARNING:", permError);
+    }
+    console.timeEnd("drive-permission");
+
+    const uploadedAt = new Date().toISOString();
+
+    console.time("db-save");
+    const { data: insertedRow, error: insertError } = await supabaseAdmin
+      .from("documents")
+      .insert([
+        {
+          fileId,
+          name: fileName,
+          type: mimeType,
+          category,
+          folder: folder || "",
+          title,
+          dateReceived,
+          year,
+          uploadedAt,
+        },
+      ])
+      .select("id")
+      .single();
+    console.timeEnd("db-save");
+
+    if (insertError) {
+      console.error("UPLOAD DB INSERT ERROR:", insertError);
+      return NextResponse.json(
+        { error: insertError.message || "Failed to save metadata." },
+        { status: 500 }
+      );
+    }
+
+    console.log("UPLOAD DONE:", {
+      id: insertedRow?.id,
+      fileId,
+      fileName,
+    });
+
+    console.timeEnd("upload-total");
+
+    return NextResponse.json({
+      ok: true,
+      id: insertedRow?.id,
+      fileId,
+      name: fileName,
+      category,
+      folder: folder || "",
+    });
+  } catch (error: any) {
     console.error("UPLOAD ERROR:", error);
+
+    if (uploadTotalStarted) {
+      try {
+        console.timeEnd("upload-total");
+      } catch {}
+    }
+
     return NextResponse.json(
-      { error: "Upload failed", details: String(error) },
+      { error: error?.message || "Upload failed." },
       { status: 500 }
     );
   }

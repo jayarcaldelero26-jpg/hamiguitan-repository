@@ -1,11 +1,22 @@
+export const runtime = "nodejs";
+
 import { NextResponse, type NextRequest } from "next/server";
-import { supabaseAdmin } from "@/app/lib/db";
 import jwt from "jsonwebtoken";
+import { getDriveClient, listChildFolders } from "@/app/lib/googleDrive";
 
 const SECRET = process.env.JWT_SECRET!;
 
+const ACADEME_ID = process.env.DRIVE_ACADEME_FOLDER_ID!;
+const STAKEHOLDERS_ID = process.env.DRIVE_STAKEHOLDERS_FOLDER_ID!;
+const PAMO_ID = process.env.DRIVE_PAMO_FOLDER_ID!;
+
+function getToken(req: NextRequest) {
+  return req.cookies.get("auth_token")?.value || "";
+}
+
 export async function GET(req: NextRequest) {
-  const token = req.cookies.get("auth_token")?.value;
+  const token = getToken(req);
+
   if (!token) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -13,47 +24,28 @@ export async function GET(req: NextRequest) {
   try {
     jwt.verify(token, SECRET);
 
-    const { data: rows, error } = await supabaseAdmin
-      .from("documents")
-      .select("folder, category")
-      .neq("folder", "")
-      .order("folder", { ascending: true });
-
-    if (error) {
-      console.error("FOLDERS GET ERROR:", error);
-      return NextResponse.json({ error: "Failed to load folders" }, { status: 500 });
+    if (!ACADEME_ID || !STAKEHOLDERS_ID || !PAMO_ID) {
+      return NextResponse.json(
+        { error: "Drive folder IDs are not configured." },
+        { status: 500 }
+      );
     }
 
-    const normalizedRows = (rows || [])
-      .map((r: any) => ({
-        folder: String(r.folder || "").trim(),
-        category: String(r.category || "").trim().toLowerCase(),
-      }))
-      .filter((r) => r.folder !== "");
+    const drive = getDriveClient();
 
-    const uniqueMap = new Map<string, { folder: string; category: string }>();
+    const [academe, stakeholders, pamo] = await Promise.all([
+      listChildFolders(drive, ACADEME_ID),
+      listChildFolders(drive, STAKEHOLDERS_ID),
+      listChildFolders(drive, PAMO_ID),
+    ]);
 
-    for (const row of normalizedRows) {
-      const key = `${row.category}::${row.folder.toLowerCase()}`;
-      if (!uniqueMap.has(key)) {
-        uniqueMap.set(key, row);
-      }
-    }
-
-    const uniqueRows = Array.from(uniqueMap.values()).sort((a, b) =>
-      a.folder.localeCompare(b.folder)
-    );
-
-    const academe = uniqueRows
-      .filter((r) => r.category === "academe")
-      .map((r) => r.folder);
-
-    const stakeholders = uniqueRows
-      .filter((r) => r.category === "stakeholder" || r.category === "stakeholders")
-      .map((r) => r.folder);
-
-    return NextResponse.json({ academe, stakeholders });
-  } catch {
-    return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+    return NextResponse.json({
+      academe,
+      stakeholders,
+      pamo,
+    });
+  } catch (error) {
+    console.error("FOLDERS GET ERROR:", error);
+    return NextResponse.json({ error: "Failed to load folders." }, { status: 500 });
   }
 }

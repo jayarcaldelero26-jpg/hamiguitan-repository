@@ -7,6 +7,7 @@ import {
   useEffect,
   useState,
 } from "react";
+import { useAuth } from "@/app/components/AuthProvider";
 
 export type DocumentRow = {
   id: number;
@@ -34,10 +35,18 @@ export function DocumentsProvider({
 }: {
   children: React.ReactNode;
 }) {
+  const { user, loading: authLoading } = useAuth();
+
   const [documents, setDocuments] = useState<DocumentRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   const loadDocuments = useCallback(async () => {
+    if (!user) {
+      setDocuments([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
 
@@ -45,6 +54,11 @@ export function DocumentsProvider({
         credentials: "include",
         cache: "no-store",
       });
+
+      if (res.status === 401) {
+        setDocuments([]);
+        return;
+      }
 
       if (!res.ok) {
         console.error("DOCUMENTS GET FAILED:", res.status);
@@ -67,11 +81,22 @@ export function DocumentsProvider({
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
+    if (authLoading) {
+      setLoading(true);
+      return;
+    }
+
+    if (!user) {
+      setDocuments([]);
+      setLoading(false);
+      return;
+    }
+
     loadDocuments();
-  }, [loadDocuments]);
+  }, [authLoading, user, loadDocuments]);
 
   return (
     <DocumentsContext.Provider

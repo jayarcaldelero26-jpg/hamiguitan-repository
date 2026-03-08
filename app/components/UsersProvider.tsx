@@ -12,6 +12,7 @@ import {
   type SetStateAction,
   type ReactNode,
 } from "react";
+import { useAuth } from "@/app/components/AuthProvider";
 
 export type UserRole = "admin" | "co_admin" | "staff";
 
@@ -50,17 +51,32 @@ type UsersContextType = {
 
 const UsersContext = createContext<UsersContextType | undefined>(undefined);
 
+function normalizeRole(role?: string): UserRole | "" {
+  const r = (role || "").trim().toLowerCase();
+  if (r === "admin" || r === "co_admin" || r === "staff") return r;
+  return "";
+}
+
+function canViewUsers(role?: string) {
+  const r = normalizeRole(role);
+  return r === "admin" || r === "co_admin";
+}
+
 function normalizeUserRow(u: any): UserRow {
   return {
     ...u,
     id: Number(u.id),
     userCode:
-      u?.userCode !== null && u?.userCode !== undefined ? String(u.userCode) : null,
+      u?.userCode !== null && u?.userCode !== undefined
+        ? String(u.userCode)
+        : null,
     contact:
-      u?.contact !== null && u?.contact !== undefined ? String(u.contact) : null,
+      u?.contact !== null && u?.contact !== undefined
+        ? String(u.contact)
+        : null,
     name: u?.name ? String(u.name) : "",
     email: u?.email ? String(u.email) : "",
-    role: (u?.role || "staff") as UserRole,
+    role: (normalizeRole(u?.role) || "staff") as UserRole,
     firstName: u?.firstName ?? null,
     middleName: u?.middleName ?? null,
     lastName: u?.lastName ?? null,
@@ -74,6 +90,8 @@ function normalizeUserRow(u: any): UserRow {
 }
 
 export function UsersProvider({ children }: { children: ReactNode }) {
+  const { user, loading: authLoading } = useAuth();
+
   const [users, setUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -82,76 +100,112 @@ export function UsersProvider({ children }: { children: ReactNode }) {
   const hasFetchedRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
 
-  const refreshUsers = useCallback(async (opts?: { silent?: boolean }) => {
-    const silent = opts?.silent === true;
+  const refreshUsers = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      const silent = opts?.silent === true;
 
-    try {
-      abortRef.current?.abort();
+      if (authLoading) return;
 
-      const controller = new AbortController();
-      abortRef.current = controller;
-
-      if (!silent) {
-        if (!hasFetchedRef.current) {
-          setLoading(true);
-        } else {
-          setRefreshing(true);
-        }
-      }
-
-      const res = await fetch("/api/admin/users", {
-        credentials: "include",
-        cache: "no-store",
-        signal: controller.signal,
-      });
-
-      const data = await res.json().catch(() => null);
-
-      if (controller.signal.aborted) return;
-
-      if (!res.ok) {
-        console.error("USERS GET FAILED:", res.status, data);
+      if (!user || !canViewUsers(user.role)) {
         if (mountedRef.current) {
           setUsers([]);
+          setLoading(false);
+          setRefreshing(false);
         }
         return;
       }
 
-      const rows: UserRow[] = Array.isArray(data?.users)
-        ? data.users
-        : Array.isArray(data)
-        ? data
-        : [];
+      try {
+        abortRef.current?.abort();
 
-      if (!mountedRef.current) return;
+        const controller = new AbortController();
+        abortRef.current = controller;
 
-      setUsers(rows.map(normalizeUserRow));
-      hasFetchedRef.current = true;
-    } catch (error: any) {
-      if (error?.name === "AbortError") return;
-      console.error("USERS LOAD FAILED:", error);
-      if (mountedRef.current) {
-        setUsers([]);
+        if (!silent) {
+          if (!hasFetchedRef.current) {
+            setLoading(true);
+          } else {
+            setRefreshing(true);
+          }
+        }
+
+        const res = await fetch("/api/admin/users", {
+          credentials: "include",
+          cache: "no-store",
+          signal: controller.signal,
+        });
+
+        const data = await res.json().catch(() => null);
+
+        if (controller.signal.aborted) return;
+
+        if (res.status === 401 || res.status === 403) {
+          if (mountedRef.current) {
+            setUsers([]);
+          }
+          return;
+        }
+
+        if (!res.ok) {
+          console.error("USERS GET FAILED:", res.status, data);
+          if (mountedRef.current) {
+            setUsers([]);
+          }
+          return;
+        }
+
+        const rows: UserRow[] = Array.isArray(data?.users)
+          ? data.users
+          : Array.isArray(data)
+          ? data
+          : [];
+
+        if (!mountedRef.current) return;
+
+        setUsers(rows.map(normalizeUserRow));
+        hasFetchedRef.current = true;
+      } catch (error: any) {
+        if (error?.name === "AbortError") return;
+        console.error("USERS LOAD FAILED:", error);
+        if (mountedRef.current) {
+          setUsers([]);
+        }
+      } finally {
+        if (!mountedRef.current) return;
+        setLoading(false);
+        setRefreshing(false);
       }
-    } finally {
-      if (!mountedRef.current) return;
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
+    },
+    [authLoading, user]
+  );
 
   useEffect(() => {
     mountedRef.current = true;
-
-    if (!hasFetchedRef.current) {
-      refreshUsers();
-    }
-
     return () => {
       mountedRef.current = false;
       abortRef.current?.abort();
     };
-  }, [refreshUsers]);
+  }, []);
+
+  useEffect(() => {
+    if (authLoading) {
+      setLoading(true);
+      return;
+    }
+
+    if (!user || !canViewUsers(user.role)) {
+      setUsers([]);
+      setLoading(false);
+      setRefreshing(false);
+      hasFetchedRef.current = false;
+      abortRef.current?.abort();
+      return;
+    }
+
+    if (!hasFetchedRef.current) {
+      refreshUsers();
+    }
+  }, [authLoading, user, refreshUsers]);
 
   const value = useMemo<UsersContextType>(
     () => ({
