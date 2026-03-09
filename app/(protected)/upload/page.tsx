@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/app/components/AuthProvider";
 import { useDocuments } from "@/app/components/DocumentsProvider";
+import { supabaseBrowser } from "@/app/lib/supabaseClient";
 import { motion } from "framer-motion";
 import {
   ArrowUpTrayIcon,
@@ -21,6 +22,7 @@ type Category = "Academe" | "Stakeholder" | "PAMO Activity";
 type FoldersState = { academe: string[]; stakeholders: string[]; pamo: string[] };
 type PageTheme = "dark" | "light";
 
+const TEMP_BUCKET = "temp-uploads";
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
 
 function initials(name: string) {
@@ -51,6 +53,10 @@ function classNames(...xs: Array<string | false | null | undefined>) {
 
 function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function sanitizeFileName(name: string) {
+  return name.replace(/[^\w.\-() ]+/g, "_");
 }
 
 function Skeleton({
@@ -318,17 +324,6 @@ export default function UploadPage() {
       return;
     }
 
-    console.log("UPLOAD REQUEST:", {
-      fileName: file.name,
-      fileSize: file.size,
-      fileType: file.type,
-      category,
-      title: title.trim(),
-      dateReceived,
-      folder: finalFolder,
-      year: year || new Date().getFullYear().toString(),
-    });
-
     setUploading(true);
     setUploadPercent(5);
     setUploadStage("Preparing upload");
@@ -337,25 +332,40 @@ export default function UploadPage() {
     let stageTimer: ReturnType<typeof setInterval> | null = null;
 
     try {
+      const safeFileName = sanitizeFileName(file.name);
+      const uniqueId =
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+      const tempPath = `${me?.id || "user"}/${uniqueId}-${safeFileName}`;
+
+      console.log("DIRECT TEMP UPLOAD:", {
+        tempPath,
+        fileName: file.name,
+        size: file.size,
+        type: file.type,
+      });
+
       await wait(200);
 
       setUploadPercent(15);
       setUploadStage("Uploading to temporary storage");
-      setUploadDetail("Sending file to secure temporary cloud storage.");
+      setUploadDetail("Sending file directly to Supabase temporary storage.");
 
       const rotatingStages = [
         {
-          percent: 28,
+          percent: 30,
           title: "Staging upload",
           detail: "Temporary file is being prepared for transfer.",
         },
         {
-          percent: 52,
+          percent: 55,
           title: "Transferring to Google Drive",
           detail: "Moving the uploaded file to permanent cloud storage.",
         },
         {
-          percent: 78,
+          percent: 80,
           title: "Saving repository record",
           detail: "Saving file details to the repository database.",
         },
@@ -375,26 +385,19 @@ export default function UploadPage() {
         idx += 1;
       };
 
-      const tempFormData = new FormData();
-      tempFormData.append("file", file);
+      const { error: tempUploadError } = await supabaseBrowser.storage
+        .from(TEMP_BUCKET)
+        .upload(tempPath, file, {
+          cacheControl: "3600",
+          upsert: false,
+          contentType: file.type || "application/octet-stream",
+        });
 
-      const tempUploadRes = await fetch("/api/upload-temp", {
-        method: "POST",
-        credentials: "include",
-        body: tempFormData,
-      });
-
-      const tempUploadData = await tempUploadRes.json().catch(() => null);
-
-      if (!tempUploadRes.ok) {
+      if (tempUploadError) {
+        console.error("DIRECT TEMP UPLOAD ERROR:", tempUploadError);
         throw new Error(
-          tempUploadData?.error || "Failed to upload temporary file."
+          tempUploadError.message || "Failed to upload temporary file."
         );
-      }
-
-      const tempPath = tempUploadData?.tempPath;
-      if (!tempPath) {
-        throw new Error("Temporary upload did not return a file path.");
       }
 
       applyStage();
