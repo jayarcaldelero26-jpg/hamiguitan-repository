@@ -2,6 +2,7 @@ export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
+import { randomUUID } from "crypto";
 import { supabaseAdmin } from "@/app/lib/db";
 
 const SECRET = process.env.JWT_SECRET!;
@@ -55,16 +56,29 @@ export async function POST(req: NextRequest) {
     }
 
     const safeFileName = sanitizeFileName(file.name);
-    const tempPath = `${payload?.id || "user"}/${Date.now()}-${safeFileName}`;
+    const uniqueId = randomUUID();
+    const tempPath = `${payload?.id || "user"}/${uniqueId}-${safeFileName}`;
+
+    console.log("UPLOAD TEMP START:", {
+      userId: payload?.id || "user",
+      tempPath,
+      fileName: file.name,
+      safeFileName,
+      size: file.size,
+      type: file.type || "application/octet-stream",
+    });
 
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
     if (!buffer.length) {
-      return NextResponse.json({ error: "Uploaded file is empty." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Uploaded file is empty." },
+        { status: 400 }
+      );
     }
 
-    const { error } = await supabaseAdmin.storage
+    const { data, error } = await supabaseAdmin.storage
       .from(TEMP_BUCKET)
       .upload(tempPath, buffer, {
         cacheControl: "3600",
@@ -73,11 +87,31 @@ export async function POST(req: NextRequest) {
       });
 
     if (error) {
+      console.error("UPLOAD TEMP STORAGE ERROR:", {
+        message: error.message,
+        name: (error as any)?.name,
+        tempPath,
+        bucket: TEMP_BUCKET,
+      });
+
       return NextResponse.json(
-        { error: error.message || "Failed to upload temporary file." },
+        {
+          error: error.message || "Failed to upload temporary file.",
+          details: {
+            tempPath,
+            bucket: TEMP_BUCKET,
+          },
+        },
         { status: 500 }
       );
     }
+
+    console.log("UPLOAD TEMP DONE:", {
+      tempPath,
+      path: data?.path,
+      id: data?.id,
+      fullPath: data?.fullPath,
+    });
 
     return NextResponse.json({
       ok: true,
@@ -88,8 +122,11 @@ export async function POST(req: NextRequest) {
     });
   } catch (error: any) {
     console.error("UPLOAD TEMP ERROR:", error);
+
     return NextResponse.json(
-      { error: error?.message || "Temporary upload failed." },
+      {
+        error: error?.message || "Temporary upload failed.",
+      },
       { status: 500 }
     );
   }

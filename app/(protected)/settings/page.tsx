@@ -203,8 +203,8 @@ export default function SettingsPage() {
     normalizedRole === "admin" ||
     normalizedRole === "co_admin" ||
     normalizedRole === "staff";
-  const canAdminReset =
-    normalizedRole === "admin" || normalizedRole === "co_admin";
+
+  const canAdminReset = normalizedRole === "admin";
 
   useEffect(() => {
     if (loadingUser) return;
