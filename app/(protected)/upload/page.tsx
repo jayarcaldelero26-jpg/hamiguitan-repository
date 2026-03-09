@@ -5,7 +5,6 @@ import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/app/components/AuthProvider";
 import { useDocuments } from "@/app/components/DocumentsProvider";
-import { supabaseBrowser } from "@/app/lib/supabaseClient";
 import { motion } from "framer-motion";
 import {
   ArrowUpTrayIcon,
@@ -22,7 +21,7 @@ type Category = "Academe" | "Stakeholder" | "PAMO Activity";
 type FoldersState = { academe: string[]; stakeholders: string[]; pamo: string[] };
 type PageTheme = "dark" | "light";
 
-const TEMP_BUCKET = "temp-uploads";
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
 
 function initials(name: string) {
   const parts = (name || "").trim().split(/\s+/).filter(Boolean);
@@ -52,10 +51,6 @@ function classNames(...xs: Array<string | false | null | undefined>) {
 
 function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function sanitizeFileName(name: string) {
-  return name.replace(/[^\w.\-() ]+/g, "_");
 }
 
 function Skeleton({
@@ -258,6 +253,23 @@ export default function UploadPage() {
   }
 
   function onFileSelected(f: File | null) {
+    if (!f) {
+      setFile(null);
+      return;
+    }
+
+    if (f.size > MAX_FILE_SIZE) {
+      setFile(null);
+
+      if (inputRef.current) {
+        inputRef.current.value = "";
+      }
+
+      setErrorMsg("File is too large. Maximum allowed file size is 50 MB.");
+      setErrorOpen(true);
+      return;
+    }
+
     setFile(f);
   }
 
@@ -277,16 +289,25 @@ export default function UploadPage() {
       setErrorOpen(true);
       return;
     }
+
+    if (file.size > MAX_FILE_SIZE) {
+      setErrorMsg("File is too large. Maximum allowed file size is 50 MB.");
+      setErrorOpen(true);
+      return;
+    }
+
     if (!title.trim()) {
       setErrorMsg("Document title is required.");
       setErrorOpen(true);
       return;
     }
+
     if (!dateReceived) {
       setErrorMsg("Date received is required.");
       setErrorOpen(true);
       return;
     }
+
     if (folderRequired && !finalFolder) {
       setErrorMsg(
         category === "Stakeholder"
@@ -297,7 +318,7 @@ export default function UploadPage() {
       return;
     }
 
-    console.log("TEMP UPLOAD REQUEST:", {
+    console.log("UPLOAD REQUEST:", {
       fileName: file.name,
       fileSize: file.size,
       fileType: file.type,
@@ -314,14 +335,9 @@ export default function UploadPage() {
     setUploadDetail("Checking required fields and preparing temporary storage.");
 
     let stageTimer: ReturnType<typeof setInterval> | null = null;
-    let uploadedTempPath = "";
 
     try {
       await wait(200);
-
-      const safeFileName = sanitizeFileName(file.name);
-      const tempPath = `${me?.id || "user"}/${Date.now()}-${safeFileName}`;
-      uploadedTempPath = tempPath;
 
       setUploadPercent(15);
       setUploadStage("Uploading to temporary storage");
@@ -359,16 +375,26 @@ export default function UploadPage() {
         idx += 1;
       };
 
-      const { error: tempUploadError } = await supabaseBrowser.storage
-        .from(TEMP_BUCKET)
-        .upload(tempPath, file, {
-          cacheControl: "3600",
-          upsert: false,
-          contentType: file.type || "application/octet-stream",
-        });
+      const tempFormData = new FormData();
+      tempFormData.append("file", file);
 
-      if (tempUploadError) {
-        throw new Error(tempUploadError.message || "Failed to upload temporary file.");
+      const tempUploadRes = await fetch("/api/upload-temp", {
+        method: "POST",
+        credentials: "include",
+        body: tempFormData,
+      });
+
+      const tempUploadData = await tempUploadRes.json().catch(() => null);
+
+      if (!tempUploadRes.ok) {
+        throw new Error(
+          tempUploadData?.error || "Failed to upload temporary file."
+        );
+      }
+
+      const tempPath = tempUploadData?.tempPath;
+      if (!tempPath) {
+        throw new Error("Temporary upload did not return a file path.");
       }
 
       applyStage();
@@ -388,6 +414,7 @@ export default function UploadPage() {
           tempPath,
           originalName: file.name,
           mimeType: file.type || "application/octet-stream",
+          fileSize: file.size,
           category,
           title: title.trim(),
           dateReceived,
@@ -947,6 +974,13 @@ export default function UploadPage() {
                     </div>
                   </div>
                 </div>
+
+                <p className={`mt-3 text-[12px] ${dark ? "text-cyan-100/65" : "text-slate-500"}`}>
+                  Maximum allowed file size:{" "}
+                  <span className={`font-semibold ${dark ? "text-cyan-200" : "text-slate-700"}`}>
+                    50 MB
+                  </span>
+                </p>
               </div>
 
               <div className="pt-1">
@@ -1148,6 +1182,18 @@ export default function UploadPage() {
                       Use consistent folder names (e.g., <b>PAMB</b>, <b>DENR</b>, <b>LGU</b>, <b>UM</b>, <b>BMS</b>) so the Documents page groups files nicely.
                     </div>
                   </div>
+                </div>
+              </div>
+
+              <div
+                className={`rounded-3xl p-4 ${
+                  dark
+                    ? "border border-amber-300/15 bg-amber-400/8"
+                    : "border border-amber-200 bg-amber-50"
+                }`}
+              >
+                <div className={`text-[12px] ${dark ? "text-amber-100/85" : "text-amber-700"}`}>
+                  Upload limit: <span className="font-semibold">50 MB maximum per file</span>
                 </div>
               </div>
 

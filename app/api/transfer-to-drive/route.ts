@@ -13,6 +13,7 @@ import {
 
 const SECRET = process.env.JWT_SECRET!;
 const TEMP_BUCKET = "temp-uploads";
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
 
 const ACADEME_ID = process.env.DRIVE_ACADEME_FOLDER_ID!;
 const STAKEHOLDERS_ID = process.env.DRIVE_STAKEHOLDERS_FOLDER_ID!;
@@ -68,6 +69,11 @@ export async function POST(req: NextRequest) {
     const dateReceived = requiredString(body?.dateReceived);
     const year =
       requiredString(body?.year) || new Date().getFullYear().toString();
+    const declaredFileSize =
+      typeof body?.fileSize === "number" && Number.isFinite(body.fileSize)
+        ? body.fileSize
+        : 0;
+
     let folder = normalizeFolderName(requiredString(body?.folder));
 
     if (!tempPath) {
@@ -94,6 +100,13 @@ export async function POST(req: NextRequest) {
     if (!dateReceived) {
       return NextResponse.json(
         { error: "Date received is required." },
+        { status: 400 }
+      );
+    }
+
+    if (declaredFileSize > MAX_FILE_SIZE) {
+      return NextResponse.json(
+        { error: "File is too large. Maximum allowed file size is 50 MB." },
         { status: 400 }
       );
     }
@@ -135,6 +148,7 @@ export async function POST(req: NextRequest) {
       title,
       dateReceived,
       year,
+      declaredFileSize,
     });
 
     const { data: fileData, error: downloadError } = await supabaseAdmin.storage
@@ -155,6 +169,19 @@ export async function POST(req: NextRequest) {
     if (!buffer.length) {
       return NextResponse.json(
         { error: "Temporary file is empty." },
+        { status: 400 }
+      );
+    }
+
+    if (buffer.length > MAX_FILE_SIZE) {
+      try {
+        await supabaseAdmin.storage.from(TEMP_BUCKET).remove([tempPath]);
+      } catch (cleanupError) {
+        console.error("TEMP FILE CLEANUP WARNING:", cleanupError);
+      }
+
+      return NextResponse.json(
+        { error: "File is too large. Maximum allowed file size is 50 MB." },
         { status: 400 }
       );
     }
