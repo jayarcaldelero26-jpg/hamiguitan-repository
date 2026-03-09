@@ -145,6 +145,7 @@ export default function ProtectedShell({
           key={href}
           type="button"
           onClick={() => handleNavigate(href)}
+          aria-current={active ? "page" : undefined}
           className={`group relative w-full flex items-center gap-3 px-3 py-3 rounded-2xl transition-all duration-200 border ${
             collapsed ? "justify-center" : ""
           } ${
@@ -233,19 +234,31 @@ export default function ProtectedShell({
 
   return (
     <>
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[9999] focus:px-4 focus:py-2 focus:rounded-xl focus:bg-cyan-400 focus:text-slate-950 focus:font-semibold"
+      >
+        Skip to main content
+      </a>
+
       <div className="h-screen overflow-hidden bg-[#020817]">
         <div className="flex h-full">
           <aside
+            aria-label="Sidebar"
             className={`h-full shrink-0 overflow-hidden border-r p-5 flex flex-col bg-[linear-gradient(180deg,#03121d_0%,#071c2a_55%,#061724_100%)] border-cyan-400/15 transition-all duration-200 ease-out ${
               collapsed ? "w-[88px]" : "w-[290px]"
             }`}
           >
-            <div className="flex items-center justify-between">
+            <div
+              role="banner"
+              className="flex items-center justify-between"
+            >
               <button
                 type="button"
                 onClick={() => setCollapsed((v) => !v)}
                 className="p-2.5 rounded-xl hover:bg-cyan-400/10 transition border border-transparent hover:border-cyan-300/15"
                 title="Toggle sidebar"
+                aria-label="Toggle sidebar"
               >
                 <Bars3Icon className="w-6 h-6 text-white" />
               </button>
@@ -292,7 +305,7 @@ export default function ProtectedShell({
 
             <div className="mt-7 mb-3 h-px bg-gradient-to-r from-transparent via-cyan-300/15 to-transparent" />
 
-            <nav className="space-y-2">
+            <nav aria-label="Primary navigation" className="space-y-2">
               {navItems.map((item) => navBtn(item.href, item.label, item.icon))}
             </nav>
 
@@ -312,6 +325,7 @@ export default function ProtectedShell({
                 className={`mt-3 w-full flex items-center gap-2 px-3 py-3 rounded-2xl border transition ${
                   collapsed ? "justify-center" : ""
                 } ${darkButtonStyle()}`}
+                aria-label="Logout"
               >
                 <ArrowRightOnRectangleIcon className="w-5 h-5" />
                 {!collapsed && (
@@ -322,6 +336,8 @@ export default function ProtectedShell({
           </aside>
 
           <main
+            id="main-content"
+            role="main"
             className={`flex-1 h-full overflow-y-auto transition-colors duration-300 ${pageBg}`}
           >
             <div className="min-h-full">{children}</div>

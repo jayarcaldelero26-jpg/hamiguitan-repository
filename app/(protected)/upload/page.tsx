@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/app/components/AuthProvider";
 import { useDocuments } from "@/app/components/DocumentsProvider";
+import { supabaseBrowser } from "@/app/lib/supabaseClient";
 import { motion } from "framer-motion";
 import {
   ArrowUpTrayIcon,
@@ -20,6 +21,8 @@ import {
 type Category = "Academe" | "Stakeholder" | "PAMO Activity";
 type FoldersState = { academe: string[]; stakeholders: string[]; pamo: string[] };
 type PageTheme = "dark" | "light";
+
+const TEMP_BUCKET = "temp-uploads";
 
 function initials(name: string) {
   const parts = (name || "").trim().split(/\s+/).filter(Boolean);
@@ -51,6 +54,10 @@ function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function sanitizeFileName(name: string) {
+  return name.replace(/[^\w.\-() ]+/g, "_");
+}
+
 function Skeleton({
   className,
   dark,
@@ -71,7 +78,7 @@ export default function UploadPage() {
   const router = useRouter();
   const { user: me, loading: loadingMe } = useAuth();
   const { refreshDocuments } = useDocuments();
-  
+
   const [pageTheme, setPageTheme] = useState<PageTheme>("dark");
 
   const [category, setCategory] = useState<Category>("Academe");
@@ -215,6 +222,7 @@ export default function UploadPage() {
   const folderRequired = category === "Stakeholder" || category === "PAMO Activity";
   const fileSize = file?.size ?? 0;
   const fileType = file?.type || "unknown";
+
   const requiredOk = useMemo(() => {
     if (!title.trim()) return false;
     if (!dateReceived) return false;
@@ -289,15 +297,7 @@ export default function UploadPage() {
       return;
     }
 
-    const fd = new FormData();
-    fd.append("file", file);
-    fd.append("category", category);
-    fd.append("title", title.trim());
-    fd.append("dateReceived", dateReceived);
-    fd.append("folder", finalFolder);
-    fd.append("year", year || new Date().getFullYear().toString());
-
-    console.log("UPLOAD REQUEST:", {
+    console.log("TEMP UPLOAD REQUEST:", {
       fileName: file.name,
       fileSize: file.size,
       fileType: file.type,
@@ -309,48 +309,44 @@ export default function UploadPage() {
     });
 
     setUploading(true);
-    setUploadPercent(6);
-    setUploadStage("Validating upload request");
-    setUploadDetail("Checking required fields and preparing document information.");
+    setUploadPercent(5);
+    setUploadStage("Preparing upload");
+    setUploadDetail("Checking required fields and preparing temporary storage.");
 
     let stageTimer: ReturnType<typeof setInterval> | null = null;
+    let uploadedTempPath = "";
 
     try {
       await wait(200);
 
-      setUploadPercent(12);
-      setUploadStage("Reading selected file");
-      setUploadDetail("Preparing the selected file before upload.");
+      const safeFileName = sanitizeFileName(file.name);
+      const tempPath = `${me?.id || "user"}/${Date.now()}-${safeFileName}`;
+      uploadedTempPath = tempPath;
 
-      await wait(250);
+      setUploadPercent(15);
+      setUploadStage("Uploading to temporary storage");
+      setUploadDetail("Sending file to secure temporary cloud storage.");
 
       const rotatingStages = [
         {
-          percent: 24,
-          title: "Connecting to Google Drive",
-          detail: "Establishing secure cloud connection.",
+          percent: 28,
+          title: "Staging upload",
+          detail: "Temporary file is being prepared for transfer.",
         },
         {
-          percent: 38,
-          title: "Preparing destination folder",
-          detail: finalFolder
-            ? `Checking the folder "${finalFolder}" before upload.`
-            : `Using the ${category} destination folder.`,
+          percent: 52,
+          title: "Transferring to Google Drive",
+          detail: "Moving the uploaded file to permanent cloud storage.",
         },
         {
-          percent: 58,
-          title: "Uploading file to Google Drive",
-          detail: "Submitting the selected file to cloud storage.",
-        },
-        {
-          percent: 82,
-          title: "Applying file permission",
-          detail: "Setting document access after upload.",
-        },
-        {
-          percent: 94,
+          percent: 78,
           title: "Saving repository record",
           detail: "Saving file details to the repository database.",
+        },
+        {
+          percent: 92,
+          title: "Cleaning temporary storage",
+          detail: "Removing the staged file after transfer.",
         },
       ];
 
@@ -363,38 +359,52 @@ export default function UploadPage() {
         idx += 1;
       };
 
+      const { error: tempUploadError } = await supabaseBrowser.storage
+        .from(TEMP_BUCKET)
+        .upload(tempPath, file, {
+          cacheControl: "3600",
+          upsert: false,
+          contentType: file.type || "application/octet-stream",
+        });
+
+      if (tempUploadError) {
+        throw new Error(tempUploadError.message || "Failed to upload temporary file.");
+      }
+
       applyStage();
       stageTimer = setInterval(() => {
         if (idx < rotatingStages.length) {
           applyStage();
         }
-      }, 800);
+      }, 1100);
 
-      const res = await fetch("/api/upload", {
+      const transferRes = await fetch("/api/transfer-to-drive", {
         method: "POST",
-        body: fd,
+        headers: {
+          "Content-Type": "application/json",
+        },
         credentials: "include",
+        body: JSON.stringify({
+          tempPath,
+          originalName: file.name,
+          mimeType: file.type || "application/octet-stream",
+          category,
+          title: title.trim(),
+          dateReceived,
+          folder: finalFolder,
+          year: year || new Date().getFullYear().toString(),
+        }),
       });
 
-      const data = await res.json().catch(() => null);
+      const transferData = await transferRes.json().catch(() => null);
 
-      console.log("UPLOAD RESPONSE:", {
-        status: res.status,
-        data,
-      });
+      if (!transferRes.ok) {
+        throw new Error(transferData?.error || "Failed to transfer file to Google Drive.");
+      }
 
       if (stageTimer) {
         clearInterval(stageTimer);
         stageTimer = null;
-      }
-
-      if (!res.ok) {
-        setUploadPercent(0);
-        setUploadStage("Upload failed");
-        setUploadDetail(data?.error || "Please try again.");
-        setErrorMsg(data?.error || "Please try again.");
-        setErrorOpen(true);
-        return;
       }
 
       setUploadPercent(97);
@@ -419,7 +429,7 @@ export default function UploadPage() {
       await wait(300);
 
       setSuccessOpen(true);
-    } catch (err) {
+    } catch (err: any) {
       console.error("UPLOAD PAGE ERROR:", err);
 
       if (stageTimer) {
@@ -429,8 +439,8 @@ export default function UploadPage() {
 
       setUploadPercent(0);
       setUploadStage("Upload failed");
-      setUploadDetail("Server unreachable. Try again.");
-      setErrorMsg("Server unreachable. Try again.");
+      setUploadDetail(err?.message || "Upload failed. Please try again.");
+      setErrorMsg(err?.message || "Upload failed. Please try again.");
       setErrorOpen(true);
     } finally {
       if (stageTimer) clearInterval(stageTimer);
@@ -695,13 +705,13 @@ export default function UploadPage() {
                     Document Details
                   </div>
                   <div className={`text-[12px] ${dark ? "text-cyan-100/65" : "text-slate-500"}`}>
-                  {formatBytes(fileSize)} • {fileType}
-                  {fileSize > 20 * 1024 * 1024 && (
-                    <span className="block mt-1">
-                      Large files may take longer to upload.
-                    </span>
-                  )}
-                </div>
+                    {formatBytes(fileSize)} • {fileType}
+                    {fileSize > 20 * 1024 * 1024 && (
+                      <span className="block mt-1">
+                        Large files may take longer to upload.
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

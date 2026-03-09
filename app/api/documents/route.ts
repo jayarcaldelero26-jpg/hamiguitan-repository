@@ -3,15 +3,8 @@ export const runtime = "nodejs";
 import { NextResponse, type NextRequest } from "next/server";
 import { supabaseAdmin } from "@/app/lib/db";
 import jwt from "jsonwebtoken";
-import { getDriveClient } from "@/app/lib/googleDrive";
-import { Readable } from "stream";
 
 const SECRET = process.env.JWT_SECRET!;
-
-function requiredString(v: FormDataEntryValue | null) {
-  if (!v || typeof v !== "string") return "";
-  return v.trim();
-}
 
 function normalizeCategory(v: string) {
   const s = (v || "").trim().toLowerCase();
@@ -29,40 +22,6 @@ function normalizeRole(role?: string) {
   return (role || "").trim().toLowerCase();
 }
 
-async function findOrCreateFolder(drive: any, name: string, parentId?: string) {
-  const safeName = name.replace(/'/g, "\\'");
-
-  const q = [
-    `mimeType='application/vnd.google-apps.folder'`,
-    `name='${safeName}'`,
-    `trashed=false`,
-    parentId ? `'${parentId}' in parents` : null,
-  ]
-    .filter(Boolean)
-    .join(" and ");
-
-  const list = await drive.files.list({
-    q,
-    fields: "files(id,name)",
-    spaces: "drive",
-    pageSize: 1,
-  });
-
-  const existing = list.data.files?.[0];
-  if (existing?.id) return existing.id;
-
-  const created = await drive.files.create({
-    requestBody: {
-      name,
-      mimeType: "application/vnd.google-apps.folder",
-      parents: parentId ? [parentId] : undefined,
-    },
-    fields: "id",
-  });
-
-  return created.data.id!;
-}
-
 function drivePreviewUrl(fileId: string) {
   return `https://drive.google.com/file/d/${fileId}/view?usp=drivesdk`;
 }
@@ -78,7 +37,6 @@ function getTokenPayload(req: NextRequest) {
   }
 }
 
-/** GET documents */
 export async function GET(req: NextRequest) {
   const payload = getTokenPayload(req);
 
@@ -87,13 +45,9 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    console.log("DOCUMENTS GET START");
-
     const { data: rows, error } = await supabaseAdmin
       .from("documents")
-      .select(
-        "id,fileId,name,type,category,folder,title,dateReceived,year,uploadedAt"
-      )
+      .select("id,fileId,name,type,category,folder,title,dateReceived,year,uploadedAt")
       .order("uploadedAt", { ascending: false })
       .limit(500);
 
@@ -108,8 +62,6 @@ export async function GET(req: NextRequest) {
       downloadUrl: d.fileId ? `/api/documents/download?id=${d.fileId}` : "",
     }));
 
-    console.log("DOCUMENTS GET DONE:", documents.length);
-
     return NextResponse.json(documents);
   } catch (e: any) {
     console.error("DOCUMENTS GET FATAL:", e);
@@ -117,7 +69,6 @@ export async function GET(req: NextRequest) {
   }
 }
 
-/** POST upload (admin + co_admin) */
 export async function POST(req: NextRequest) {
   const payload = getTokenPayload(req);
 
@@ -132,66 +83,32 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const formData = await req.formData();
+    const body = await req.json();
 
-    const file = formData.get("file");
-    if (!file || typeof file === "string") {
-      return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
-    }
-
-    const rawCategory = requiredString(formData.get("category")) || "Academe";
+    const fileId = String(body?.fileId || "").trim();
+    const name = String(body?.name || "").trim();
+    const mimeType = String(body?.type || "application/octet-stream").trim();
+    const rawCategory = String(body?.category || "Academe").trim();
     const category = normalizeCategory(rawCategory);
+    const folder = String(body?.folder || "").trim();
+    const title = String(body?.title || "").trim();
+    const dateReceived = String(body?.dateReceived || "").trim();
+    const year = String(body?.year || new Date().getFullYear()).trim();
 
-    const folder = requiredString(formData.get("folder"));
-    const title = requiredString(formData.get("title"));
-    const dateReceived = requiredString(formData.get("dateReceived"));
-    const year = requiredString(formData.get("year")) || new Date().getFullYear().toString();
-
-    const originalName = (file as File).name || "upload";
-    const finalName = originalName;
-    const mimeType = (file as File).type || "application/octet-stream";
-
-    console.log("DOCUMENT POST START:", {
-      role,
-      category,
-      folder,
-      title,
-      dateReceived,
-      year,
-      fileName: finalName,
-      mimeType,
-    });
-
-    const drive = getDriveClient();
-
-    const ROOT = "Hamiguitan Repository";
-    const rootId = await findOrCreateFolder(drive, ROOT);
-
-    const categoryId = await findOrCreateFolder(drive, category, rootId);
-
-    let targetParent = categoryId;
-    if (folder) {
-      targetParent = await findOrCreateFolder(drive, folder, categoryId);
+    if (!fileId) {
+      return NextResponse.json({ error: "Missing fileId." }, { status: 400 });
     }
 
-    const arrayBuffer = await (file as File).arrayBuffer();
-    const streamBody = Readable.from(Buffer.from(arrayBuffer));
+    if (!name) {
+      return NextResponse.json({ error: "Missing file name." }, { status: 400 });
+    }
 
-    const uploaded = await drive.files.create({
-      requestBody: {
-        name: finalName,
-        parents: [targetParent],
-      },
-      media: {
-        mimeType,
-        body: streamBody,
-      },
-      fields: "id,name",
-    });
+    if (!title) {
+      return NextResponse.json({ error: "Document title is required." }, { status: 400 });
+    }
 
-    const fileId = uploaded.data.id;
-    if (!fileId) {
-      return NextResponse.json({ error: "Google Drive upload failed." }, { status: 500 });
+    if (!dateReceived) {
+      return NextResponse.json({ error: "Date received is required." }, { status: 400 });
     }
 
     const uploadedAt = new Date().toISOString();
@@ -201,12 +118,12 @@ export async function POST(req: NextRequest) {
       .insert([
         {
           fileId,
-          name: finalName,
+          name,
           type: mimeType,
           category,
-          folder: folder || "",
-          title: title || "",
-          dateReceived: dateReceived || "",
+          folder,
+          title,
+          dateReceived,
           year,
           uploadedAt,
         },
@@ -222,23 +139,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    console.log("DOCUMENT POST DONE:", {
-      id: insertedRow?.id,
-      fileId,
-      name: finalName,
-    });
-
     return NextResponse.json({
       ok: true,
       id: insertedRow?.id,
       fileId,
-      name: finalName,
+      name,
       type: mimeType,
       category,
-      folder: folder || "",
+      folder,
     });
   } catch (e: any) {
     console.error("DOCUMENT POST ERROR:", e);
-    return NextResponse.json({ error: e?.message || "Upload failed" }, { status: 500 });
+    return NextResponse.json({ error: e?.message || "Failed to save document" }, { status: 500 });
   }
 }
