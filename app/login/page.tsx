@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
 import styles from "./login.module.css";
@@ -54,13 +56,14 @@ export default function LoginPage() {
     setLeaving(true);
     setTimeout(() => {
       router.push("/register");
-    }, 280);
+    }, 250);
   };
 
   const handleLogin = async () => {
     if (loading) return;
 
     setLoading(true);
+
     try {
       const res = await fetch("/api/login", {
         method: "POST",
@@ -95,7 +98,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className={styles.wrap}>
+    <main className={styles.wrap}>
       <ConfirmDialog
         open={showError}
         title="Login Failed"
@@ -119,71 +122,135 @@ export default function LoginPage() {
         }}
       />
 
+      <div className={styles.bgImage} />
+      <div className={styles.bgOverlay} />
       <div className={`${styles.bgGlow} ${styles.bgGlow1}`} />
       <div className={`${styles.bgGlow} ${styles.bgGlow2}`} />
 
-      <div className={`${styles.card} ${leaving ? styles.cardExit : styles.cardEnter}`}>
-        <div className={styles.formsLeft}>
-          <div className={styles.panelLeft}>
-            <h2 className={styles.heading}>Login</h2>
+      <section
+        className={`${styles.card} ${
+          leaving ? styles.cardExit : styles.cardEnter
+        }`}
+      >
+        <div className={styles.logoRow}>
+          <div className={styles.logoItemSmall}>
+            <Image
+              src="/images/branding/denr-logo.png"
+              alt="DENR Logo"
+              width={92}
+              height={92}
+              className={styles.logoSmall}
+              priority
+            />
+          </div>
 
-            <label className={styles.label}>Email</label>
+          <div className={styles.logoItemSmall}>
+            <Image
+              src="/images/branding/asean-logo.png"
+              alt="ASEAN Logo"
+              width={92}
+              height={92}
+              className={styles.logoSmall}
+              priority
+            />
+          </div>
+
+          <div className={styles.logoItemCenter}>
+            <Image
+              src="/images/branding/mhrws-logo.png"
+              alt="MHRWS Logo"
+              width={126}
+              height={126}
+              className={styles.logoCenter}
+              priority
+            />
+          </div>
+
+          <div className={styles.logoItemSmall}>
+            <Image
+              src="/images/branding/unesco-logo.png"
+              alt="UNESCO Logo"
+              width={92}
+              height={92}
+              className={styles.logoSmall}
+              priority
+            />
+          </div>
+        </div>
+
+        <div className={styles.brandBlock}>
+          <h2 className={styles.brandSubTitle}>
+            Protected Area Management Office
+          </h2>
+
+          <h1 className={styles.brandMain}>
+            Mt. Hamiguitan Range Wildlife Sanctuary
+          </h1>
+        </div>
+
+        <div className={styles.formBlock}>
+          <label className={styles.fieldLabel}>Email Address</label>
+          <div className={styles.inputShell}>
+            <span className={styles.inputIcon}>✉</span>
             <input
               className={styles.input}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               type="email"
-              placeholder="Enter your email"
+              placeholder="Enter your email..."
               autoComplete="email"
             />
+          </div>
 
-            <label className={styles.label}>Password</label>
+          <label className={styles.fieldLabel}>Password</label>
+          <div className={styles.inputShell}>
+            <span className={styles.inputIcon}>🔒</span>
             <input
               className={styles.input}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               type="password"
-              placeholder="Enter your password"
+              placeholder="Enter your password..."
               autoComplete="current-password"
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !loading) handleLogin();
               }}
             />
-
-            <button
-              type="button"
-              className={styles.button}
-              disabled={loading || leaving}
-              onClick={handleLogin}
-            >
-              {loading ? "Signing in..." : "Login"}
-            </button>
           </div>
-        </div>
 
-        <div className={styles.overlayRight}>
-          <div className={styles.overlayInnerRight}>
-            <h1 className={styles.title}>WELCOME BACK!</h1>
-            <div className={styles.repoBox}>
-              <h2 className={styles.repoTitle}>MHRWS Repository Documents</h2>
+          <div className={styles.rowMeta}>
+            <Link href="/forgot-password" className={styles.forgotLink}>
+              Forgot Password?
+            </Link>
+          </div>
 
-              <p className={styles.sub}>
-                Mount Hamiguitan Range Wildlife Sanctuary
-                <br />
-                Secure access to research reports and official documents.
-              </p>
-            </div>
+          <button
+            type="button"
+            className={styles.button}
+            disabled={loading || leaving}
+            onClick={handleLogin}
+          >
+            <span>{loading ? "Signing In..." : "Sign In"}</span>
+            <span className={styles.buttonArrow}>→</span>
+          </button>
+
+          <div className={styles.bottomText}>
+            <span>Don’t have an account?</span>
             <button
               type="button"
-              className={styles.ghost}
+              className={styles.inlineRegister}
               onClick={goRegister}
               disabled={loading || leaving}
             >
-              Register
+              Create Account
             </button>
           </div>
+
+          <div className={styles.footerLine} />
+
+          <p className={styles.footerNote}>Secure • Research • Innovation</p>
         </div>
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }

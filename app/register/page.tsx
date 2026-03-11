@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
 import styles from "./register.module.css";
@@ -114,7 +115,7 @@ export default function RegisterPage() {
     setLeaving(true);
     setTimeout(() => {
       router.push("/login");
-    }, 280);
+    }, 250);
   };
 
   const submit = async () => {
@@ -190,7 +191,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className={styles.page}>
+    <main className={styles.wrap}>
       <style jsx global>{`
         input[type="password"]::-ms-reveal,
         input[type="password"]::-ms-clear {
@@ -218,133 +219,194 @@ export default function RegisterPage() {
         onCancel={() => setShowMsg(false)}
       />
 
-      <div className={`${styles.orb} ${styles.orb1}`} />
-      <div className={`${styles.orb} ${styles.orb2}`} />
+      <div className={styles.bgImage} />
+      <div className={styles.bgOverlay} />
+      <div className={`${styles.bgGlow} ${styles.bgGlow1}`} />
+      <div className={`${styles.bgGlow} ${styles.bgGlow2}`} />
 
-      <div className={`${styles.shell} ${leaving ? styles.shellExit : styles.shellEnter}`}>
-        <div className={styles.leftPanel}>
-          <div className={styles.leftInner}>
-            <h1>MHRWS Repository</h1>
-              <p className={styles.repoSubtitle}>Documents</p>
+      <section
+        className={`${styles.card} ${
+          leaving ? styles.cardExit : styles.cardEnter
+        }`}
+      >
+        <div className={styles.cardTop}>
+          <div className={styles.logoRow}>
+            <div className={styles.logoItemSmall}>
+              <Image
+                src="/images/branding/denr-logo.png"
+                alt="DENR Logo"
+                width={92}
+                height={92}
+                className={styles.logoSmall}
+                priority
+              />
+            </div>
 
-            <p>
-              Register to access the official document and research repository of
-              <br />
-              Mount Hamiguitan Range Wildlife Sanctuary.
-            </p>
+            <div className={styles.logoItemSmall}>
+              <Image
+                src="/images/branding/asean-logo.png"
+                alt="ASEAN Logo"
+                width={92}
+                height={92}
+                className={styles.logoSmall}
+                priority
+              />
+            </div>
 
-            <button
-              onClick={goLogin}
-              className={styles.ghostBtn}
-              disabled={loading || leaving}
-            >
-              Login
-            </button>
+            <div className={styles.logoItemCenter}>
+              <Image
+                src="/images/branding/mhrws-logo.png"
+                alt="MHRWS Logo"
+                width={126}
+                height={126}
+                className={styles.logoCenter}
+                priority
+              />
+            </div>
+
+            <div className={styles.logoItemSmall}>
+              <Image
+                src="/images/branding/unesco-logo.png"
+                alt="UNESCO Logo"
+                width={92}
+                height={92}
+                className={styles.logoSmall}
+                priority
+              />
+            </div>
+          </div>
+
+          <div className={styles.brandBlock}>
+            <h2 className={styles.brandSubTitle}>
+              Protected Area Management Office
+            </h2>
+
+            <h1 className={styles.brandMain}>
+              Mt. Hamiguitan Range Wildlife Sanctuary
+            </h1>
+
+            <p className={styles.brandRegister}>Create Account</p>
           </div>
         </div>
 
-        <div className={styles.rightPanel}>
-          <h2 className={styles.heading}>Register</h2>
-
-          <div className={styles.formGrid}>
+        <div className={styles.formBlock}>
+          <div className={styles.formScroll}>
             <div className={styles.rowTwo}>
-              <div className={styles.field}>
-                <label>
+              <div>
+                <label className={styles.fieldLabel}>
                   First Name <span className={styles.required}>*</span>
                 </label>
-                <input
-                  placeholder="First name"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                />
+                <div className={styles.inputShell}>
+                  <input
+                    className={styles.input}
+                    placeholder="First name"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                  />
+                </div>
               </div>
 
-              <div className={styles.field}>
-                <label>Middle Name</label>
-                <input
-                  placeholder="Middle name (optional)"
-                  value={middleName}
-                  onChange={(e) => setMiddleName(e.target.value)}
-                />
+              <div>
+                <label className={styles.fieldLabel}>Middle Name</label>
+                <div className={styles.inputShell}>
+                  <input
+                    className={styles.input}
+                    placeholder="Middle name"
+                    value={middleName}
+                    onChange={(e) => setMiddleName(e.target.value)}
+                  />
+                </div>
               </div>
             </div>
 
             <div className={styles.rowTwo}>
-              <div className={styles.field}>
-                <label>
+              <div>
+                <label className={styles.fieldLabel}>
                   Last Name <span className={styles.required}>*</span>
                 </label>
-                <input
-                  placeholder="Last name"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                />
+                <div className={styles.inputShell}>
+                  <input
+                    className={styles.input}
+                    placeholder="Last name"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                  />
+                </div>
               </div>
 
-              <div className={styles.field}>
-                <label>Suffix</label>
-                <select value={suffix} onChange={(e) => setSuffix(e.target.value)}>
-                  <option>None</option>
-                  <option>Jr</option>
-                  <option>Sr</option>
-                  <option>II</option>
-                  <option>III</option>
-                </select>
+              <div>
+                <label className={styles.fieldLabel}>Suffix</label>
+                <div className={styles.inputShell}>
+                  <select
+                    className={styles.select}
+                    value={suffix}
+                    onChange={(e) => setSuffix(e.target.value)}
+                  >
+                    <option>None</option>
+                    <option>Jr</option>
+                    <option>Sr</option>
+                    <option>II</option>
+                    <option>III</option>
+                  </select>
+                </div>
               </div>
             </div>
 
-            <div className={styles.field}>
-              <label>
-                Birthdate <span className={styles.required}>*</span>
-              </label>
-              <input type="date" value={birthdate} onChange={(e) => setBirthdate(e.target.value)} />
-            </div>
-
-            <div className={styles.field}>
-              <label>
-                Email <span className={styles.required}>*</span>
-              </label>
+            <label className={styles.fieldLabel}>
+              Birthdate <span className={styles.required}>*</span>
+            </label>
+            <div className={styles.inputShell}>
               <input
-                placeholder="your@email.com"
+                className={styles.input}
+                type="date"
+                value={birthdate}
+                onChange={(e) => setBirthdate(e.target.value)}
+              />
+            </div>
+
+            <label className={styles.fieldLabel}>
+              Email Address <span className={styles.required}>*</span>
+            </label>
+            <div className={styles.inputShell}>
+              <span className={styles.inputIcon}>✉</span>
+              <input
+                className={styles.input}
+                placeholder="Enter your email..."
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 onBlur={() => setEmail((v) => v.trim().toLowerCase())}
                 type="email"
                 inputMode="email"
               />
-              {email.trim() && !isValidEmail(emailLower) && (
-                <div className={styles.errorText}>Please enter a valid email.</div>
-              )}
             </div>
+            {email.trim() && !isValidEmail(emailLower) && (
+              <div className={styles.errorText}>Please enter a valid email.</div>
+            )}
 
-            <div className={styles.field}>
-              <label>
-                Password <span className={styles.required}>*</span>
-              </label>
-
-              <div className={styles.passWrap}>
-                <input
-                  className={styles.passInput}
-                  placeholder="Create password (min 8 chars)"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  type={showPass ? "text" : "password"}
-                  autoComplete="new-password"
-                />
-
-                <button
-                  type="button"
-                  onClick={() => setShowPass((s) => !s)}
-                  className={styles.eyeBtn}
-                  aria-label={showPass ? "Hide password" : "Show password"}
-                  title={showPass ? "Hide password" : "Show password"}
-                >
-                  <EyeIcon open={showPass} />
-                </button>
-              </div>
-
-              <p className={styles.tip}>Tip: use letters + numbers. Minimum 8 characters.</p>
+            <label className={styles.fieldLabel}>
+              Password <span className={styles.required}>*</span>
+            </label>
+            <div className={styles.inputShell}>
+              <span className={styles.inputIcon}>🔒</span>
+              <input
+                className={styles.input}
+                placeholder="Create password (min 8 chars)"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                type={showPass ? "text" : "password"}
+                autoComplete="new-password"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPass((s) => !s)}
+                className={styles.eyeBtn}
+                aria-label={showPass ? "Hide password" : "Show password"}
+                title={showPass ? "Hide password" : "Show password"}
+              >
+                <EyeIcon open={showPass} />
+              </button>
             </div>
+            <p className={styles.tip}>Tip: use letters + numbers. Minimum 8 characters.</p>
 
             <div className={styles.empBox}>
               <div className={styles.empTitle}>
@@ -355,7 +417,9 @@ export default function RegisterPage() {
                 {["Job Order", "Contract of Service", "Casual", "Permanent"].map((opt) => (
                   <label
                     key={opt}
-                    className={`${styles.empOpt} ${employmentType === opt ? styles.empOptActive : ""}`}
+                    className={`${styles.empOpt} ${
+                      employmentType === opt ? styles.empOptActive : ""
+                    }`}
                   >
                     <input
                       type="radio"
@@ -371,48 +435,71 @@ export default function RegisterPage() {
             </div>
 
             <div className={styles.rowTwo}>
-              <div className={styles.field}>
-                <label>Contact No.</label>
-                <input
-                  placeholder="09xxxxxxxxxx"
-                  value={contact}
-                  onChange={(e) => setContact(e.target.value)}
-                />
+              <div>
+                <label className={styles.fieldLabel}>Contact No.</label>
+                <div className={styles.inputShell}>
+                  <input
+                    className={styles.input}
+                    placeholder="09xxxxxxxxxx"
+                    value={contact}
+                    onChange={(e) => setContact(e.target.value)}
+                  />
+                </div>
               </div>
 
-              <div className={styles.field}>
-                <label>Position</label>
-                <input
-                  placeholder="e.g. PAMO Staff / Ranger"
-                  value={position}
-                  onChange={(e) => setPosition(e.target.value)}
-                />
+              <div>
+                <label className={styles.fieldLabel}>Position</label>
+                <div className={styles.inputShell}>
+                  <input
+                    className={styles.input}
+                    placeholder="e.g. PAMO Staff / Ranger"
+                    value={position}
+                    onChange={(e) => setPosition(e.target.value)}
+                  />
+                </div>
               </div>
             </div>
 
-            <div className={styles.field}>
-              <label>Department</label>
-              <input value={department} onChange={(e) => setDepartment(e.target.value)} />
+            <label className={styles.fieldLabel}>Department</label>
+            <div className={styles.inputShell}>
+              <input
+                className={styles.input}
+                value={department}
+                onChange={(e) => setDepartment(e.target.value)}
+              />
             </div>
 
-            <button onClick={submit} disabled={loading || leaving} className={styles.submitBtn}>
+            <button
+              type="button"
+              onClick={submit}
+              disabled={loading || leaving}
+              className={styles.button}
+            >
               {loading && <Spinner />}
-              {loading ? "Registering..." : "Register"}
+              <span>{loading ? "Registering..." : "Create Account"}</span>
+              {!loading && <span className={styles.buttonArrow}>→</span>}
             </button>
 
-            <p className={styles.loginText}>
-              Already have an account?{" "}
-              <button onClick={goLogin} className={styles.inlineLink} type="button" disabled={loading || leaving}>
-                Login
+            <div className={styles.bottomText}>
+              <span>Already have an account?</span>
+              <button
+                type="button"
+                className={styles.inlineLogin}
+                onClick={goLogin}
+                disabled={loading || leaving}
+              >
+                Sign In
               </button>
-            </p>
+            </div>
 
-            <p className={styles.reqText}>
+            <div className={styles.footerLine} />
+
+            <p className={styles.footerNote}>
               Fields with <span className={styles.required}>*</span> are required.
             </p>
           </div>
         </div>
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }
