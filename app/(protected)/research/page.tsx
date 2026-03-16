@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useEffect, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
 import { useAuth } from "@/app/components/AuthProvider";
 import {
@@ -15,6 +15,8 @@ import {
   CloudArrowDownIcon,
   TrashIcon,
   ChevronRightIcon,
+  PencilSquareIcon,
+  XMarkIcon,
 } from "@heroicons/react/24/outline";
 import { repoTheme, type PageTheme } from "@/app/lib/repoTheme";
 
@@ -60,6 +62,10 @@ function canUpload(role?: string) {
 
 function canDelete(role?: string) {
   return role === "admin";
+}
+
+function canManageDocuments(role?: string) {
+  return role === "admin" || role === "co_admin";
 }
 
 function Badge({
@@ -116,9 +122,11 @@ function GroupCard({
   loading,
   isOpen,
   toggleFolder,
+  onRenameFolder,
   docUrl,
   onAskDelete,
   canDeleteDocs,
+  canRenameFolders,
   dark,
 }: {
   title: string;
@@ -129,9 +137,11 @@ function GroupCard({
   loading: boolean;
   isOpen: (folder: string) => boolean;
   toggleFolder: (folder: string) => void;
+  onRenameFolder: (folder: string) => void;
   docUrl: (d: DocumentRow) => string;
   onAskDelete: (id: number) => void;
   canDeleteDocs: boolean;
+  canRenameFolders: boolean;
   dark: boolean;
 }) {
   const ui = repoTheme(dark ? "dark" : "light");
@@ -266,10 +276,7 @@ function GroupCard({
                     : ""
                 }`}
               >
-                <button
-                  type="button"
-                  onClick={() => toggleFolder(folder)}
-                  aria-expanded={open}
+                <div
                   className={`w-full flex items-center justify-between gap-3 px-4 py-3 transition ${
                     open
                       ? dark
@@ -280,7 +287,12 @@ function GroupCard({
                       : "hover:bg-white/40"
                   }`}
                 >
-                  <div className="flex items-center gap-3 min-w-0">
+                  <button
+                    type="button"
+                    onClick={() => toggleFolder(folder)}
+                    aria-expanded={open}
+                    className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                  >
                     <div
                       className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px] border shadow-[0_10px_24px_rgba(0,0,0,0.08)] ${
                         open
@@ -298,24 +310,41 @@ function GroupCard({
                         {items.length} file{items.length === 1 ? "" : "s"}
                       </div>
                     </div>
-                  </div>
+                  </button>
 
-                  <div
-                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition ${
-                      open
-                        ? dark
-                          ? "border-white/10 bg-white/[0.06]"
-                          : "border-white/70 bg-white/75"
-                        : `${subBg} ${subBorder}`
-                    }`}
-                  >
-                    <ChevronRightIcon
-                      className={`h-5 w-5 transition-transform duration-200 ${
-                        open ? `rotate-90 ${textMain}` : textMuted
+                  <div className="flex items-center gap-2 shrink-0">
+                    {canRenameFolders && folder !== "Unsorted" && (
+                      <button
+                        type="button"
+                        onClick={() => onRenameFolder(folder)}
+                        className={`inline-flex min-h-10 items-center gap-1.5 px-3 py-2 rounded-[14px] text-[11px] font-medium transition ${ui.buttonSecondary}`}
+                      >
+                        <PencilSquareIcon className="w-4 h-4" />
+                        Rename
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => toggleFolder(folder)}
+                      aria-expanded={open}
+                      aria-label={open ? `Collapse ${folder}` : `Expand ${folder}`}
+                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition ${
+                        open
+                          ? dark
+                            ? "border-white/10 bg-white/[0.06]"
+                            : "border-white/70 bg-white/75"
+                          : `${subBg} ${subBorder}`
                       }`}
-                    />
+                    >
+                      <ChevronRightIcon
+                        className={`h-5 w-5 transition-transform duration-200 ${
+                          open ? `rotate-90 ${textMain}` : textMuted
+                        }`}
+                      />
+                    </button>
                   </div>
-                </button>
+                </div>
 
                 {open && (
                   <div
@@ -414,6 +443,10 @@ export default function ResearchPage() {
   const [errorMsg, setErrorMsg] = useState("Something went wrong.");
   const [openFolderKey, setOpenFolderKey] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [renameFolderCategory, setRenameFolderCategory] = useState<string | null>(null);
+  const [renameFolderCurrent, setRenameFolderCurrent] = useState("");
+  const [renameFolderNext, setRenameFolderNext] = useState("");
+  const [renamingFolder, setRenamingFolder] = useState(false);
   const [pageTheme, setPageTheme] = useState<PageTheme>("dark");
 
   useEffect(() => {
@@ -524,6 +557,70 @@ export default function ResearchPage() {
     }
   };
 
+  const openRenameFolderDialog = (category: string, folder: string) => {
+    setRenameFolderCategory(category);
+    setRenameFolderCurrent(folder);
+    setRenameFolderNext(folder);
+  };
+
+  const submitFolderRename = async () => {
+    const category = renameFolderCategory;
+    const nextName = renameFolderNext.trim();
+
+    if (!category) return;
+
+    if (!renameFolderCurrent.trim()) {
+      setErrorMsg("Current folder name is invalid.");
+      setErrorOpen(true);
+      return;
+    }
+
+    if (!nextName) {
+      setErrorMsg("New folder name is required.");
+      setErrorOpen(true);
+      return;
+    }
+
+    setRenamingFolder(true);
+
+    try {
+      const res = await fetch("/api/documents", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          category,
+          oldFolder: renameFolderCurrent,
+          newFolder: nextName,
+        }),
+      });
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        setErrorMsg(data?.error || "Unable to rename folder.");
+        setErrorOpen(true);
+        return;
+      }
+
+      await refreshDocuments();
+      setRenameFolderCategory(null);
+      setRenameFolderCurrent("");
+      setRenameFolderNext("");
+      setSuccessMsg(
+        data?.updatedCount
+          ? `Folder renamed successfully. ${data.updatedCount} document${data.updatedCount === 1 ? "" : "s"} updated.`
+          : "Folder renamed successfully."
+      );
+      setSuccessOpen(true);
+    } catch {
+      setErrorMsg("Server unreachable.");
+      setErrorOpen(true);
+    } finally {
+      setRenamingFolder(false);
+    }
+  };
+
   const dark = pageTheme === "dark";
   const ui = repoTheme(pageTheme);
 
@@ -587,6 +684,87 @@ export default function ResearchPage() {
         variant="warning"
         onConfirm={() => setErrorOpen(false)}
       />
+
+      <AnimatePresence>
+        {renameFolderCategory && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.16 }}
+            className="fixed inset-0 z-[65] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 16, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 8, scale: 0.98 }}
+              transition={{ duration: 0.18 }}
+              className={`relative w-full max-w-xl rounded-[28px] shadow-2xl overflow-hidden ${ui.modal}`}
+            >
+              <div className={`px-4 sm:px-6 py-4 sm:py-5 border-b ${dark ? "border-white/8 bg-[#051F20]/45" : "border-white/55 bg-white/45"}`}>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className={`text-lg font-semibold ${textMain}`}>Rename Folder</div>
+                    <div className={`mt-1 text-[12px] ${textMuted}`}>
+                      This updates all documents in {renameFolderCategory} that currently use this folder name.
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => !renamingFolder && setRenameFolderCategory(null)}
+                    className={`min-h-11 min-w-11 p-2.5 rounded-[16px] transition border shadow-sm ${ui.buttonSecondary}`}
+                  >
+                    <XMarkIcon className={`w-5 h-5 ${dark ? "text-[#DAF1DE]" : "text-[#163832]"}`} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-4 sm:p-6 space-y-4">
+                <div>
+                  <label className={`block text-[11px] font-semibold uppercase tracking-[0.08em] ${textSoft}`}>Current Folder</label>
+                  <input
+                    value={renameFolderCurrent}
+                    disabled
+                    className={`${ui.input.replace("pl-11", "pl-4")} mt-2 text-sm opacity-80`}
+                  />
+                </div>
+
+                <div>
+                  <label className={`block text-[11px] font-semibold uppercase tracking-[0.08em] ${textSoft}`}>New Folder Name</label>
+                  <input
+                    value={renameFolderNext}
+                    onChange={(e) => setRenameFolderNext(e.target.value)}
+                    className={`${ui.input.replace("pl-11", "pl-4")} mt-2 text-sm`}
+                    disabled={renamingFolder}
+                  />
+                  <div className={`mt-2 text-[12px] ${textMuted}`}>
+                    If the target name already exists in this category, documents will be merged into that folder name safely.
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setRenameFolderCategory(null)}
+                    disabled={renamingFolder}
+                    className={`min-h-11 px-5 py-3 rounded-[20px] font-medium text-sm ${ui.buttonSecondary}`}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={submitFolderRename}
+                    disabled={renamingFolder}
+                    className={`min-h-11 px-5 py-3 rounded-[20px] font-semibold text-sm ${ui.buttonPrimary}`}
+                  >
+                    {renamingFolder ? "Renaming..." : "Rename Folder"}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="max-w-[1600px] mx-auto">
         <motion.div
@@ -703,9 +881,11 @@ export default function ResearchPage() {
               loading={loadingDocs}
               isOpen={(folder) => isOpen("Academe", folder)}
               toggleFolder={(folder) => toggleFolder("Academe", folder)}
+              onRenameFolder={(folder) => openRenameFolderDialog("Academe", folder)}
               docUrl={docUrl}
               onAskDelete={(id) => setDeleteId(id)}
               canDeleteDocs={canDelete(me.role)}
+              canRenameFolders={canManageDocuments(me.role)}
               dark={dark}
             />
           </motion.div>
@@ -720,9 +900,11 @@ export default function ResearchPage() {
               loading={loadingDocs}
               isOpen={(folder) => isOpen("Stakeholders", folder)}
               toggleFolder={(folder) => toggleFolder("Stakeholders", folder)}
+              onRenameFolder={(folder) => openRenameFolderDialog("Stakeholders", folder)}
               docUrl={docUrl}
               onAskDelete={(id) => setDeleteId(id)}
               canDeleteDocs={canDelete(me.role)}
+              canRenameFolders={canManageDocuments(me.role)}
               dark={dark}
             />
           </motion.div>
@@ -737,9 +919,11 @@ export default function ResearchPage() {
               loading={loadingDocs}
               isOpen={(folder) => isOpen("PAMO Activity", folder)}
               toggleFolder={(folder) => toggleFolder("PAMO Activity", folder)}
+              onRenameFolder={(folder) => openRenameFolderDialog("PAMO Activity", folder)}
               docUrl={docUrl}
               onAskDelete={(id) => setDeleteId(id)}
               canDeleteDocs={canDelete(me.role)}
+              canRenameFolders={canManageDocuments(me.role)}
               dark={dark}
             />
           </motion.div>

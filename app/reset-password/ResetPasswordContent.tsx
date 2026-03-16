@@ -297,7 +297,7 @@ export default function ResetPasswordContent() {
 
           <button
             type="button"
-            className={`${styles.button} app-primary-button`}
+            className={styles.button}
             disabled={loading || leaving}
             onClick={submit}
           >

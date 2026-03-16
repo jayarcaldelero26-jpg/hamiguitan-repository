@@ -59,6 +59,12 @@ function darkButtonStyle() {
   return "bg-white/[0.05] text-[#DAF1DE] border-white/10 hover:bg-white/[0.08]";
 }
 
+function navActionBase(active: boolean) {
+  return active
+    ? "bg-white/[0.09] text-white border-white/14 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
+    : "text-white border-transparent hover:bg-white/[0.05] hover:border-white/10";
+}
+
 export default function ProtectedShell({
   children,
 }: {
@@ -147,23 +153,34 @@ export default function ProtectedShell({
           type="button"
           onClick={() => handleNavigate(href)}
           aria-current={active ? "page" : undefined}
-          className={`group relative w-full min-h-11 flex items-center gap-3 px-3 py-3 rounded-2xl transition-colors duration-150 border ${
+          className={`group relative w-full min-h-10 flex items-center gap-2.5 px-2.5 py-2.5 rounded-2xl transition-colors duration-150 border ${
             showLabel ? "" : "justify-center"
-          } ${
-            active
-              ? "bg-white/[0.08] text-white border-white/12 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
-              : "text-white border-transparent hover:bg-white/[0.05] hover:border-white/10"
-          }`}
+          } ${navActionBase(active)}`}
         >
           {active && (
             <span className="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-cyan-300" />
           )}
 
-          <span className="shrink-0 text-white">{icon}</span>
+          <span
+            className={`grid h-8.5 w-8.5 shrink-0 place-items-center rounded-xl border transition-colors ${
+              active
+                ? "border-white/12 bg-white/[0.07] text-cyan-200"
+                : "border-transparent bg-transparent text-white/90 group-hover:border-white/8 group-hover:bg-white/[0.04]"
+            }`}
+          >
+            {icon}
+          </span>
 
           {showLabel && (
-            <span className="font-semibold text-[14px] tracking-[0.01em] text-white">
-              {label}
+            <span className="min-w-0 flex-1">
+              <span className="block font-semibold text-[13px] tracking-[0.01em] text-white">
+                {label}
+              </span>
+              {active && (
+                <span className="block text-[10px] font-medium uppercase tracking-[0.12em] text-cyan-200/75">
+                  Active
+                </span>
+              )}
             </span>
           )}
         </button>
@@ -258,13 +275,13 @@ export default function ProtectedShell({
 
           <aside
             aria-label="Sidebar"
-            className={`fixed inset-y-0 left-0 z-50 h-full overflow-hidden border-r p-4 sm:p-5 flex flex-col bg-[linear-gradient(180deg,#04191a_0%,#0B2B26_52%,#163832_100%)] border-white/10 transition-transform duration-150 ease-out md:relative md:z-auto md:translate-x-0 ${
+            className={`fixed inset-y-0 left-0 z-50 h-full overflow-hidden border-r p-3 sm:p-4 md:p-4 flex flex-col bg-[linear-gradient(180deg,#04191a_0%,#0B2B26_52%,#163832_100%)] border-white/10 shadow-[0_12px_28px_rgba(0,0,0,0.22)] md:shadow-none transition-transform duration-150 ease-out md:relative md:z-auto md:translate-x-0 ${
               mobileNavOpen ? "translate-x-0" : "-translate-x-full"
             } ${
               collapsed ? "md:w-[88px]" : "md:w-[290px]"
             } w-[min(84vw,290px)]`}
           >
-            <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top_left,rgba(142,182,155,0.12),transparent_36%),radial-gradient(circle_at_bottom_left,rgba(35,83,71,0.22),transparent_40%)]" />
+            <div className="absolute inset-0 pointer-events-none hidden md:block bg-[radial-gradient(circle_at_top_left,rgba(142,182,155,0.12),transparent_36%),radial-gradient(circle_at_bottom_left,rgba(35,83,71,0.22),transparent_40%)]" />
             <div role="banner" className="flex items-center justify-between">
               <button
                 type="button"
@@ -275,7 +292,7 @@ export default function ProtectedShell({
                   }
                   setCollapsed((v) => !v);
                 }}
-                className="min-h-11 min-w-11 p-2.5 rounded-xl hover:bg-white/[0.08] transition border border-transparent hover:border-white/10"
+                className="min-h-10 min-w-10 p-2 rounded-xl hover:bg-white/[0.08] transition border border-transparent hover:border-white/10"
                 title="Toggle sidebar"
                 aria-label="Toggle sidebar"
               >
@@ -283,24 +300,24 @@ export default function ProtectedShell({
               </button>
 
               {showSidebarLabels && (
-                <span className="text-[11px] px-2.5 py-1 rounded-full bg-white/[0.05] text-[#DAF1DE] font-semibold border border-white/10">
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.05] text-[#DAF1DE] font-semibold border border-white/10">
                   {roleLabel(user.role)}
                 </span>
               )}
             </div>
 
-            <div className={`mt-6 ${showSidebarLabels ? "" : "text-center"}`}>
-              <div className="flex items-center gap-3">
-                <div className="h-12 w-12 rounded-2xl bg-white/[0.06] text-[#DAF1DE] border border-white/10 grid place-items-center font-extrabold">
+            <div className={`mt-3 sm:mt-4 ${showSidebarLabels ? "" : "text-center"}`}>
+              <div className="flex items-center gap-2.5">
+                <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-2xl bg-white/[0.06] text-[#DAF1DE] border border-white/10 grid place-items-center text-sm font-extrabold">
                   {initials(user.name)}
                 </div>
 
                 {showSidebarLabels && (
                   <div className="min-w-0">
-                    <div className="font-extrabold text-white text-[16px] leading-tight tracking-[0.02em]">
+                    <div className="font-extrabold text-white text-[14px] sm:text-[15px] leading-tight tracking-[0.02em]">
                       Hamiguitan
                     </div>
-                    <div className="text-[12px] text-white/70 truncate">
+                    <div className="text-[11px] text-white/70 truncate">
                       Repository System
                     </div>
                   </div>
@@ -308,32 +325,46 @@ export default function ProtectedShell({
               </div>
 
               {showSidebarLabels && (
-                <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-3">
-                  <div className="flex items-center gap-2 text-[#DAF1DE]">
-                    <ShieldCheckIcon className="w-4 h-4 text-[#8EB69B]" />
-                    <span className="text-[12px] font-semibold">
-                      Secure Access Panel
+                <div className="mt-2.5 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2.5">
+                  <div className="flex items-center justify-between gap-2 text-[#DAF1DE]">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <ShieldCheckIcon className="w-4 h-4 text-[#8EB69B]" />
+                      <span className="text-[11px] font-semibold">
+                        Secure Access Panel
+                      </span>
+                    </div>
+                    <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70">
+                      {roleLabel(user.role)}
                     </span>
                   </div>
-                  <p className="mt-1 text-[11px] leading-5 text-[#DAF1DE]/65">
+                  <p className="mt-1 hidden sm:block text-[10px] leading-4 text-[#DAF1DE]/65">
                     Manage documents, uploads, settings, and staff records.
                   </p>
                 </div>
               )}
             </div>
 
-            <div className="mt-7 mb-3 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent" />
+            <div className="mt-4 mb-2 sm:mt-5 sm:mb-2 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent" />
 
-            <nav aria-label="Primary navigation" className="space-y-2 overflow-y-auto pr-1">
+            <nav aria-label="Primary navigation" className="space-y-1.5 overflow-y-auto pr-1">
               {navItems.map((item) => navBtn(item.href, item.label, item.icon))}
             </nav>
 
-            <div className="mt-auto pt-5">
+            <div className="mt-auto pt-3 sm:pt-4">
               {showSidebarLabels && (
-                <div className="rounded-2xl border p-3.5 bg-white/[0.04] border-white/10">
-                  <div className="text-[11px] text-[#DAF1DE]/60">Signed in as</div>
-                  <div className="font-semibold text-[#DAF1DE] truncate text-sm mt-1">
-                    {user.email}
+                <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#DAF1DE]/52">
+                        Signed in
+                      </div>
+                      <div className="mt-1 truncate font-semibold text-[#DAF1DE] text-[13px]">
+                        {user.email}
+                      </div>
+                    </div>
+                    <div className="grid h-7.5 w-7.5 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.04] text-[11px] text-white/70">
+                      {initials(user.name)}
+                    </div>
                   </div>
                 </div>
               )}
@@ -341,14 +372,21 @@ export default function ProtectedShell({
               <button
                 type="button"
                 onClick={() => setConfirmLogoutPath(pathname)}
-                className={`mt-3 w-full min-h-11 flex items-center gap-2 px-3 py-3 rounded-2xl border transition ${
+                className={`mt-2.5 w-full min-h-10 flex items-center gap-2 px-2.5 py-2.5 rounded-2xl border transition ${
                   showSidebarLabels ? "" : "justify-center"
-                } ${darkButtonStyle()}`}
+                } ${navActionBase(false)} ${darkButtonStyle()}`}
                 aria-label="Logout"
               >
-                <ArrowRightOnRectangleIcon className="w-5 h-5" />
+                <span className="grid h-8.5 w-8.5 shrink-0 place-items-center rounded-xl border border-white/8 bg-white/[0.04] text-white/90">
+                  <ArrowRightOnRectangleIcon className="w-5 h-5" />
+                </span>
                 {showSidebarLabels && (
-                  <span className="font-semibold text-sm">Logout</span>
+                  <span className="min-w-0 flex-1 text-left">
+                    <span className="block font-semibold text-[13px]">Logout</span>
+                    <span className="block text-[10px] uppercase tracking-[0.12em] text-white/55">
+                      End Session
+                    </span>
+                  </span>
                 )}
               </button>
             </div>
@@ -359,7 +397,7 @@ export default function ProtectedShell({
             role="main"
           className={`flex-1 h-full overflow-y-auto md:transition-colors md:duration-300 ${pageBg}`}
           >
-            <div className="sticky top-0 z-30 border-b border-white/10 bg-[#04191a]/95 px-4 py-3 md:hidden">
+            <div className="sticky top-0 z-30 border-b border-white/10 bg-[#04191a]/95 px-4 py-2.5 md:hidden">
               <div className="flex items-center justify-between gap-3">
                 <button
                   type="button"

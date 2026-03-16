@@ -210,12 +210,13 @@ export default function ForgotPasswordPage() {
 
               <button
                 type="button"
-                className={`${styles.button} app-primary-button`}
+                className={styles.button}
                 disabled={loading}
                 onClick={sendCode}
               >
                 {loading && <Spinner />}
                 <span>{loading ? "Sending..." : "Send Verification Code"}</span>
+                {!loading && <span className={styles.buttonArrow}>→</span>}
               </button>
 
               <div className={styles.bottomText}>
@@ -255,12 +256,13 @@ export default function ForgotPasswordPage() {
 
               <button
                 type="button"
-                className={`${styles.button} app-primary-button`}
+                className={styles.button}
                 disabled={loading}
                 onClick={verifyCode}
               >
                 {loading && <Spinner />}
                 <span>{loading ? "Verifying..." : "Verify Code"}</span>
+                {!loading && <span className={styles.buttonArrow}>→</span>}
               </button>
 
               <div className={styles.bottomActions}>

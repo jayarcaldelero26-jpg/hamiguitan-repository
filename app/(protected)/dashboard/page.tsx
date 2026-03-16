@@ -14,6 +14,7 @@ import {
   CloudArrowDownIcon,
   MagnifyingGlassIcon,
   EyeIcon,
+  PencilSquareIcon,
   XMarkIcon,
   Squares2X2Icon,
   ClockIcon,
@@ -97,6 +98,17 @@ function timeAgo(iso?: string | null) {
 
 function canDeleteDocuments(role?: string) {
   return role === "admin";
+}
+
+function canManageDocuments(role?: string) {
+  return role === "admin" || role === "co_admin";
+}
+
+function categoryLabel(value?: string | null) {
+  const c = normalizeCat(value);
+  if (c === "stakeholder") return "Stakeholders";
+  if (c === "pamo") return "PAMO Activity";
+  return "Academe";
 }
 
 function SkeletonBlock({
@@ -324,9 +336,18 @@ export default function Dashboard() {
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [successOpen, setSuccessOpen] = useState(false);
+  const [successTitle, setSuccessTitle] = useState("Success");
+  const [successMsg, setSuccessMsg] = useState("Action completed successfully.");
   const [errorOpen, setErrorOpen] = useState(false);
   const [errorMsg, setErrorMsg] = useState("Something went wrong.");
   const [previewDoc, setPreviewDoc] = useState<DocumentRow | null>(null);
+  const [editDoc, setEditDoc] = useState<DocumentRow | null>(null);
+  const [editCategory, setEditCategory] = useState("Academe");
+  const [editTitle, setEditTitle] = useState("");
+  const [editDateReceived, setEditDateReceived] = useState("");
+  const [editSelectedFolder, setEditSelectedFolder] = useState("");
+  const [editNewFolder, setEditNewFolder] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
 
   useEffect(() => {
     const syncTheme = () => {
@@ -430,6 +451,29 @@ export default function Dashboard() {
     };
   }, [docs, stats.academe, stats.pamo, stats.stake]);
 
+  const folderOptionsByCategory = useMemo(() => {
+    const grouped = {
+      Academe: new Set<string>(),
+      Stakeholders: new Set<string>(),
+      "PAMO Activity": new Set<string>(),
+    };
+
+    for (const doc of docs) {
+      const folder = (doc.folder || "").trim();
+      if (!folder) continue;
+      grouped[categoryLabel(doc.category)].add(folder);
+    }
+
+    return {
+      Academe: Array.from(grouped.Academe).sort((a, b) => a.localeCompare(b)),
+      Stakeholders: Array.from(grouped.Stakeholders).sort((a, b) => a.localeCompare(b)),
+      "PAMO Activity": Array.from(grouped["PAMO Activity"]).sort((a, b) => a.localeCompare(b)),
+    };
+  }, [docs]);
+
+  const editFolderOptions = folderOptionsByCategory[editCategory as keyof typeof folderOptionsByCategory] || [];
+  const finalEditFolder = (editNewFolder.trim() || editSelectedFolder).trim();
+
   const deleteDoc = async (id: number) => {
     try {
       const res = await fetch(`/api/delete-documents?id=${id}`, {
@@ -446,10 +490,83 @@ export default function Dashboard() {
       }
 
       await refreshDocuments();
+      setSuccessTitle("Document Deleted");
+      setSuccessMsg("The selected file has been removed successfully from the repository.");
       setSuccessOpen(true);
     } catch {
       setErrorMsg("Server unreachable.");
       setErrorOpen(true);
+    }
+  };
+
+  const openEditDialog = (doc: DocumentRow) => {
+    setEditDoc(doc);
+    setEditCategory(categoryLabel(doc.category));
+    setEditTitle(doc.title?.trim() ? doc.title : doc.name);
+    setEditDateReceived(doc.dateReceived || "");
+    setEditSelectedFolder((doc.folder || "").trim());
+    setEditNewFolder("");
+  };
+
+  const saveDocumentEdit = async () => {
+    if (!editDoc) return;
+
+    const title = editTitle.trim();
+    const folder = finalEditFolder;
+    const folderRequired = editCategory === "Stakeholders" || editCategory === "PAMO Activity";
+
+    if (!title) {
+      setErrorMsg("Document title is required.");
+      setErrorOpen(true);
+      return;
+    }
+
+    if (!editDateReceived) {
+      setErrorMsg("Date received is required.");
+      setErrorOpen(true);
+      return;
+    }
+
+    if (folderRequired && !folder) {
+      setErrorMsg("Folder is required for the selected category.");
+      setErrorOpen(true);
+      return;
+    }
+
+    setSavingEdit(true);
+
+    try {
+      const res = await fetch("/api/documents", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          id: editDoc.id,
+          category: editCategory,
+          title,
+          dateReceived: editDateReceived,
+          folder,
+        }),
+      });
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        setErrorMsg(data?.error || "Unable to update document.");
+        setErrorOpen(true);
+        return;
+      }
+
+      await refreshDocuments();
+      setEditDoc(null);
+      setSuccessTitle("Document Updated");
+      setSuccessMsg("Document details were updated successfully.");
+      setSuccessOpen(true);
+    } catch {
+      setErrorMsg("Server unreachable.");
+      setErrorOpen(true);
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -1082,6 +1199,17 @@ export default function Dashboard() {
                           </div>
 
                           <div className="flex flex-wrap lg:justify-end gap-2">
+                            {canManageDocuments(user?.role) && (
+                              <button
+                                type="button"
+                                onClick={() => openEditDialog(doc)}
+                                className={`${btnSm} ${ui.buttonSecondary}`}
+                              >
+                                <PencilSquareIcon className="w-3.5 h-3.5" />
+                                Edit
+                              </button>
+                            )}
+
                             <button
                               type="button"
                               onClick={() => setPreviewDoc(doc)}
@@ -1126,6 +1254,139 @@ export default function Dashboard() {
       )}
 
       <AnimatePresence>
+        {editDoc && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.16 }}
+            className="fixed inset-0 z-[65] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 16, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 8, scale: 0.98 }}
+              transition={{ duration: 0.18 }}
+              className={`relative w-full max-w-2xl rounded-[28px] shadow-2xl overflow-hidden ${ui.modal}`}
+            >
+              <div className={`px-4 sm:px-6 py-4 sm:py-5 border-b ${dark ? "border-white/8 bg-[#051F20]/45" : "border-white/55 bg-white/45"}`}>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className={`text-lg font-semibold ${textMain}`}>Edit Document</div>
+                    <div className={`mt-1 text-[12px] ${textMuted}`}>Update category, title, received date, and project folder.</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => !savingEdit && setEditDoc(null)}
+                    className={`min-h-11 min-w-11 p-2.5 rounded-[16px] transition border shadow-sm ${ui.buttonSecondary}`}
+                  >
+                    <XMarkIcon className={`w-5 h-5 ${dark ? "text-[#DAF1DE]" : "text-[#163832]"}`} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-4 sm:p-6 space-y-4">
+                <div>
+                  <label className={`block text-[11px] font-semibold uppercase tracking-[0.08em] ${textSoft}`}>Folder Category</label>
+                  <select
+                    value={editCategory}
+                    onChange={(e) => {
+                      setEditCategory(e.target.value);
+                      setEditSelectedFolder("");
+                      setEditNewFolder("");
+                    }}
+                    className={`${ui.input.replace("pl-11", "pl-4")} mt-2 text-sm`}
+                    disabled={savingEdit}
+                  >
+                    <option className="text-slate-900" value="Academe">Academe</option>
+                    <option className="text-slate-900" value="Stakeholders">Stakeholders</option>
+                    <option className="text-slate-900" value="PAMO Activity">PAMO Activity</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className={`block text-[11px] font-semibold uppercase tracking-[0.08em] ${textSoft}`}>Document Title</label>
+                  <input
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    className={`${ui.input.replace("pl-11", "pl-4")} mt-2 text-sm`}
+                    disabled={savingEdit}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className={`block text-[11px] font-semibold uppercase tracking-[0.08em] ${textSoft}`}>Date Received</label>
+                    <input
+                      type="date"
+                      value={editDateReceived}
+                      onChange={(e) => setEditDateReceived(e.target.value)}
+                      className={`${ui.input.replace("pl-11", "pl-4")} mt-2 text-sm`}
+                      disabled={savingEdit}
+                    />
+                  </div>
+
+                  <div>
+                    <label className={`block text-[11px] font-semibold uppercase tracking-[0.08em] ${textSoft}`}>Existing Project Folder</label>
+                    <select
+                      value={editSelectedFolder}
+                      onChange={(e) => {
+                        setEditSelectedFolder(e.target.value);
+                        if (e.target.value) setEditNewFolder("");
+                      }}
+                      className={`${ui.input.replace("pl-11", "pl-4")} mt-2 text-sm`}
+                      disabled={savingEdit}
+                    >
+                      <option className="text-slate-900" value="">Select existing folder</option>
+                      {editFolderOptions.map((folder) => (
+                        <option className="text-slate-900" key={folder} value={folder}>
+                          {folder}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className={`block text-[11px] font-semibold uppercase tracking-[0.08em] ${textSoft}`}>New Project Folder</label>
+                  <input
+                    value={editNewFolder}
+                    onChange={(e) => {
+                      setEditNewFolder(e.target.value);
+                      if (e.target.value.trim()) setEditSelectedFolder("");
+                    }}
+                    placeholder="Type a new folder name to create or replace the existing one"
+                    className={`${ui.input.replace("pl-11", "pl-4")} mt-2 text-sm`}
+                    disabled={savingEdit}
+                  />
+                  <div className={`mt-2 text-[12px] ${textMuted}`}>
+                    New folder text overrides the selected existing folder. Stakeholders and PAMO Activity require a folder.
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setEditDoc(null)}
+                    disabled={savingEdit}
+                    className={`min-h-11 px-5 py-3 rounded-[20px] font-medium text-sm ${ui.buttonSecondary}`}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={saveDocumentEdit}
+                    disabled={savingEdit}
+                    className={`min-h-11 px-5 py-3 rounded-[20px] font-semibold text-sm ${ui.buttonPrimary}`}
+                  >
+                    {savingEdit ? "Saving..." : "Save Changes"}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+
         {previewDoc && (
           <motion.div
             initial={{ opacity: 0 }}
@@ -1207,8 +1468,8 @@ export default function Dashboard() {
 
       <ConfirmDialog
         open={successOpen}
-        title="Document Deleted"
-        message="The selected file has been removed successfully from the repository."
+        title={successTitle}
+        message={successMsg}
         confirmText="Continue"
         oneButton
         variant="success"

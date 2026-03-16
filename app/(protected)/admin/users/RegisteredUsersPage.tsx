@@ -169,14 +169,14 @@ function StatCard({
       : "text-[#163832]";
 
   return (
-    <div className={`${ui.card} relative overflow-hidden px-5 py-5`}>
+    <div className={`${ui.card} relative overflow-hidden px-4 py-4 sm:px-5 sm:py-5`}>
       <div className={`absolute inset-x-0 top-0 h-2 ${accentCls}`} />
       <div
         className={`text-[11px] font-semibold uppercase tracking-[0.08em] ${ui.textSoft}`}
       >
         {label}
       </div>
-      <div className={`mt-2 text-4xl font-bold tracking-tight ${valueCls}`}>{value}</div>
+      <div className={`mt-1.5 text-3xl sm:text-4xl font-bold tracking-tight ${valueCls}`}>{value}</div>
     </div>
   );
 }
@@ -203,6 +203,24 @@ function IconButton({
     >
       {children}
     </button>
+  );
+}
+
+function EmploymentText({
+  children,
+  dark,
+}: {
+  children: React.ReactNode;
+  dark: boolean;
+}) {
+  return (
+    <span
+      className={`inline-flex max-w-full items-center rounded-full px-2.5 py-1 text-[11px] font-medium ${
+        dark ? "bg-white/[0.04] text-cyan-100/72" : "bg-slate-100 text-slate-600"
+      }`}
+    >
+      {children}
+    </span>
   );
 }
 
@@ -555,20 +573,20 @@ export default function RegisteredUsersPage() {
 
   return (
     <div className={`${ui.page} h-full`}>
-      <div className="h-full w-full px-4 sm:px-6 lg:px-8 py-4 sm:py-5 flex flex-col gap-4">
+      <div className="h-full w-full px-4 sm:px-6 lg:px-8 py-4 sm:py-5 flex flex-col gap-3.5">
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.16 }}
-          className={`${ui.shell} px-4 sm:px-6 py-5 sm:py-6`}
+          className={`${ui.shell} px-4 sm:px-6 py-4 sm:py-5`}
         >
-          <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
+          <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3.5">
             <div className="flex items-start gap-4">
               <div
                 className={
                   dark
-                    ? "h-16 w-16 rounded-3xl bg-white/[0.06] border border-white/10 text-[#b8c4d6] grid place-items-center shadow-[0_12px_28px_rgba(0,0,0,0.10)]"
-                    : "h-16 w-16 rounded-3xl bg-[#eff3f7] border border-white/60 text-[#5d6c80] grid place-items-center shadow-[0_12px_24px_rgba(17,24,39,0.06)]"
+                    ? "h-14 w-14 rounded-3xl bg-white/[0.06] border border-white/10 text-[#b8c4d6] grid place-items-center shadow-[0_10px_22px_rgba(0,0,0,0.08)]"
+                    : "h-14 w-14 rounded-3xl bg-[#eff3f7] border border-white/60 text-[#5d6c80] grid place-items-center shadow-[0_10px_20px_rgba(17,24,39,0.05)]"
                 }
               >
                 <HeaderUsersIcon />
@@ -577,7 +595,7 @@ export default function RegisteredUsersPage() {
               <div>
                 <div className="flex flex-wrap items-center gap-3">
                   <h1
-                    className={`text-3xl md:text-4xl leading-none tracking-tight font-bold ${
+                    className={`text-[30px] md:text-4xl leading-none tracking-tight font-bold ${
                       dark
                         ? "text-white drop-shadow-[0_0_12px_rgba(34,211,238,0.12)]"
                         : "text-slate-900"
@@ -595,7 +613,7 @@ export default function RegisteredUsersPage() {
                     {isAdmin ? "ADMIN ACCESS" : "CO-ADMIN VIEW ONLY"}
                   </span>
                 </div>
-                <p className={`mt-2 text-sm ${dark ? "text-cyan-100/70" : "text-slate-600"}`}>
+                <p className={`mt-1.5 text-sm ${dark ? "text-cyan-100/70" : "text-slate-600"}`}>
                   {isAdmin
                     ? "Click a user row to view, edit, update, delete, or assign co-admin."
                     : "View-only mode. Co-admin can inspect user information but cannot edit, delete, or assign roles."}
@@ -619,7 +637,7 @@ export default function RegisteredUsersPage() {
             </div>
           </div>
 
-          <div className="mt-6 grid grid-cols-1 sm:grid-cols-4 gap-4">
+          <div className="mt-5 grid grid-cols-2 xl:grid-cols-4 gap-3">
             <motion.div {...fadeUpDelayed(0)}>
               <StatCard label="Total Users" value={stats.total} dark={dark} />
             </motion.div>
@@ -636,7 +654,7 @@ export default function RegisteredUsersPage() {
 
           <motion.div
             {...fadeUpDelayed(0.11)}
-            className={`mt-5 rounded-[26px] p-4 relative overflow-hidden ${
+            className={`mt-4 rounded-[26px] p-3.5 sm:p-4 relative overflow-hidden ${
               dark
                 ? "border border-white/8 bg-white/[0.03] shadow-inner"
                 : "border border-white/50 bg-white/38"
@@ -644,7 +662,7 @@ export default function RegisteredUsersPage() {
           >
             <div className={`absolute inset-x-0 top-0 h-1.5 ${dark ? "bg-[#7c8798]/45" : "bg-[#a7b0bd]/65"}`} />
             <div className="flex flex-col xl:flex-row gap-3 xl:items-center">
-              <div className="flex-1">
+              <div className="min-w-0 flex-1">
                 <div className="relative">
                   <span
                     className={`absolute left-4 top-1/2 -translate-y-1/2 ${
@@ -657,7 +675,7 @@ export default function RegisteredUsersPage() {
                     value={q}
                     onChange={(e) => setQ(e.target.value)}
                     placeholder="Search name, email, position, department, code, contact…"
-                    className={`w-full h-12 rounded-2xl pl-11 pr-4 text-sm shadow-sm outline-none ${
+                    className={`w-full h-11 rounded-2xl pl-11 pr-4 text-sm shadow-sm outline-none ${
                       dark
                         ? "border border-cyan-300/12 bg-white/[0.04] text-white placeholder:text-cyan-100/35 focus:ring-4 focus:ring-cyan-400/10 focus:border-cyan-300/25"
                         : "border border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 focus:ring-4 focus:ring-cyan-100 focus:border-cyan-400"
@@ -666,11 +684,11 @@ export default function RegisteredUsersPage() {
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-3">
+              <div className="flex flex-col sm:flex-row gap-2.5 xl:w-auto">
                 <select
                   value={roleFilter}
                   onChange={(e) => setRoleFilter(e.target.value as "all" | "admin" | "co_admin" | "staff")}
-                  className={inputCls}
+                  className={`${inputCls} sm:min-w-[150px]`}
                 >
                   <option className="text-slate-900" value="all">
                     All roles
@@ -693,7 +711,7 @@ export default function RegisteredUsersPage() {
                       e.target.value as "all" | "Job Order" | "Contract of Service" | "Casual" | "Permanent"
                     )
                   }
-                  className={inputCls}
+                  className={`${inputCls} sm:min-w-[190px]`}
                 >
                   <option className="text-slate-900" value="all">
                     All employment types
@@ -715,7 +733,7 @@ export default function RegisteredUsersPage() {
                 <button
                   type="button"
                   onClick={clear}
-                  className={`h-12 px-5 rounded-2xl border transition font-medium shadow-sm text-sm ${
+                  className={`h-11 px-4 rounded-2xl border transition font-medium shadow-sm text-sm ${
                     dark
                       ? "border-cyan-300/12 bg-white/[0.05] text-white hover:bg-white/[0.08]"
                       : "border-slate-300 bg-white text-slate-800 hover:bg-slate-50"
@@ -726,7 +744,7 @@ export default function RegisteredUsersPage() {
               </div>
             </div>
 
-            <div className={`mt-3 text-sm ${dark ? "text-cyan-100/60" : "text-slate-500"}`}>
+            <div className={`mt-2.5 text-[13px] ${dark ? "text-cyan-100/60" : "text-slate-500"}`}>
               Showing{" "}
               <span className={`font-medium ${dark ? "text-white" : "text-slate-900"}`}>
                 {filtered.length}
@@ -744,7 +762,7 @@ export default function RegisteredUsersPage() {
           {...fadeUpDelayed(0.14)}
           className={`${ui.card} flex-1 min-h-0 overflow-hidden flex flex-col`}
         >
-          <div className="md:hidden p-3 space-y-3 overflow-y-auto">
+          <div className="md:hidden p-3 space-y-2.5 overflow-y-auto">
             {loadingUsers ? null : filtered.length === 0 ? (
               <div
                 className={`rounded-[22px] border px-4 py-8 text-center ${
@@ -763,17 +781,17 @@ export default function RegisteredUsersPage() {
                 <div
                   key={`mobile-user-${u.id}`}
                   onClick={() => openUser(u)}
-                  className={`rounded-[22px] border p-4 transition ${ui.rowHover} ${
+                  className={`rounded-[22px] border p-3.5 transition ${ui.rowHover} ${
                     dark ? "border-white/8 bg-white/[0.03]" : "border-white/50 bg-white/40"
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex items-center gap-2.5 min-w-0">
                       <div
                         className={
                           dark
-                            ? "h-11 w-11 shrink-0 rounded-full bg-cyan-400/12 border border-cyan-300/18 text-white grid place-items-center text-sm font-bold shadow-sm"
-                            : "h-11 w-11 shrink-0 rounded-full bg-cyan-50 border border-cyan-200 text-cyan-700 grid place-items-center text-sm font-bold shadow-sm"
+                            ? "h-10 w-10 shrink-0 rounded-full bg-cyan-400/12 border border-cyan-300/18 text-white grid place-items-center text-[13px] font-bold shadow-sm"
+                            : "h-10 w-10 shrink-0 rounded-full bg-cyan-50 border border-cyan-200 text-cyan-700 grid place-items-center text-[13px] font-bold shadow-sm"
                         }
                       >
                         {initials(u.name || "U")}
@@ -802,13 +820,13 @@ export default function RegisteredUsersPage() {
                     </div>
                   </div>
 
-                  <div className="mt-3 flex flex-wrap gap-2">
+                  <div className="mt-2.5 flex flex-wrap gap-2">
                     <Pill tone={roleTone(u.role)} dark={dark}>
                       {roleLabel(u.role)}
                     </Pill>
-                    <Pill tone="purple" dark={dark}>
+                    <EmploymentText dark={dark}>
                       {safeText(u.employmentType)}
-                    </Pill>
+                    </EmploymentText>
                   </div>
 
                   <div className={`mt-3 grid grid-cols-1 gap-2 text-[12px] ${dark ? "text-cyan-100/75" : "text-slate-600"}`}>
@@ -832,20 +850,20 @@ export default function RegisteredUsersPage() {
 
           <div className="hidden md:block flex-1 overflow-auto">
             <table className="min-w-[1180px] w-full text-sm">
-              <thead className={`sticky top-0 z-10 backdrop-blur border-b ${ui.tableHead}`}>
+              <thead className={`sticky top-0 z-10 border-b ${ui.tableHead} ${dark ? "bg-[#04191a]/96 text-cyan-100/72" : "bg-[#eef4f0]/96 text-slate-700"}`}>
                 <tr
                   className={`text-left text-[11px] uppercase tracking-[0.08em] ${
-                    dark ? "text-cyan-100/55" : "text-slate-500"
+                    dark ? "text-cyan-100/72" : "text-slate-700"
                   }`}
                 >
-                  <th className="px-5 py-4 font-semibold">User</th>
-                  <th className="px-5 py-4 font-semibold">Email</th>
-                  <th className="px-5 py-4 font-semibold">Role</th>
-                  <th className="px-5 py-4 font-semibold">Employment</th>
-                  <th className="px-5 py-4 font-semibold">Position</th>
-                  <th className="px-5 py-4 font-semibold">Department</th>
-                  <th className="px-5 py-4 font-semibold">Created</th>
-                  <th className="px-5 py-4 font-semibold text-right">Action</th>
+                  <th className="px-4 py-3.5 font-semibold">User</th>
+                  <th className="px-4 py-3.5 font-semibold">Email</th>
+                  <th className="px-4 py-3.5 font-semibold">Role</th>
+                  <th className="px-4 py-3.5 font-semibold">Employment</th>
+                  <th className="px-4 py-3.5 font-semibold">Position</th>
+                  <th className="px-4 py-3.5 font-semibold">Department</th>
+                  <th className="px-4 py-3.5 font-semibold">Created</th>
+                  <th className="px-4 py-3.5 font-semibold text-right">Action</th>
                 </tr>
               </thead>
 
@@ -882,13 +900,13 @@ export default function RegisteredUsersPage() {
                       onClick={() => openUser(u)}
                       className={`cursor-pointer transition-all duration-200 ${ui.rowHover}`}
                     >
-                      <td className="px-5 py-4 align-middle">
-                        <div className="flex items-center gap-4 min-w-[260px]">
+                      <td className="px-4 py-3 align-middle">
+                        <div className="flex items-center gap-3 min-w-[240px]">
                           <div
                             className={
                               dark
-                                ? "h-12 w-12 shrink-0 rounded-full bg-cyan-400/12 border border-cyan-300/18 text-white grid place-items-center text-sm font-bold shadow-sm"
-                                : "h-12 w-12 shrink-0 rounded-full bg-cyan-50 border border-cyan-200 text-cyan-700 grid place-items-center text-sm font-bold shadow-sm"
+                                ? "h-10 w-10 shrink-0 rounded-full bg-cyan-400/12 border border-cyan-300/18 text-white grid place-items-center text-[13px] font-bold shadow-sm"
+                                : "h-10 w-10 shrink-0 rounded-full bg-cyan-50 border border-cyan-200 text-cyan-700 grid place-items-center text-[13px] font-bold shadow-sm"
                             }
                           >
                             {initials(u.name || "U")}
@@ -896,21 +914,21 @@ export default function RegisteredUsersPage() {
 
                           <div className="min-w-0">
                             <div
-                              className={`truncate text-[15px] font-medium ${
+                              className={`truncate text-[14px] font-semibold ${
                                 dark ? "text-white" : "text-slate-900"
                               }`}
                             >
                               {safeText(u.name)}
                             </div>
                             <div
-                              className={`mt-0.5 text-[11px] ${
+                              className={`mt-0.5 text-[10px] ${
                                 dark ? "text-cyan-100/45" : "text-slate-400"
                               }`}
                             >
                               ID: {String(u.id)}
                             </div>
                             <div
-                              className={`mt-0.5 text-[11px] ${
+                              className={`mt-0.5 text-[10px] ${
                                 dark ? "text-cyan-100/45" : "text-slate-400"
                               }`}
                             >
@@ -920,9 +938,9 @@ export default function RegisteredUsersPage() {
                         </div>
                       </td>
 
-                      <td className="px-5 py-4 align-middle">
+                      <td className="px-4 py-3 align-middle">
                         <div
-                          className={`max-w-[290px] truncate text-sm ${
+                          className={`max-w-[280px] truncate text-[13px] ${
                             dark ? "text-cyan-100" : "text-slate-700"
                           }`}
                         >
@@ -930,7 +948,7 @@ export default function RegisteredUsersPage() {
                         </div>
                       </td>
 
-                      <td className="px-5 py-4 align-middle">
+                      <td className="px-4 py-3 align-middle">
                         <div className="flex">
                           <Pill tone={roleTone(u.role)} dark={dark}>
                             {roleLabel(u.role)}
@@ -938,17 +956,17 @@ export default function RegisteredUsersPage() {
                         </div>
                       </td>
 
-                      <td className="px-5 py-4 align-middle">
+                      <td className="px-4 py-3 align-middle">
                         <div className="flex">
-                          <Pill tone="purple" dark={dark}>
+                          <EmploymentText dark={dark}>
                             {safeText(u.employmentType)}
-                          </Pill>
+                          </EmploymentText>
                         </div>
                       </td>
 
-                      <td className="px-5 py-4 align-middle">
+                      <td className="px-4 py-3 align-middle">
                         <div
-                          className={`max-w-[220px] truncate text-sm ${
+                          className={`max-w-[220px] truncate text-[13px] ${
                             dark ? "text-cyan-100/85" : "text-slate-700"
                           }`}
                           title={safeText(u.position)}
@@ -957,9 +975,9 @@ export default function RegisteredUsersPage() {
                         </div>
                       </td>
 
-                      <td className="px-5 py-4 align-middle">
+                      <td className="px-4 py-3 align-middle">
                         <div
-                          className={`max-w-[300px] truncate text-sm ${
+                          className={`max-w-[280px] truncate text-[13px] ${
                             dark ? "text-cyan-100/85" : "text-slate-700"
                           }`}
                           title={safeText(u.department)}
@@ -969,14 +987,14 @@ export default function RegisteredUsersPage() {
                       </td>
 
                       <td
-                        className={`px-5 py-4 align-middle whitespace-nowrap text-sm ${
+                        className={`px-4 py-3 align-middle whitespace-nowrap text-[13px] ${
                           dark ? "text-cyan-100/75" : "text-slate-500"
                         }`}
                       >
                         {fmtDate(u.createdAt)}
                       </td>
 
-                      <td className="px-5 py-4 align-middle">
+                      <td className="px-4 py-3 align-middle">
                         <div className="flex justify-end gap-2" onClick={(e) => e.stopPropagation()}>
                           <IconButton onClick={() => copyEmail(safeText(u.email, ""))} title="Copy Email" dark={dark}>
                             <CopyIcon />
