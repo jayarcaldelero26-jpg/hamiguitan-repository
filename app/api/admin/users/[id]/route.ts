@@ -6,8 +6,21 @@ function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i.test(email.trim());
 }
 
-const ALLOWED_ROLES = ["admin", "co_admin", "staff"];
-const ALLOWED_EMPLOYMENT = ["Job Order", "Contract of Service", "Casual", "Permanent"];
+function normalizeSpaces(value: string) {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+const ALLOWED_ROLES = ["admin", "co_admin", "staff"] as const;
+const ALLOWED_EMPLOYMENT = [
+  "Job Order",
+  "Contract of Service",
+  "Casual",
+  "Permanent",
+] as const;
+
+function isValidUserId(value: number) {
+  return Number.isInteger(value) && value > 0;
+}
 
 export async function PATCH(
   req: NextRequest,
@@ -27,35 +40,46 @@ export async function PATCH(
     const { id: idRaw } = await context.params;
     const id = Number(idRaw);
 
-    if (!Number.isFinite(id)) {
-      return NextResponse.json({ error: "Invalid user id" }, { status: 400 });
+    if (!isValidUserId(id)) {
+      return NextResponse.json({ error: "Invalid user id." }, { status: 400 });
     }
 
     const body = await req.json();
 
-    const name = String(body.name ?? "").trim();
-    const email = String(body.email ?? "").trim().toLowerCase();
-    const role = String(body.role ?? "").trim();
-    const position = String(body.position ?? "").trim();
-    const department = String(body.department ?? "").trim();
-    const employmentType = String(body.employmentType ?? "").trim();
-    const contact = String(body.contact ?? "").trim();
-    const birthdate = String(body.birthdate ?? "").trim();
+    const name = normalizeSpaces(String(body?.name ?? ""));
+    const email = normalizeSpaces(String(body?.email ?? "")).toLowerCase();
+    const role = normalizeSpaces(String(body?.role ?? "")).toLowerCase();
+    const position = normalizeSpaces(String(body?.position ?? ""));
+    const department = normalizeSpaces(String(body?.department ?? ""));
+    const employmentType = normalizeSpaces(String(body?.employmentType ?? ""));
+    const contact = normalizeSpaces(String(body?.contact ?? ""));
+    const birthdate = normalizeSpaces(String(body?.birthdate ?? ""));
 
     if (!name) {
       return NextResponse.json({ error: "Name is required." }, { status: 400 });
     }
 
     if (!email || !isValidEmail(email)) {
-      return NextResponse.json({ error: "Valid email is required." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Valid email is required." },
+        { status: 400 }
+      );
     }
 
-    if (!ALLOWED_ROLES.includes(role)) {
+    if (!ALLOWED_ROLES.includes(role as (typeof ALLOWED_ROLES)[number])) {
       return NextResponse.json({ error: "Invalid role." }, { status: 400 });
     }
 
-    if (employmentType && !ALLOWED_EMPLOYMENT.includes(employmentType)) {
-      return NextResponse.json({ error: "Invalid employment type." }, { status: 400 });
+    if (
+      employmentType &&
+      !ALLOWED_EMPLOYMENT.includes(
+        employmentType as (typeof ALLOWED_EMPLOYMENT)[number]
+      )
+    ) {
+      return NextResponse.json(
+        { error: "Invalid employment type." },
+        { status: 400 }
+      );
     }
 
     const { data: existing, error: existingError } = await supabaseAdmin
@@ -82,7 +106,10 @@ export async function PATCH(
 
     if (existingError) {
       console.error("PATCH USER FETCH ERROR:", existingError);
-      return NextResponse.json({ error: "Failed to fetch user." }, { status: 500 });
+      return NextResponse.json(
+        { error: "Failed to fetch user." },
+        { status: 500 }
+      );
     }
 
     if (!existing) {
@@ -98,11 +125,17 @@ export async function PATCH(
 
     if (emailTakenError) {
       console.error("PATCH USER EMAIL CHECK ERROR:", emailTakenError);
-      return NextResponse.json({ error: "Failed to validate email." }, { status: 500 });
+      return NextResponse.json(
+        { error: "Failed to validate email." },
+        { status: 500 }
+      );
     }
 
     if (emailTaken) {
-      return NextResponse.json({ error: "Email already exists." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Email already exists." },
+        { status: 400 }
+      );
     }
 
     if (existing.role === "admin" && role !== "admin") {
@@ -113,23 +146,29 @@ export async function PATCH(
 
       if (adminCountError) {
         console.error("PATCH USER ADMIN COUNT ERROR:", adminCountError);
-        return NextResponse.json({ error: "Failed to validate admin count." }, { status: 500 });
+        return NextResponse.json(
+          { error: "Failed to validate admin count." },
+          { status: 500 }
+        );
       }
 
       if ((adminCount || 0) <= 1) {
-        return NextResponse.json({ error: "Cannot demote the last admin." }, { status: 400 });
+        return NextResponse.json(
+          { error: "Cannot demote the last admin." },
+          { status: 400 }
+        );
       }
     }
 
     const noChanges =
-      String(existing.name ?? "").trim() === name &&
-      String(existing.email ?? "").trim().toLowerCase() === email &&
-      String(existing.role ?? "").trim() === role &&
-      String(existing.position ?? "").trim() === String(position || "").trim() &&
-      String(existing.department ?? "").trim() === String(department || "").trim() &&
-      String(existing.employmentType ?? "").trim() === String(employmentType || "").trim() &&
-      String(existing.contact ?? "").trim() === String(contact || "").trim() &&
-      String(existing.birthdate ?? "").trim() === String(birthdate || "").trim();
+      normalizeSpaces(String(existing.name ?? "")) === name &&
+      normalizeSpaces(String(existing.email ?? "")).toLowerCase() === email &&
+      normalizeSpaces(String(existing.role ?? "")).toLowerCase() === role &&
+      normalizeSpaces(String(existing.position ?? "")) === position &&
+      normalizeSpaces(String(existing.department ?? "")) === department &&
+      normalizeSpaces(String(existing.employmentType ?? "")) === employmentType &&
+      normalizeSpaces(String(existing.contact ?? "")) === contact &&
+      normalizeSpaces(String(existing.birthdate ?? "")) === birthdate;
 
     if (noChanges) {
       return NextResponse.json({
@@ -156,7 +195,10 @@ export async function PATCH(
 
     if (updateError) {
       console.error("PATCH USER UPDATE ERROR:", updateError);
-      return NextResponse.json({ error: "Failed to update user." }, { status: 500 });
+      return NextResponse.json(
+        { error: "Failed to update user." },
+        { status: 500 }
+      );
     }
 
     const { data: updated, error: updatedError } = await supabaseAdmin
@@ -183,7 +225,10 @@ export async function PATCH(
 
     if (updatedError) {
       console.error("PATCH USER REFRESH ERROR:", updatedError);
-      return NextResponse.json({ error: "Failed to fetch updated user." }, { status: 500 });
+      return NextResponse.json(
+        { error: "Failed to fetch updated user." },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({
@@ -191,9 +236,12 @@ export async function PATCH(
       message: "User information updated successfully.",
       user: updated,
     });
-  } catch (e) {
-    console.error("PATCH USER ROUTE ERROR:", e);
-    return NextResponse.json({ error: "Failed to update user." }, { status: 500 });
+  } catch (error) {
+    console.error("PATCH USER ROUTE ERROR:", error);
+    return NextResponse.json(
+      { error: "Failed to update user." },
+      { status: 500 }
+    );
   }
 }
 
@@ -215,12 +263,15 @@ export async function DELETE(
     const { id: idRaw } = await context.params;
     const id = Number(idRaw);
 
-    if (!Number.isFinite(id)) {
-      return NextResponse.json({ error: "Invalid user id" }, { status: 400 });
+    if (!isValidUserId(id)) {
+      return NextResponse.json({ error: "Invalid user id." }, { status: 400 });
     }
 
     if (me.id === id) {
-      return NextResponse.json({ error: "You cannot delete your own account." }, { status: 400 });
+      return NextResponse.json(
+        { error: "You cannot delete your own account." },
+        { status: 400 }
+      );
     }
 
     const { data: target, error: targetError } = await supabaseAdmin
@@ -231,14 +282,17 @@ export async function DELETE(
 
     if (targetError) {
       console.error("DELETE USER FETCH ERROR:", targetError);
-      return NextResponse.json({ error: "Failed to fetch user." }, { status: 500 });
+      return NextResponse.json(
+        { error: "Failed to fetch user." },
+        { status: 500 }
+      );
     }
 
     if (!target) {
       return NextResponse.json({ error: "User not found." }, { status: 404 });
     }
 
-    if (target.role === "admin") {
+    if (String(target.role || "").trim().toLowerCase() === "admin") {
       const { count: adminCount, error: adminCountError } = await supabaseAdmin
         .from("users")
         .select("*", { count: "exact", head: true })
@@ -246,11 +300,17 @@ export async function DELETE(
 
       if (adminCountError) {
         console.error("DELETE USER ADMIN COUNT ERROR:", adminCountError);
-        return NextResponse.json({ error: "Failed to validate admin count." }, { status: 500 });
+        return NextResponse.json(
+          { error: "Failed to validate admin count." },
+          { status: 500 }
+        );
       }
 
       if ((adminCount || 0) <= 1) {
-        return NextResponse.json({ error: "Cannot delete the last admin." }, { status: 400 });
+        return NextResponse.json(
+          { error: "Cannot delete the last admin." },
+          { status: 400 }
+        );
       }
     }
 
@@ -261,12 +321,18 @@ export async function DELETE(
 
     if (deleteError) {
       console.error("DELETE USER ERROR:", deleteError);
-      return NextResponse.json({ error: "Failed to delete user." }, { status: 500 });
+      return NextResponse.json(
+        { error: "Failed to delete user." },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({ success: true });
-  } catch (e) {
-    console.error("DELETE USER ROUTE ERROR:", e);
-    return NextResponse.json({ error: "Failed to delete user." }, { status: 500 });
+  } catch (error) {
+    console.error("DELETE USER ROUTE ERROR:", error);
+    return NextResponse.json(
+      { error: "Failed to delete user." },
+      { status: 500 }
+    );
   }
 }

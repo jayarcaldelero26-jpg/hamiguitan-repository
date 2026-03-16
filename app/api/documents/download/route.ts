@@ -1,43 +1,76 @@
-// app/api/documents/download/route.ts
-import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
-import { getDriveClient } from "@/app/lib/googleDrive";
-
 export const runtime = "nodejs";
-const SECRET = process.env.JWT_SECRET!;
+
+import { NextRequest, NextResponse } from "next/server";
+import { Readable } from "stream";
+import { getDriveClient } from "@/app/lib/googleDrive";
+import { getCurrentUser } from "@/app/lib/auth";
+import { supabaseAdmin } from "@/app/lib/db";
+
+function safeFilename(name: string) {
+  return name.replace(/[/\\?%*:|"<>]/g, "_");
+}
 
 export async function GET(req: NextRequest) {
-  const token = req.cookies.get("auth_token")?.value;
-  if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const me = await getCurrentUser();
+
+  if (!me) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   try {
-    jwt.verify(token, SECRET);
+    const fileId = String(req.nextUrl.searchParams.get("id") || "").trim();
 
-    const fileId = req.nextUrl.searchParams.get("id");
-    if (!fileId) return NextResponse.json({ error: "Missing id" }, { status: 400 });
+    if (!fileId) {
+      return NextResponse.json({ error: "Missing id." }, { status: 400 });
+    }
+
+    const { data: doc, error: docError } = await supabaseAdmin
+      .from("documents")
+      .select("id,fileId,name,type")
+      .eq("fileId", fileId)
+      .maybeSingle();
+
+    if (docError) {
+      console.error("DOWNLOAD DOC LOOKUP ERROR:", docError);
+      return NextResponse.json({ error: "Failed to load document." }, { status: 500 });
+    }
+
+    if (!doc) {
+      return NextResponse.json({ error: "Document not found." }, { status: 404 });
+    }
 
     const drive = getDriveClient();
 
     const meta = await drive.files.get({
-      fileId,
+      fileId: doc.fileId,
       fields: "name,mimeType",
+      supportsAllDrives: true,
     });
 
-    const filename = meta.data.name || "download";
-    const mimeType = meta.data.mimeType || "application/octet-stream";
+    const filename = safeFilename(meta.data.name || doc.name || "download");
+    const mimeType = meta.data.mimeType || doc.type || "application/octet-stream";
 
     const fileRes = await drive.files.get(
-      { fileId, alt: "media" },
+      {
+        fileId: doc.fileId,
+        alt: "media",
+        supportsAllDrives: true,
+      },
       { responseType: "stream" }
     );
 
-    return new NextResponse(fileRes.data as any, {
+    const body = Readable.toWeb(fileRes.data as Readable) as ReadableStream<Uint8Array>;
+
+    return new NextResponse(body, {
       headers: {
         "Content-Type": mimeType,
         "Content-Disposition": `attachment; filename="${filename}"`,
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff",
       },
     });
-  } catch {
-    return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+  } catch (error) {
+    console.error("DOWNLOAD ROUTE ERROR:", error);
+    return NextResponse.json({ error: "Failed to download document." }, { status: 500 });
   }
 }

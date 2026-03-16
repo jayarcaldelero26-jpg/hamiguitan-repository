@@ -2,9 +2,7 @@ export const runtime = "nodejs";
 
 import { NextResponse, type NextRequest } from "next/server";
 import { supabaseAdmin } from "@/app/lib/db";
-import jwt from "jsonwebtoken";
-
-const SECRET = process.env.JWT_SECRET!;
+import { getCurrentUser } from "@/app/lib/auth";
 
 function normalizeCategory(v: string) {
   const s = (v || "").trim().toLowerCase();
@@ -15,32 +13,21 @@ function normalizeCategory(v: string) {
     return "PAMO Activity";
   }
 
-  return "Academe";
+  return "";
 }
 
 function normalizeRole(role?: string) {
   return (role || "").trim().toLowerCase();
 }
 
-function drivePreviewUrl(fileId: string) {
-  return `https://drive.google.com/file/d/${fileId}/view?usp=drivesdk`;
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
 }
 
-function getTokenPayload(req: NextRequest) {
-  const token = req.cookies.get("auth_token")?.value;
-  if (!token) return null;
+export async function GET() {
+  const me = await getCurrentUser();
 
-  try {
-    return jwt.verify(token, SECRET) as any;
-  } catch {
-    return null;
-  }
-}
-
-export async function GET(req: NextRequest) {
-  const payload = getTokenPayload(req);
-
-  if (!payload) {
+  if (!me) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -53,31 +40,32 @@ export async function GET(req: NextRequest) {
 
     if (error) {
       console.error("DOCUMENTS GET ERROR:", error);
-      return NextResponse.json({ error: "Failed to load documents" }, { status: 500 });
+      return NextResponse.json({ error: "Failed to load documents." }, { status: 500 });
     }
 
-    const documents = (rows || []).map((d: any) => ({
+    const documents = (rows || []).map((d) => ({
       ...d,
-      url: d.fileId ? drivePreviewUrl(d.fileId) : "",
-      downloadUrl: d.fileId ? `/api/documents/download?id=${d.fileId}` : "",
+      url: d.fileId ? `/api/documents/preview?id=${encodeURIComponent(d.fileId)}` : "",
+      previewUrl: d.fileId ? `/api/documents/preview?id=${encodeURIComponent(d.fileId)}` : "",
+      downloadUrl: d.fileId ? `/api/documents/download?id=${encodeURIComponent(d.fileId)}` : "",
     }));
 
     return NextResponse.json(documents);
-  } catch (e: any) {
-    console.error("DOCUMENTS GET FATAL:", e);
-    return NextResponse.json({ error: "Failed to load documents" }, { status: 500 });
+  } catch (error) {
+    console.error("DOCUMENTS GET FATAL:", error);
+    return NextResponse.json({ error: "Failed to load documents." }, { status: 500 });
   }
 }
 
 export async function POST(req: NextRequest) {
-  const payload = getTokenPayload(req);
+  const me = await getCurrentUser();
 
-  if (!payload) {
+  if (!me) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
-    const role = normalizeRole(payload?.role);
+    const role = normalizeRole(me.role);
 
     if (role !== "admin" && role !== "co_admin") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -88,7 +76,7 @@ export async function POST(req: NextRequest) {
     const fileId = String(body?.fileId || "").trim();
     const name = String(body?.name || "").trim();
     const mimeType = String(body?.type || "application/octet-stream").trim();
-    const rawCategory = String(body?.category || "Academe").trim();
+    const rawCategory = String(body?.category || "").trim();
     const category = normalizeCategory(rawCategory);
     const folder = String(body?.folder || "").trim();
     const title = String(body?.title || "").trim();
@@ -109,6 +97,10 @@ export async function POST(req: NextRequest) {
 
     if (!dateReceived) {
       return NextResponse.json({ error: "Date received is required." }, { status: 400 });
+    }
+
+    if (!category) {
+      return NextResponse.json({ error: "Invalid category." }, { status: 400 });
     }
 
     const uploadedAt = new Date().toISOString();
@@ -134,7 +126,7 @@ export async function POST(req: NextRequest) {
     if (insertError) {
       console.error("DOCUMENT INSERT ERROR:", insertError);
       return NextResponse.json(
-        { error: insertError.message || "Failed to save document metadata" },
+        { error: insertError.message || "Failed to save document metadata." },
         { status: 500 }
       );
     }
@@ -148,8 +140,11 @@ export async function POST(req: NextRequest) {
       category,
       folder,
     });
-  } catch (e: any) {
-    console.error("DOCUMENT POST ERROR:", e);
-    return NextResponse.json({ error: e?.message || "Failed to save document" }, { status: 500 });
+  } catch (error: unknown) {
+    console.error("DOCUMENT POST ERROR:", error);
+    return NextResponse.json(
+      { error: getErrorMessage(error, "Failed to save document.") },
+      { status: 500 }
+    );
   }
 }

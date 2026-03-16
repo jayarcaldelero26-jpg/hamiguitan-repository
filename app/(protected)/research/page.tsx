@@ -14,11 +14,10 @@ import {
   FolderIcon,
   CloudArrowDownIcon,
   TrashIcon,
-  ChevronDownIcon,
   ChevronRightIcon,
 } from "@heroicons/react/24/outline";
+import { repoTheme, type PageTheme } from "@/app/lib/repoTheme";
 
-type PageTheme = "dark" | "light";
 type CategoryFilter = "All" | "Academe" | "Stakeholders" | "PAMO Activity";
 
 function fmtDate(iso?: string | null) {
@@ -72,22 +71,16 @@ function Badge({
   tone?: "gray" | "green" | "blue" | "amber";
   dark: boolean;
 }) {
+  const ui = repoTheme(dark ? "dark" : "light");
+
   const cls =
     tone === "green"
-      ? dark
-        ? "bg-emerald-400/10 text-emerald-200 border-emerald-300/20"
-        : "bg-emerald-50 text-emerald-700 border-emerald-200"
+      ? ui.pillGreen
       : tone === "blue"
-      ? dark
-        ? "bg-indigo-400/10 text-indigo-200 border-indigo-300/20"
-        : "bg-indigo-50 text-indigo-700 border-indigo-200"
+      ? ui.pillBlue
       : tone === "amber"
-      ? dark
-        ? "bg-amber-400/10 text-amber-200 border-amber-300/20"
-        : "bg-amber-50 text-amber-700 border-amber-200"
-      : dark
-      ? "bg-cyan-400/8 text-cyan-100 border-cyan-300/15"
-      : "bg-cyan-50 text-cyan-700 border-cyan-200";
+      ? ui.pillAmber
+      : ui.pill;
 
   return (
     <span
@@ -108,7 +101,7 @@ function SkeletonLine({
   return (
     <div
       className={`animate-pulse rounded-full ${
-        dark ? "bg-white/10" : "bg-slate-200"
+        dark ? "bg-white/10" : "bg-[#235347]/10"
       } ${className}`}
     />
   );
@@ -141,70 +134,58 @@ function GroupCard({
   canDeleteDocs: boolean;
   dark: boolean;
 }) {
-  const cardCls = dark
-    ? "bg-white/[0.04] border border-cyan-300/12 shadow-[0_8px_30px_rgba(0,0,0,0.18)] backdrop-blur-md"
-    : "bg-white/85 border border-slate-200 shadow-[0_10px_28px_rgba(15,23,42,0.08)]";
+  const ui = repoTheme(dark ? "dark" : "light");
+
+  const cardCls = ui.card;
 
   const headerCls =
     headerTone === "green"
       ? dark
-        ? "bg-emerald-400/6 border-emerald-300/10"
-        : "bg-emerald-50 border-emerald-200"
+        ? "bg-[#163832]/50 border-white/8"
+        : "bg-[#edf6f0] border-white/50"
       : headerTone === "blue"
       ? dark
-        ? "bg-indigo-400/6 border-indigo-300/10"
-        : "bg-indigo-50 border-indigo-200"
+        ? "bg-[#0B2B26]/55 border-white/8"
+        : "bg-[#f1f6f3] border-white/50"
       : dark
-      ? "bg-amber-400/6 border-amber-300/10"
-      : "bg-amber-50 border-amber-200";
+      ? "bg-[#235347]/45 border-white/8"
+      : "bg-[#f0f6f2] border-white/50";
 
-  const titleCls =
-    headerTone === "green"
-      ? dark
-        ? "text-emerald-200"
-        : "text-emerald-700"
-      : headerTone === "blue"
-      ? dark
-        ? "text-indigo-200"
-        : "text-indigo-700"
-      : dark
-      ? "text-amber-200"
-      : "text-amber-700";
-
+  const titleCls = dark ? "text-[#DAF1DE]" : "text-[#163832]";
   const folderIconCls =
     headerTone === "green"
       ? dark
-        ? "text-emerald-200"
-        : "text-emerald-600"
+        ? "text-[#8EB69B]"
+        : "text-[#235347]"
       : headerTone === "blue"
       ? dark
-        ? "text-indigo-200"
-        : "text-indigo-600"
+        ? "text-[#c8d8f0]"
+        : "text-[#4d6f99]"
       : dark
-      ? "text-amber-200"
-      : "text-amber-600";
-
-  const actionBtnCls =
+      ? "text-[#f0cf97]"
+      : "text-[#9d6c26]";
+  const actionBtnCls = ui.buttonPrimary;
+  const textMain = ui.textMain;
+  const textMuted = ui.textMuted;
+  const textSoft = ui.textSoft;
+  const subBg = dark ? "bg-white/[0.03]" : "bg-white/45";
+  const subBorder = dark ? "border-white/8" : "border-white/50";
+  const accentBar =
     headerTone === "green"
       ? dark
-        ? "bg-emerald-500/90 hover:bg-emerald-400 text-slate-950"
-        : "bg-emerald-600 hover:bg-emerald-500 text-white"
+        ? "bg-[#8EB69B]/55"
+        : "bg-[#8EB69B]/70"
       : headerTone === "blue"
       ? dark
-        ? "bg-indigo-500/90 hover:bg-indigo-400 text-white"
-        : "bg-indigo-600 hover:bg-indigo-500 text-white"
+        ? "bg-[#8fb0d7]/50"
+        : "bg-[#9fc0e6]/70"
       : dark
-      ? "bg-amber-500/90 hover:bg-amber-400 text-slate-950"
-      : "bg-amber-500 hover:bg-amber-400 text-slate-950";
-
-  const textMain = dark ? "text-white" : "text-slate-900";
-  const textMuted = dark ? "text-cyan-100/65" : "text-slate-600";
-  const textSoft = dark ? "text-cyan-100/45" : "text-slate-500";
-  const subBg = dark ? "bg-white/[0.03]" : "bg-slate-50";
-  const subBorder = dark ? "border-cyan-300/10" : "border-slate-200";
+      ? "bg-[#d7aa6b]/68"
+      : "bg-[#ddb16f]/82";
 
   return (
-    <div className={`${cardCls} rounded-3xl overflow-hidden`}>
+    <div className={`${cardCls} relative overflow-hidden`}>
+      <div className={`absolute inset-x-0 top-0 h-2 ${accentBar}`} />
       <div className={`px-5 py-4 border-b ${headerCls}`}>
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -230,13 +211,13 @@ function GroupCard({
             {[1, 2, 3].map((i) => (
               <div
                 key={i}
-                className={`border rounded-2xl p-4 ${subBg} ${subBorder}`}
+                className={`border rounded-[22px] p-4 ${subBg} ${subBorder}`}
               >
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3 flex-1">
                     <div
-                      className={`h-10 w-10 rounded-2xl animate-pulse ${
-                        dark ? "bg-white/10" : "bg-slate-200"
+                      className={`h-10 w-10 rounded-[16px] animate-pulse ${
+                        dark ? "bg-white/10" : "bg-[#235347]/10"
                       }`}
                     />
                     <div className="flex-1 space-y-2">
@@ -250,7 +231,25 @@ function GroupCard({
             ))}
           </div>
         ) : folders.length === 0 ? (
-          <div className={`${textMuted} px-2 py-6 text-sm`}>No folders found.</div>
+          <div className="px-2 py-6">
+            <div
+              className={`mx-auto max-w-[280px] rounded-[22px] border px-5 py-6 text-center ${
+                dark ? "border-white/8 bg-white/[0.03]" : "border-white/50 bg-white/40"
+              }`}
+            >
+              <div
+                className={`mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-[18px] border shadow-[0_10px_24px_rgba(0,0,0,0.08)] ${
+                  dark ? "border-white/10 bg-white/[0.06]" : "border-white/70 bg-white/78"
+                }`}
+              >
+                <FolderIcon className={`w-6 h-6 ${folderIconCls}`} />
+              </div>
+              <div className={`font-medium ${textMain}`}>No folders found</div>
+              <div className={`mt-1 text-sm ${textMuted}`}>
+                This section will show grouped records once repository files are available.
+              </div>
+            </div>
+          </div>
         ) : (
           folders.map((folder) => {
             const open = isOpen(folder);
@@ -259,17 +258,40 @@ function GroupCard({
             return (
               <div
                 key={folder}
-                className={`border rounded-2xl overflow-hidden ${subBg} ${subBorder}`}
+                className={`border rounded-[22px] overflow-hidden transition ${subBg} ${subBorder} ${
+                  open
+                    ? dark
+                      ? "shadow-[0_16px_40px_rgba(0,0,0,0.22)]"
+                      : "shadow-[0_16px_36px_rgba(17,24,39,0.08)]"
+                    : ""
+                }`}
               >
                 <button
                   type="button"
                   onClick={() => toggleFolder(folder)}
-                  className={`w-full flex items-center justify-between px-4 py-3 transition ${
-                    dark ? "hover:bg-white/[0.04]" : "hover:bg-white"
+                  aria-expanded={open}
+                  className={`w-full flex items-center justify-between gap-3 px-4 py-3 transition ${
+                    open
+                      ? dark
+                        ? "bg-white/[0.055] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
+                        : "bg-white/65 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]"
+                      : dark
+                      ? "hover:bg-white/[0.035]"
+                      : "hover:bg-white/40"
                   }`}
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <FolderIcon className={`w-5 h-5 ${folderIconCls}`} />
+                    <div
+                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px] border shadow-[0_10px_24px_rgba(0,0,0,0.08)] ${
+                        open
+                          ? dark
+                            ? "border-white/10 bg-white/[0.06]"
+                            : "border-white/70 bg-white/80"
+                          : `${subBg} ${subBorder}`
+                      }`}
+                    >
+                      <FolderIcon className={`w-5 h-5 ${folderIconCls}`} />
+                    </div>
                     <div className="min-w-0 text-left">
                       <div className={`font-medium truncate ${textMain}`}>{folder}</div>
                       <div className={`text-[11px] ${textMuted}`}>
@@ -278,29 +300,40 @@ function GroupCard({
                     </div>
                   </div>
 
-                  {open ? (
-                    <ChevronDownIcon className={`w-5 h-5 ${textMuted}`} />
-                  ) : (
-                    <ChevronRightIcon className={`w-5 h-5 ${textMuted}`} />
-                  )}
+                  <div
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition ${
+                      open
+                        ? dark
+                          ? "border-white/10 bg-white/[0.06]"
+                          : "border-white/70 bg-white/75"
+                        : `${subBg} ${subBorder}`
+                    }`}
+                  >
+                    <ChevronRightIcon
+                      className={`h-5 w-5 transition-transform duration-200 ${
+                        open ? `rotate-90 ${textMain}` : textMuted
+                      }`}
+                    />
+                  </div>
                 </button>
 
                 {open && (
                   <div
-                    className={`border-t p-3 space-y-3 ${
+                    className={`border-t p-3 ${
                       dark
-                        ? "border-cyan-300/10 bg-black/10"
-                        : "border-slate-200 bg-white/70"
+                        ? "border-white/8 bg-black/10"
+                        : "border-white/50 bg-white/35"
                     }`}
                   >
-                    {items.map((d) => (
-                      <div
-                        key={d.id}
-                        className={`rounded-2xl border shadow-sm p-3 transition ${subBg} ${subBorder} ${
-                          dark ? "hover:bg-white/[0.05]" : "hover:bg-white"
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-3">
+                    <div className="max-h-[360px] space-y-3 overflow-y-auto pr-1">
+                      {items.map((d) => (
+                        <div
+                          key={d.id}
+                          className={`rounded-[20px] border shadow-sm p-3 transition-all duration-200 ${subBg} ${subBorder} ${
+                            dark ? "hover:bg-white/[0.05]" : "hover:bg-white"
+                          }`}
+                        >
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                           <div className="min-w-0">
                             <div className={`font-medium truncate ${textMain}`}>
                               {d.title?.trim() ? d.title : d.name}
@@ -313,25 +346,25 @@ function GroupCard({
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-2 shrink-0">
+                          <div className="mt-3 sm:mt-0 flex flex-wrap items-center gap-2 shrink-0">
                             <a
                               href={docUrl(d)}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-medium shadow-sm transition ${actionBtnCls}`}
+                            className={`inline-flex min-h-11 items-center gap-1.5 px-3 py-2 rounded-[14px] text-[11px] font-medium shadow-sm transition ${actionBtnCls}`}
                             >
                               <CloudArrowDownIcon className="w-4 h-4" />
-                              <span className="hidden sm:inline">Download</span>
+                              <span>Download</span>
                             </a>
 
                             {canDeleteDocs && (
                               <button
                                 type="button"
                                 onClick={() => onAskDelete(d.id)}
-                                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-medium transition shadow-sm bg-slate-800 text-white hover:bg-slate-700"
+                                className={`inline-flex min-h-11 items-center gap-1.5 px-3 py-2 rounded-[14px] text-[11px] font-medium transition shadow-sm ${ui.buttonDanger}`}
                               >
                                 <TrashIcon className="w-4 h-4" />
-                                <span className="hidden sm:inline">Delete</span>
+                                <span>Delete</span>
                               </button>
                             )}
                           </div>
@@ -348,8 +381,9 @@ function GroupCard({
                             Uploaded: {fmtDate(d.uploadedAt)}
                           </Badge>
                         </div>
-                      </div>
-                    ))}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -378,7 +412,7 @@ export default function ResearchPage() {
   const [successMsg, setSuccessMsg] = useState("Done.");
   const [errorOpen, setErrorOpen] = useState(false);
   const [errorMsg, setErrorMsg] = useState("Something went wrong.");
-  const [openFolders, setOpenFolders] = useState<Record<string, boolean>>({});
+  const [openFolderKey, setOpenFolderKey] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [pageTheme, setPageTheme] = useState<PageTheme>("dark");
 
@@ -491,20 +525,17 @@ export default function ResearchPage() {
   };
 
   const dark = pageTheme === "dark";
-  const cardCls = dark
-    ? "bg-white/[0.04] border border-cyan-300/12 shadow-[0_8px_30px_rgba(0,0,0,0.18)] backdrop-blur-md"
-    : "bg-white/85 border border-slate-200 shadow-[0_10px_28px_rgba(15,23,42,0.08)]";
-  const textMain = dark ? "text-white" : "text-slate-900";
-  const textMuted = dark ? "text-cyan-100/65" : "text-slate-600";
-  const textSoft = dark ? "text-cyan-100/45" : "text-slate-500";
-  const inputCls = dark
-    ? "w-full pl-10 pr-4 py-3 rounded-2xl border border-cyan-300/15 bg-white/[0.04] text-white placeholder-cyan-100/40 shadow-sm outline-none focus:ring-4 focus:ring-cyan-400/10 focus:border-cyan-300/30 caret-cyan-200 text-sm"
-    : "w-full pl-10 pr-4 py-3 rounded-2xl border border-slate-300 bg-white text-slate-900 placeholder-slate-400 shadow-sm outline-none focus:ring-4 focus:ring-cyan-100 focus:border-cyan-400 caret-cyan-700 text-sm";
+  const ui = repoTheme(pageTheme);
+
+  const textMain = ui.textMain;
+  const textMuted = ui.textMuted;
+  const textSoft = ui.textSoft;
+  const inputCls = `${ui.input} shadow-sm text-sm`;
 
   if (loadingMe || !me) {
     return (
-      <div className="min-h-full grid place-items-center p-6">
-        <div className={`${cardCls} rounded-2xl p-6 ${textMuted}`}>Loading…</div>
+      <div className={`${ui.page} min-h-full grid place-items-center p-6`}>
+        <div className={`${ui.card} rounded-[24px] p-6 ${textMuted}`}>Loading…</div>
       </div>
     );
   }
@@ -513,15 +544,15 @@ export default function ResearchPage() {
   const stakeFolders = Object.keys(grouped.Stakeholders).sort((a, b) => a.localeCompare(b));
   const pamoFolders = Object.keys(grouped["PAMO Activity"]).sort((a, b) => a.localeCompare(b));
 
-  const isOpen = (group: string, folder: string) => !!openFolders[`${group}::${folder}`];
+  const isOpen = (group: string, folder: string) => openFolderKey === `${group}::${folder}`;
 
   const toggleFolder = (group: string, folder: string) => {
     const key = `${group}::${folder}`;
-    setOpenFolders((prev) => ({ ...prev, [key]: !prev[key] }));
+    setOpenFolderKey((prev) => (prev === key ? null : key));
   };
 
   return (
-    <div className={`min-h-full p-6 md:p-10 ${dark ? "text-slate-100" : "text-slate-900"}`}>
+    <div className={`${ui.page} min-h-full p-4 sm:p-6 md:p-10`}>
       <ConfirmDialog
         open={deleteId !== null}
         title="Delete Document?"
@@ -583,11 +614,7 @@ export default function ResearchPage() {
               <button
                 type="button"
                 onClick={() => router.push("/upload")}
-                className={`px-4 py-2.5 rounded-2xl transition font-medium text-sm ${
-                  dark
-                    ? "bg-cyan-500/90 text-slate-950 hover:bg-cyan-400"
-                    : "bg-cyan-600 text-white hover:bg-cyan-500"
-                }`}
+                className={`min-h-11 px-4 py-2.5 rounded-[18px] transition font-medium text-sm ${ui.buttonPrimary}`}
               >
                 Upload Document
               </button>
@@ -597,14 +624,14 @@ export default function ResearchPage() {
 
         <motion.div
           {...fadeUpDelayed(0.04)}
-          className={`${cardCls} mt-6 rounded-3xl p-5`}
+          className={`${ui.shell} mt-6 p-4 sm:p-5`}
         >
-          <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
+          <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center sm:justify-between">
             <div className="flex-1">
               <div className="relative">
                 <MagnifyingGlassIcon
                   className={`w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 ${
-                    dark ? "text-cyan-100/45" : "text-slate-400"
+                    dark ? "text-[#8EB69B]/65" : "text-[#235347]/45"
                   }`}
                 />
                 <input
@@ -620,10 +647,10 @@ export default function ResearchPage() {
               <select
                 value={cat}
                 onChange={(e) => setCat(e.target.value as CategoryFilter)}
-                className={`px-4 py-3 rounded-2xl border shadow-sm outline-none text-sm ${
+                className={`min-h-11 px-4 py-3 rounded-[20px] border shadow-sm outline-none text-sm ${
                   dark
-                    ? "border-cyan-300/15 bg-white/[0.04] text-white focus:ring-4 focus:ring-cyan-400/10"
-                    : "border-slate-300 bg-white text-slate-900 focus:ring-4 focus:ring-cyan-100"
+                    ? "border-white/10 bg-white/[0.04] text-[#DAF1DE] focus:ring-4 focus:ring-[#8EB69B]/10"
+                    : "border-white/55 bg-white/55 text-[#163832] focus:ring-4 focus:ring-[#8EB69B]/18"
                 }`}
               >
                 <option className="text-slate-900" value="All">
@@ -646,11 +673,7 @@ export default function ResearchPage() {
                   setQ("");
                   setCat("All");
                 }}
-                className={`px-4 py-3 rounded-2xl border transition font-medium shadow-sm text-sm ${
-                  dark
-                    ? "border-cyan-300/15 bg-white/[0.05] text-white hover:bg-white/[0.08]"
-                    : "border-slate-300 bg-white text-slate-900 hover:bg-slate-50"
-                }`}
+                className={`min-h-11 px-4 py-3 rounded-[20px] transition font-medium shadow-sm text-sm ${ui.buttonSecondary}`}
               >
                 Clear
               </button>

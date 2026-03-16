@@ -101,7 +101,7 @@ export default function ConfirmDialog({
   return (
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-4">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -117,14 +117,14 @@ export default function ConfirmDialog({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 10 }}
             transition={{ duration: 0.18, ease: "easeOut" }}
-            className="relative w-full max-w-[540px] rounded-[30px] bg-white border border-slate-200 shadow-[0_28px_80px_rgba(15,23,42,0.20)] px-6 py-7 sm:px-8"
+            className="relative w-full max-w-[540px] max-h-[min(88dvh,760px)] overflow-y-auto rounded-[28px] bg-white border border-slate-200 shadow-[0_28px_80px_rgba(15,23,42,0.20)] px-4 py-6 sm:px-6 sm:py-7 sm:rounded-[30px]"
           >
             {!oneButton && onCancel && (
               <button
                 type="button"
                 onClick={() => !loading && onCancel()}
                 disabled={loading}
-                className="absolute right-4 top-4 h-10 w-10 rounded-xl border border-slate-200 bg-white text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition disabled:opacity-60 grid place-items-center"
+                className="absolute right-3 top-3 h-11 w-11 rounded-xl border border-slate-200 bg-white text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition disabled:opacity-60 grid place-items-center sm:right-4 sm:top-4 sm:h-10 sm:w-10"
                 aria-label="Close dialog"
               >
                 <XMarkIcon className="w-5 h-5" />
@@ -143,11 +143,11 @@ export default function ConfirmDialog({
                 <span className="absolute -left-1 -bottom-3 h-2 w-2 rounded-full bg-cyan-100" />
               </div>
 
-              <h2 className="text-[30px] leading-tight font-extrabold text-slate-900">
+              <h2 className="text-[24px] sm:text-[30px] leading-tight font-extrabold text-slate-900">
                 {title}
               </h2>
 
-              <p className="mt-3 max-w-[420px] text-[15px] leading-7 text-slate-500 whitespace-pre-line">
+              <p className="mt-3 max-w-[420px] text-[14px] sm:text-[15px] leading-6 sm:leading-7 text-slate-500 whitespace-pre-line">
                 {message}
               </p>
 
@@ -168,7 +168,7 @@ export default function ConfirmDialog({
               )}
 
               <div
-                className={`mt-7 flex w-full gap-3 ${
+                className={`mt-7 flex w-full flex-col sm:flex-row gap-3 ${
                   oneButton ? "justify-center" : "justify-center sm:justify-between"
                 } ${oneButton ? "max-w-[320px]" : ""}`}
               >
@@ -177,7 +177,7 @@ export default function ConfirmDialog({
                     type="button"
                     onClick={() => onCancel?.()}
                     disabled={loading}
-                    className="flex-1 sm:flex-none sm:min-w-[140px] px-5 py-3 rounded-2xl border border-slate-300 bg-white text-slate-700 font-bold hover:bg-slate-50 transition disabled:opacity-70 disabled:cursor-not-allowed"
+                    className="flex-1 sm:flex-none sm:min-w-[140px] min-h-11 px-5 py-3 rounded-2xl border border-slate-300 bg-white text-slate-700 font-bold hover:bg-slate-50 transition disabled:opacity-70 disabled:cursor-not-allowed"
                   >
                     {cancelText}
                   </button>
@@ -187,7 +187,7 @@ export default function ConfirmDialog({
                   type="button"
                   onClick={onConfirm}
                   disabled={loading}
-                  className={`flex-1 sm:flex-none sm:min-w-[180px] px-6 py-3 rounded-2xl font-extrabold transition disabled:opacity-70 disabled:cursor-not-allowed ${confirmBtnClass}`}
+                  className={`flex-1 sm:flex-none sm:min-w-[180px] min-h-11 px-6 py-3 rounded-2xl font-extrabold transition disabled:opacity-70 disabled:cursor-not-allowed ${confirmBtnClass}`}
                 >
                   {loading ? "Please wait..." : confirmText}
                 </button>

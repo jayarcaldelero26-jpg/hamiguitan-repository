@@ -1,84 +1,46 @@
 export const runtime = "nodejs";
 
 import { NextResponse, type NextRequest } from "next/server";
-import jwt from "jsonwebtoken";
-import { getDriveClient, normalizeDriveCategory, normalizeFolderName } from "@/app/lib/googleDrive";
-
-const SECRET = process.env.JWT_SECRET!;
-const ROOT_ID = process.env.DRIVE_ROOT_FOLDER_ID!;
-const ACADEME_ID = process.env.DRIVE_ACADEME_FOLDER_ID!;
-const STAKEHOLDERS_ID = process.env.DRIVE_STAKEHOLDERS_FOLDER_ID!;
-const PAMO_ID = process.env.DRIVE_PAMO_FOLDER_ID!;
-
-function getTokenPayload(req: NextRequest) {
-  const token = req.cookies.get("auth_token")?.value;
-  if (!token) return null;
-
-  try {
-    return jwt.verify(token, SECRET) as any;
-  } catch {
-    return null;
-  }
-}
+import {
+  getDriveClient,
+  normalizeDriveCategory,
+  normalizeFolderName,
+  findOrCreateFolder,
+} from "@/app/lib/googleDrive";
+import { getCurrentUser } from "@/app/lib/auth";
+import { serverEnv } from "@/app/lib/serverEnv";
 
 function normalizeRole(role?: string) {
   return (role || "").trim().toLowerCase();
 }
 
 function getCategoryFolderId(category: string) {
-  if (category === "Academe") return ACADEME_ID;
-  if (category === "Stakeholders") return STAKEHOLDERS_ID;
-  if (category === "PAMO Activity") return PAMO_ID;
-  return ROOT_ID;
+  if (category === "Academe") return serverEnv.driveAcademeFolderId;
+  if (category === "Stakeholders") return serverEnv.driveStakeholdersFolderId;
+  if (category === "PAMO Activity") return serverEnv.drivePamoFolderId;
+  return serverEnv.driveRootFolderId;
 }
 
-async function findOrCreateFolder(drive: any, name: string, parentId?: string) {
-  const cleanName = normalizeFolderName(name);
-  const safeName = cleanName.replace(/'/g, "\\'");
+function isSupportedCategory(category: string) {
+  return (
+    category === "Academe" ||
+    category === "Stakeholders" ||
+    category === "PAMO Activity"
+  );
+}
 
-  const q = [
-    `mimeType='application/vnd.google-apps.folder'`,
-    `name='${safeName}'`,
-    `trashed=false`,
-    parentId ? `'${parentId}' in parents` : null,
-  ]
-    .filter(Boolean)
-    .join(" and ");
-
-  const list = await drive.files.list({
-    q,
-    fields: "files(id,name)",
-    spaces: "drive",
-    pageSize: 1,
-  });
-
-  const existing = list.data.files?.[0];
-  if (existing?.id) return existing.id;
-
-  const created = await drive.files.create({
-    requestBody: {
-      name: cleanName,
-      mimeType: "application/vnd.google-apps.folder",
-      parents: parentId ? [parentId] : undefined,
-    },
-    fields: "id,name",
-  });
-
-  if (!created.data.id) {
-    throw new Error(`Failed to create folder: ${cleanName}`);
-  }
-
-  return created.data.id;
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
 }
 
 export async function POST(req: NextRequest) {
-  const payload = getTokenPayload(req);
+  const me = await getCurrentUser();
 
-  if (!payload) {
+  if (!me) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const role = normalizeRole(payload?.role);
+  const role = normalizeRole(me.role);
   if (role !== "admin" && role !== "co_admin") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
@@ -91,12 +53,24 @@ export async function POST(req: NextRequest) {
 
     const category = normalizeDriveCategory(rawCategory);
 
+    if (!isSupportedCategory(category)) {
+      return NextResponse.json({ error: "Invalid category." }, { status: 400 });
+    }
+
     if (category === "Stakeholders" && folder) {
       folder = folder.toUpperCase();
     }
 
-    const drive = getDriveClient();
     const categoryFolderId = getCategoryFolderId(category);
+
+    if (!categoryFolderId) {
+      return NextResponse.json(
+        { error: "Drive folder ID is not configured for this category." },
+        { status: 500 }
+      );
+    }
+
+    const drive = getDriveClient();
 
     let targetFolderId = categoryFolderId;
     if (folder) {
@@ -109,10 +83,10 @@ export async function POST(req: NextRequest) {
       folder,
       parentId: targetFolderId,
     });
-  } catch (e: any) {
-    console.error("DRIVE TARGET ERROR:", e);
+  } catch (error: unknown) {
+    console.error("DRIVE TARGET ERROR:", error);
     return NextResponse.json(
-      { error: e?.message || "Failed to resolve Drive folder." },
+      { error: getErrorMessage(error, "Failed to resolve Drive folder.") },
       { status: 500 }
     );
   }

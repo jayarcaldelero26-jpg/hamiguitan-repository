@@ -1,8 +1,8 @@
 export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
 import { Readable } from "stream";
+import type { ReadableStream as NodeReadableStream } from "stream/web";
 import { supabaseAdmin } from "@/app/lib/db";
 import {
   getDriveClient,
@@ -10,27 +10,12 @@ import {
   normalizeDriveCategory,
   normalizeFolderName,
 } from "@/app/lib/googleDrive";
+import { getCurrentUser } from "@/app/lib/auth";
+import { serverEnv } from "@/app/lib/serverEnv";
 
-const SECRET = process.env.JWT_SECRET!;
-const TEMP_BUCKET = "temp-uploads";
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
 
-const ACADEME_ID = process.env.DRIVE_ACADEME_FOLDER_ID!;
-const STAKEHOLDERS_ID = process.env.DRIVE_STAKEHOLDERS_FOLDER_ID!;
-const PAMO_ID = process.env.DRIVE_PAMO_FOLDER_ID!;
-
-function getTokenPayload(req: NextRequest) {
-  const token = req.cookies.get("auth_token")?.value;
-  if (!token) return null;
-
-  try {
-    return jwt.verify(token, SECRET) as any;
-  } catch {
-    return null;
-  }
-}
-
-function requiredString(v: any) {
+function requiredString(v: unknown) {
   return typeof v === "string" ? v.trim() : "";
 }
 
@@ -38,21 +23,25 @@ function normalizeRole(role?: string) {
   return (role || "").trim().toLowerCase();
 }
 
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
+}
+
 function getCategoryFolderId(category: string) {
-  if (category === "Academe") return ACADEME_ID;
-  if (category === "Stakeholders") return STAKEHOLDERS_ID;
-  if (category === "PAMO Activity") return PAMO_ID;
+  if (category === "Academe") return serverEnv.driveAcademeFolderId;
+  if (category === "Stakeholders") return serverEnv.driveStakeholdersFolderId;
+  if (category === "PAMO Activity") return serverEnv.drivePamoFolderId;
   return "";
 }
 
 export async function POST(req: NextRequest) {
-  const payload = getTokenPayload(req);
+  const me = await getCurrentUser();
 
-  if (!payload) {
+  if (!me) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const role = normalizeRole(payload?.role);
+  const role = normalizeRole(me.role);
   if (role !== "admin" && role !== "co_admin") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
@@ -62,8 +51,7 @@ export async function POST(req: NextRequest) {
 
     const tempPath = requiredString(body?.tempPath);
     const originalName = requiredString(body?.originalName);
-    const mimeType =
-      requiredString(body?.mimeType) || "application/octet-stream";
+    const mimeType = requiredString(body?.mimeType) || "application/octet-stream";
     const rawCategory = requiredString(body?.category);
     const title = requiredString(body?.title);
     const dateReceived = requiredString(body?.dateReceived);
@@ -77,10 +65,7 @@ export async function POST(req: NextRequest) {
     let folder = normalizeFolderName(requiredString(body?.folder));
 
     if (!tempPath) {
-      return NextResponse.json(
-        { error: "Missing temp file path." },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Missing temp file path." }, { status: 400 });
     }
 
     if (!originalName) {
@@ -152,7 +137,7 @@ export async function POST(req: NextRequest) {
     });
 
     const { data: fileData, error: downloadError } = await supabaseAdmin.storage
-      .from(TEMP_BUCKET)
+      .from(serverEnv.tempUploadsBucket)
       .download(tempPath);
 
     if (downloadError || !fileData) {
@@ -163,19 +148,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const arrayBuffer = await fileData.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    const actualFileSize =
+      typeof fileData.size === "number" ? fileData.size : declaredFileSize;
 
-    if (!buffer.length) {
+    if (!actualFileSize) {
       return NextResponse.json(
         { error: "Temporary file is empty." },
         { status: 400 }
       );
     }
 
-    if (buffer.length > MAX_FILE_SIZE) {
+    if (actualFileSize > MAX_FILE_SIZE) {
       try {
-        await supabaseAdmin.storage.from(TEMP_BUCKET).remove([tempPath]);
+        await supabaseAdmin.storage
+          .from(serverEnv.tempUploadsBucket)
+          .remove([tempPath]);
       } catch (cleanupError) {
         console.error("TEMP FILE CLEANUP WARNING:", cleanupError);
       }
@@ -200,7 +187,7 @@ export async function POST(req: NextRequest) {
       },
       media: {
         mimeType,
-        body: Readable.from(buffer),
+        body: Readable.fromWeb(fileData.stream() as unknown as NodeReadableStream),
       },
       fields: "id,name,webViewLink",
       supportsAllDrives: true,
@@ -209,19 +196,6 @@ export async function POST(req: NextRequest) {
     const fileId = uploaded.data.id;
     if (!fileId) {
       throw new Error("Google Drive did not return a file ID.");
-    }
-
-    try {
-      await drive.permissions.create({
-        fileId,
-        requestBody: {
-          type: "anyone",
-          role: "reader",
-        },
-        supportsAllDrives: true,
-      });
-    } catch (permError) {
-      console.error("DRIVE PERMISSION WARNING:", permError);
     }
 
     const uploadedAt = new Date().toISOString();
@@ -253,7 +227,7 @@ export async function POST(req: NextRequest) {
     }
 
     const { error: removeError } = await supabaseAdmin.storage
-      .from(TEMP_BUCKET)
+      .from(serverEnv.tempUploadsBucket)
       .remove([tempPath]);
 
     if (removeError) {
@@ -274,10 +248,10 @@ export async function POST(req: NextRequest) {
       category,
       folder: folder || "",
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("TRANSFER ERROR:", error);
     return NextResponse.json(
-      { error: error?.message || "Transfer failed." },
+      { error: getErrorMessage(error, "Transfer failed.") },
       { status: 500 }
     );
   }

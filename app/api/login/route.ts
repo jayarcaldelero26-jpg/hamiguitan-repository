@@ -1,45 +1,55 @@
 import { NextResponse } from "next/server";
-import { supabaseAdmin, ensureAdminUser } from "@/app/lib/db";
+import { supabaseAdmin } from "@/app/lib/db";
+import { serverEnv } from "@/app/lib/serverEnv";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 
-const SECRET = process.env.JWT_SECRET!;
-
 export async function POST(req: Request) {
   try {
-    await ensureAdminUser();
+    const body = await req.json();
 
-    const { email, password } = await req.json();
-
-    const cleanEmail = String(email || "").trim().toLowerCase();
-    const cleanPassword = String(password || "");
+    const cleanEmail = String(body?.email || "").trim().toLowerCase();
+    const cleanPassword = String(body?.password || "");
 
     if (!cleanEmail || !cleanPassword) {
       return NextResponse.json(
-        { error: "Email and password are required" },
+        { error: "Email and password are required." },
         { status: 400 }
       );
     }
 
     const { data: user, error } = await supabaseAdmin
       .from("users")
-      .select("*")
+      .select("id, name, email, role, password, mustChangePassword")
       .eq("email", cleanEmail)
       .maybeSingle();
 
     if (error) {
       console.error("LOGIN FETCH ERROR:", error);
-      return NextResponse.json({ error: "Server error" }, { status: 500 });
+      return NextResponse.json({ error: "Server error." }, { status: 500 });
     }
 
     if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 401 });
+      return NextResponse.json(
+        { error: "Invalid email or password." },
+        { status: 401 }
+      );
+    }
+
+    if (!user.password) {
+      return NextResponse.json(
+        { error: "Account password is not properly configured." },
+        { status: 500 }
+      );
     }
 
     const match = await bcrypt.compare(cleanPassword, user.password);
 
     if (!match) {
-      return NextResponse.json({ error: "Invalid password" }, { status: 401 });
+      return NextResponse.json(
+        { error: "Invalid email or password." },
+        { status: 401 }
+      );
     }
 
     const token = jwt.sign(
@@ -49,7 +59,7 @@ export async function POST(req: Request) {
         role: user.role,
         email: user.email,
       },
-      SECRET,
+      serverEnv.jwtSecret,
       { expiresIn: "7d" }
     );
 
@@ -60,6 +70,7 @@ export async function POST(req: Request) {
         name: user.name,
         role: user.role,
         email: user.email,
+        mustChangePassword: user.mustChangePassword ?? 0,
       },
     });
 
@@ -74,6 +85,6 @@ export async function POST(req: Request) {
     return res;
   } catch (err) {
     console.error("LOGIN ERROR:", err);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    return NextResponse.json({ error: "Server error." }, { status: 500 });
   }
 }

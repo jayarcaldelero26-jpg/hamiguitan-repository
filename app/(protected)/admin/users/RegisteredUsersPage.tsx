@@ -11,6 +11,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
+import { repoTheme } from "@/app/lib/repoTheme";
 
 type PageTheme = "dark" | "light";
 
@@ -107,25 +108,19 @@ function Pill({
   children: React.ReactNode;
   dark: boolean;
 }) {
-  const cls = dark
-    ? tone === "green"
-      ? "bg-emerald-400/12 text-emerald-200 border-emerald-300/20"
+  const ui = repoTheme(dark ? "dark" : "light");
+  const cls =
+    tone === "green"
+      ? ui.pillGreen
       : tone === "blue"
-      ? "bg-cyan-400/12 text-cyan-100 border-cyan-300/20"
-      : tone === "purple"
-      ? "bg-violet-400/12 text-violet-200 border-violet-300/20"
+      ? ui.pillBlue
       : tone === "amber"
-      ? "bg-amber-400/12 text-amber-200 border-amber-300/20"
-      : "bg-white/[0.06] text-cyan-100 border-cyan-300/10"
-    : tone === "green"
-    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-    : tone === "blue"
-    ? "bg-cyan-50 text-cyan-700 border-cyan-200"
-    : tone === "purple"
-    ? "bg-violet-50 text-violet-700 border-violet-200"
-    : tone === "amber"
-    ? "bg-amber-50 text-amber-700 border-amber-200"
-    : "bg-slate-100 text-slate-700 border-slate-200";
+      ? ui.pillAmber
+      : tone === "purple"
+      ? dark
+        ? "bg-[#235347]/55 text-[#DAF1DE] border border-white/8"
+        : "bg-[#edf5ef] text-[#235347] border border-white/50"
+      : ui.pill;
 
   return (
     <span
@@ -147,33 +142,37 @@ function StatCard({
   tone?: "slate" | "green" | "blue";
   dark: boolean;
 }) {
+  const ui = repoTheme(dark ? "dark" : "light");
+  const accentCls =
+    tone === "green"
+      ? dark
+        ? "bg-[#8EB69B]/55"
+        : "bg-[#8EB69B]/70"
+      : tone === "blue"
+      ? dark
+        ? "bg-[#8fb0d7]/50"
+        : "bg-[#9fc0e6]/70"
+      : dark
+      ? "bg-[#7c8798]/60"
+      : "bg-[#a7b0bd]/78";
   const valueCls =
     tone === "green"
       ? dark
-        ? "text-emerald-200"
-        : "text-emerald-700"
+        ? "text-[#DAF1DE]"
+        : "text-[#235347]"
       : tone === "blue"
       ? dark
-        ? "text-cyan-100"
-        : "text-cyan-700"
+        ? "text-[#DAF1DE]"
+        : "text-[#163832]"
       : dark
-      ? "text-white"
-      : "text-slate-900";
+      ? "text-[#DAF1DE]"
+      : "text-[#163832]";
 
   return (
-    <div
-      className={
-        dark
-          ? "rounded-3xl border border-cyan-300/12 bg-white/[0.04] px-5 py-5 shadow-[0_8px_30px_rgba(0,0,0,0.18)] backdrop-blur-md"
-          : "rounded-3xl border border-slate-200 bg-white px-5 py-5 shadow-[0_10px_30px_rgba(15,23,42,0.08)]"
-      }
-    >
+    <div className={`${ui.card} relative overflow-hidden px-5 py-5`}>
+      <div className={`absolute inset-x-0 top-0 h-2 ${accentCls}`} />
       <div
-        className={
-          dark
-            ? "text-[11px] font-semibold uppercase tracking-[0.08em] text-cyan-100/55"
-            : "text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500"
-        }
+        className={`text-[11px] font-semibold uppercase tracking-[0.08em] ${ui.textSoft}`}
       >
         {label}
       </div>
@@ -193,17 +192,14 @@ function IconButton({
   children: React.ReactNode;
   dark: boolean;
 }) {
+  const ui = repoTheme(dark ? "dark" : "light");
   return (
     <button
       type="button"
       onClick={onClick}
       title={title}
       aria-label={title}
-      className={
-        dark
-          ? "h-10 w-10 rounded-xl border border-cyan-300/10 bg-white/[0.05] text-cyan-100/70 hover:text-white hover:bg-white/[0.09] transition shadow-sm grid place-items-center"
-          : "h-10 w-10 rounded-xl border border-slate-200 bg-white text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition shadow-sm grid place-items-center"
-      }
+      className={`h-10 w-10 rounded-xl transition shadow-sm grid place-items-center ${ui.buttonSecondary}`}
     >
       {children}
     </button>
@@ -518,25 +514,18 @@ export default function RegisteredUsersPage() {
   };
 
   const dark = pageTheme === "dark";
-
-  const inputCls = dark
-    ? "w-full h-12 rounded-2xl border border-cyan-300/12 bg-white/[0.04] px-4 text-sm text-white placeholder:text-cyan-100/35 shadow-sm outline-none focus:ring-4 focus:ring-cyan-400/10 focus:border-cyan-300/25"
-    : "w-full h-12 rounded-2xl border border-slate-300 bg-white px-4 text-sm text-slate-900 placeholder:text-slate-400 shadow-sm outline-none focus:ring-4 focus:ring-cyan-100 focus:border-cyan-400";
-
+  const ui = repoTheme(pageTheme);
+  const inputCls = `${ui.input.replace("pl-11", "pl-4")} h-12`;
   const modalInputCls = dark
-    ? "mt-1 w-full h-11 rounded-xl border border-cyan-300/12 bg-white/[0.04] px-3 text-sm text-white outline-none focus:ring-4 focus:ring-cyan-400/10 focus:border-cyan-300/25 disabled:bg-white/[0.03] disabled:text-cyan-100/60"
-    : "mt-1 w-full h-11 rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:ring-4 focus:ring-cyan-100 focus:border-cyan-400 disabled:bg-slate-50 disabled:text-slate-500";
+    ? "mt-1 w-full h-11 rounded-xl border border-white/10 bg-white/[0.04] px-3 text-sm text-[#DAF1DE] outline-none focus:ring-4 focus:ring-[#8EB69B]/10 focus:border-[#8EB69B]/25 disabled:bg-white/[0.03] disabled:text-[#DAF1DE]/60"
+    : "mt-1 w-full h-11 rounded-xl border border-white/55 bg-white/60 px-3 text-sm text-[#163832] outline-none focus:ring-4 focus:ring-[#8EB69B]/18 focus:border-[#8EB69B]/55 disabled:bg-white/40 disabled:text-[#235347]/55";
 
   if (loadingMe || !me) {
     return (
-      <div className={`h-full ${dark ? "text-slate-100" : "text-slate-900"}`}>
-        <div className="h-full w-full px-4 sm:px-6 lg:px-8 py-5 flex flex-col gap-4">
+      <div className={`${ui.page} h-full`}>
+        <div className="h-full w-full px-4 sm:px-6 lg:px-8 py-4 sm:py-5 flex flex-col gap-4">
           <div
-            className={`rounded-[30px] px-6 py-6 ${
-              dark
-                ? "border border-cyan-300/12 bg-white/[0.04] backdrop-blur-md shadow-[0_18px_50px_rgba(0,0,0,0.20)]"
-                : "border border-slate-200 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.08)]"
-            }`}
+            className={`${ui.shell} px-4 sm:px-6 py-5 sm:py-6`}
           >
             <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
               <div className="flex items-start gap-4">
@@ -565,25 +554,21 @@ export default function RegisteredUsersPage() {
   }
 
   return (
-    <div className={`h-full ${dark ? "text-slate-100" : "text-slate-900"}`}>
-      <div className="h-full w-full px-4 sm:px-6 lg:px-8 py-5 flex flex-col gap-4">
+    <div className={`${ui.page} h-full`}>
+      <div className="h-full w-full px-4 sm:px-6 lg:px-8 py-4 sm:py-5 flex flex-col gap-4">
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.16 }}
-          className={`rounded-[30px] px-6 py-6 ${
-            dark
-              ? "border border-cyan-300/12 bg-white/[0.04] backdrop-blur-md shadow-[0_18px_50px_rgba(0,0,0,0.20)]"
-              : "border border-slate-200 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.08)]"
-          }`}
+          className={`${ui.shell} px-4 sm:px-6 py-5 sm:py-6`}
         >
           <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
             <div className="flex items-start gap-4">
               <div
                 className={
                   dark
-                    ? "h-16 w-16 rounded-3xl bg-cyan-400/12 border border-cyan-300/20 text-cyan-100 grid place-items-center shadow-[0_0_20px_rgba(34,211,238,0.12)]"
-                    : "h-16 w-16 rounded-3xl bg-cyan-50 border border-cyan-200 text-cyan-700 grid place-items-center"
+                    ? "h-16 w-16 rounded-3xl bg-white/[0.06] border border-white/10 text-[#b8c4d6] grid place-items-center shadow-[0_12px_28px_rgba(0,0,0,0.10)]"
+                    : "h-16 w-16 rounded-3xl bg-[#eff3f7] border border-white/60 text-[#5d6c80] grid place-items-center shadow-[0_12px_24px_rgba(17,24,39,0.06)]"
                 }
               >
                 <HeaderUsersIcon />
@@ -603,8 +588,8 @@ export default function RegisteredUsersPage() {
                   <span
                     className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide border ${
                       dark
-                        ? "bg-cyan-400/10 border-cyan-300/18 text-cyan-100"
-                        : "bg-cyan-50 border-cyan-200 text-cyan-700"
+                        ? "bg-white/[0.05] border-white/10 text-[#DAF1DE]"
+                        : "bg-white/55 border-white/60 text-[#235347]"
                     }`}
                   >
                     {isAdmin ? "ADMIN ACCESS" : "CO-ADMIN VIEW ONLY"}
@@ -627,11 +612,7 @@ export default function RegisteredUsersPage() {
                   setInfoOpen(true);
                 }}
                 disabled={refreshing}
-                className={`h-12 px-6 rounded-2xl transition font-semibold ${
-                  dark
-                    ? "bg-cyan-500/90 hover:bg-cyan-400 text-slate-950 shadow-[0_0_18px_rgba(34,211,238,0.18)] disabled:opacity-70"
-                    : "bg-cyan-600 hover:bg-cyan-700 text-white shadow-sm disabled:opacity-70"
-                }`}
+                className={`min-h-11 h-12 px-6 rounded-2xl transition font-semibold ${ui.buttonSecondary} disabled:opacity-70`}
               >
                 {refreshing ? "Refreshing..." : "Refresh"}
               </button>
@@ -655,12 +636,13 @@ export default function RegisteredUsersPage() {
 
           <motion.div
             {...fadeUpDelayed(0.11)}
-            className={`mt-5 rounded-[26px] p-4 ${
+            className={`mt-5 rounded-[26px] p-4 relative overflow-hidden ${
               dark
-                ? "border border-cyan-300/12 bg-white/[0.03] shadow-inner"
-                : "border border-slate-200 bg-slate-50"
+                ? "border border-white/8 bg-white/[0.03] shadow-inner"
+                : "border border-white/50 bg-white/38"
             }`}
           >
+            <div className={`absolute inset-x-0 top-0 h-1.5 ${dark ? "bg-[#7c8798]/45" : "bg-[#a7b0bd]/65"}`} />
             <div className="flex flex-col xl:flex-row gap-3 xl:items-center">
               <div className="flex-1">
                 <div className="relative">
@@ -760,19 +742,97 @@ export default function RegisteredUsersPage() {
 
         <motion.div
           {...fadeUpDelayed(0.14)}
-          className={`flex-1 min-h-0 rounded-[30px] overflow-hidden flex flex-col ${
-            dark
-              ? "border border-cyan-300/12 bg-white/[0.04] shadow-[0_18px_50px_rgba(0,0,0,0.20)] backdrop-blur-md"
-              : "border border-slate-200 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.08)]"
-          }`}
+          className={`${ui.card} flex-1 min-h-0 overflow-hidden flex flex-col`}
         >
-          <div className="flex-1 overflow-auto">
-            <table className="min-w-[1180px] w-full text-sm">
-              <thead
-                className={`sticky top-0 z-10 backdrop-blur border-b ${
-                  dark ? "bg-[#0a1825]/95 border-cyan-300/10" : "bg-white/95 border-slate-200"
+          <div className="md:hidden p-3 space-y-3 overflow-y-auto">
+            {loadingUsers ? null : filtered.length === 0 ? (
+              <div
+                className={`rounded-[22px] border px-4 py-8 text-center ${
+                  dark ? "border-white/8 bg-white/[0.03]" : "border-white/50 bg-white/40"
                 }`}
               >
+                <div className={`font-medium ${dark ? "text-[#DAF1DE]" : "text-[#163832]"}`}>
+                  No users found
+                </div>
+                <div className={`mt-1 text-sm ${dark ? "text-[#DAF1DE]/60" : "text-[#235347]/70"}`}>
+                  No users matched the current search or filters.
+                </div>
+              </div>
+            ) : (
+              filtered.map((u) => (
+                <div
+                  key={`mobile-user-${u.id}`}
+                  onClick={() => openUser(u)}
+                  className={`rounded-[22px] border p-4 transition ${ui.rowHover} ${
+                    dark ? "border-white/8 bg-white/[0.03]" : "border-white/50 bg-white/40"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div
+                        className={
+                          dark
+                            ? "h-11 w-11 shrink-0 rounded-full bg-cyan-400/12 border border-cyan-300/18 text-white grid place-items-center text-sm font-bold shadow-sm"
+                            : "h-11 w-11 shrink-0 rounded-full bg-cyan-50 border border-cyan-200 text-cyan-700 grid place-items-center text-sm font-bold shadow-sm"
+                        }
+                      >
+                        {initials(u.name || "U")}
+                      </div>
+                      <div className="min-w-0">
+                        <div className={`truncate text-sm font-medium ${dark ? "text-white" : "text-slate-900"}`}>
+                          {safeText(u.name)}
+                        </div>
+                        <div className={`mt-0.5 text-xs truncate ${dark ? "text-cyan-100/75" : "text-slate-600"}`}>
+                          {safeText(u.email)}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                      <IconButton onClick={() => copyEmail(safeText(u.email, ""))} title="Copy Email" dark={dark}>
+                        <CopyIcon />
+                      </IconButton>
+                      <IconButton
+                        onClick={() => openUser(u)}
+                        title={isAdmin ? "Manage User" : "View User"}
+                        dark={dark}
+                      >
+                        <EditIcon />
+                      </IconButton>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Pill tone={roleTone(u.role)} dark={dark}>
+                      {roleLabel(u.role)}
+                    </Pill>
+                    <Pill tone="purple" dark={dark}>
+                      {safeText(u.employmentType)}
+                    </Pill>
+                  </div>
+
+                  <div className={`mt-3 grid grid-cols-1 gap-2 text-[12px] ${dark ? "text-cyan-100/75" : "text-slate-600"}`}>
+                    <div>
+                      Code: <span className={dark ? "text-white" : "text-slate-900"}>{safeText(u.userCode)}</span>
+                    </div>
+                    <div>
+                      Created: <span className={dark ? "text-white" : "text-slate-900"}>{fmtDate(u.createdAt)}</span>
+                    </div>
+                    <div>
+                      Position: <span className={dark ? "text-white" : "text-slate-900"}>{safeText(u.position)}</span>
+                    </div>
+                    <div>
+                      Department: <span className={dark ? "text-white" : "text-slate-900"}>{safeText(u.department)}</span>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="hidden md:block flex-1 overflow-auto">
+            <table className="min-w-[1180px] w-full text-sm">
+              <thead className={`sticky top-0 z-10 backdrop-blur border-b ${ui.tableHead}`}>
                 <tr
                   className={`text-left text-[11px] uppercase tracking-[0.08em] ${
                     dark ? "text-cyan-100/55" : "text-slate-500"
@@ -789,14 +849,30 @@ export default function RegisteredUsersPage() {
                 </tr>
               </thead>
 
-              <tbody className={dark ? "divide-y divide-cyan-300/8" : "divide-y divide-slate-200"}>
+              <tbody className={dark ? "divide-y divide-white/8" : "divide-y divide-white/50"}>
                 {loadingUsers ? null : filtered.length === 0 ? (
                   <tr>
                     <td
                       colSpan={8}
-                      className={`px-5 py-12 text-sm ${dark ? "text-cyan-100/60" : "text-slate-500"}`}
+                      className="px-5 py-12"
                     >
-                      No users found. Try changing search/filter.
+                      <div className="mx-auto max-w-[320px] text-center">
+                        <div
+                          className={`mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-[20px] border shadow-[0_10px_24px_rgba(0,0,0,0.08)] ${
+                            dark
+                              ? "border-white/10 bg-white/[0.06] text-[#b8c4d6]"
+                              : "border-white/60 bg-[#eff3f7] text-[#5d6c80]"
+                          }`}
+                        >
+                          <HeaderUsersIcon />
+                        </div>
+                        <div className={`font-medium ${dark ? "text-[#DAF1DE]" : "text-[#163832]"}`}>
+                          No users found
+                        </div>
+                        <div className={`mt-1 text-sm ${dark ? "text-[#DAF1DE]/60" : "text-[#235347]/70"}`}>
+                          Try adjusting the current search or filter settings.
+                        </div>
+                      </div>
                     </td>
                   </tr>
                 ) : (
@@ -804,9 +880,7 @@ export default function RegisteredUsersPage() {
                     <tr
                       key={`user-${u.id}`}
                       onClick={() => openUser(u)}
-                      className={`transition-colors cursor-pointer ${
-                        dark ? "hover:bg-white/[0.035]" : "hover:bg-slate-50"
-                      }`}
+                      className={`cursor-pointer transition-all duration-200 ${ui.rowHover}`}
                     >
                       <td className="px-5 py-4 align-middle">
                         <div className="flex items-center gap-4 min-w-[260px]">
@@ -926,8 +1000,8 @@ export default function RegisteredUsersPage() {
           <div
             className={`border-t px-5 py-3 text-[11px] ${
               dark
-                ? "border-cyan-300/10 bg-white/[0.03] text-cyan-100/50"
-                : "border-slate-200 bg-slate-50 text-slate-500"
+                ? "border-white/8 bg-white/[0.03] text-[#DAF1DE]/50"
+                : "border-white/50 bg-white/35 text-[#235347]/70"
             }`}
           >
             Note: Passwords are not shown for security. Only admin can manage users and assign co-admin.
@@ -953,23 +1027,20 @@ export default function RegisteredUsersPage() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 8, scale: 0.98 }}
               transition={{ duration: 0.18 }}
-              className={`w-full max-w-3xl rounded-[30px] overflow-hidden ${
-                dark
-                  ? "border border-cyan-300/12 bg-[#07131f] shadow-[0_24px_70px_rgba(0,0,0,0.35)]"
-                  : "border border-slate-200 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.16)]"
-              }`}
-            >
+                className={`relative w-full max-w-3xl max-h-[92dvh] rounded-[24px] sm:rounded-[30px] overflow-hidden shadow-[0_24px_70px_rgba(0,0,0,0.28)] ${ui.modal}`}
+              >
+              <div className={`absolute inset-x-6 top-0 h-1.5 rounded-b-full ${dark ? "bg-[#7c8798]/55" : "bg-[#a7b0bd]/72"}`} />
               <div
-                className={`px-6 py-5 flex items-start justify-between gap-4 border-b ${
-                  dark ? "border-cyan-300/10 bg-[#0a1825]" : "border-slate-200 bg-slate-50"
+                className={`px-4 sm:px-6 py-4 sm:py-5 flex items-start justify-between gap-4 border-b ${
+                  dark ? "border-white/8 bg-[#051F20]/45" : "border-white/55 bg-white/45"
                 }`}
               >
                 <div className="flex items-start gap-4">
                   <div
                     className={
                       dark
-                        ? "h-14 w-14 rounded-full bg-cyan-400/12 border border-cyan-300/18 text-white grid place-items-center text-lg font-bold shadow-sm"
-                        : "h-14 w-14 rounded-full bg-cyan-50 border border-cyan-200 text-cyan-700 grid place-items-center text-lg font-bold shadow-sm"
+                        ? "h-14 w-14 rounded-full bg-white/[0.06] border border-white/10 text-[#DAF1DE] grid place-items-center text-lg font-bold shadow-[0_10px_24px_rgba(0,0,0,0.10)]"
+                        : "h-14 w-14 rounded-full bg-white/75 border border-white/60 text-[#5d6c80] grid place-items-center text-lg font-bold shadow-[0_10px_24px_rgba(17,24,39,0.06)]"
                     }
                   >
                     {initials(draftUser.name || "U")}
@@ -983,7 +1054,7 @@ export default function RegisteredUsersPage() {
                         {roleLabel(draftUser.role)}
                       </Pill>
                     </div>
-                    <p className={`mt-1 text-sm ${dark ? "text-cyan-100/65" : "text-slate-500"}`}>
+                    <p className={`mt-1 text-sm ${dark ? "text-[#DAF1DE]/65" : "text-[#235347]/70"}`}>
                       View full information, edit details, delete account, or assign co-admin.
                     </p>
                   </div>
@@ -994,8 +1065,8 @@ export default function RegisteredUsersPage() {
                   onClick={closeUser}
                   className={
                     dark
-                      ? "h-10 w-10 rounded-xl border border-cyan-300/10 bg-white/[0.04] hover:bg-white/[0.08] text-cyan-100/70 hover:text-white transition grid place-items-center"
-                      : "h-10 w-10 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 hover:text-slate-900 transition grid place-items-center"
+                      ? "h-10 w-10 rounded-[16px] border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] text-[#DAF1DE]/70 hover:text-white transition shadow-sm grid place-items-center"
+                      : "h-10 w-10 rounded-[16px] border border-white/60 bg-white/75 hover:bg-white text-[#5d6c80] hover:text-[#163832] transition shadow-sm grid place-items-center"
                   }
                   title="Close"
                 >
@@ -1003,7 +1074,7 @@ export default function RegisteredUsersPage() {
                 </button>
               </div>
 
-              <div className="p-6 max-h-[78vh] overflow-auto">
+              <div className="p-4 sm:p-6 max-h-[78dvh] overflow-auto">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className={dark ? "text-[11px] font-semibold text-cyan-100/55" : "text-[11px] font-semibold text-slate-500"}>
@@ -1180,7 +1251,7 @@ export default function RegisteredUsersPage() {
                     </div>
                   )}
 
-                  <div className="flex items-center gap-3 justify-end">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 justify-end">
                     {canManage ? (
                       !editMode ? (
                         <button
@@ -1223,11 +1294,7 @@ export default function RegisteredUsersPage() {
                             type="button"
                             onClick={saveUser}
                             disabled={saving || !hasChanges}
-                            className={
-                              dark
-                                ? "h-11 px-5 rounded-2xl bg-cyan-500/90 hover:bg-cyan-400 text-slate-950 transition font-semibold shadow-[0_0_18px_rgba(34,211,238,0.18)] disabled:opacity-70"
-                                : "h-11 px-5 rounded-2xl bg-cyan-600 hover:bg-cyan-700 text-white transition font-semibold shadow-sm disabled:opacity-70"
-                            }
+                            className={`h-11 px-5 rounded-2xl transition font-semibold disabled:opacity-70 ${ui.buttonPrimary}`}
                           >
                             {saving ? "Saving..." : !hasChanges ? "No Changes" : "Save Changes"}
                           </button>

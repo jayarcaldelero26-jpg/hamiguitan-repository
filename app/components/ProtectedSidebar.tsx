@@ -2,7 +2,7 @@
 
 import ConfirmDialog from "@/app/components/ConfirmDialog";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import {
   Cog6ToothIcon,
@@ -65,13 +65,11 @@ export default function ProtectedSidebar({
   const pathname = usePathname();
 
   const [collapsed, setCollapsed] = useState(false);
-  const [confirmLogout, setConfirmLogout] = useState(false);
+  const [confirmLogoutPath, setConfirmLogoutPath] = useState<string | null>(null);
   const [logoutErrorOpen, setLogoutErrorOpen] = useState(false);
   const [logoutErrorMsg, setLogoutErrorMsg] = useState("Please try again.");
 
-  useEffect(() => {
-    setConfirmLogout(false);
-  }, [pathname]);
+  const confirmLogout = confirmLogoutPath === pathname;
 
   const navBtn = (href: string, label: string, icon: React.ReactNode) => {
     const active = pathname === href;
@@ -166,9 +164,9 @@ export default function ProtectedSidebar({
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => setConfirmLogout(true)}
+                <button
+                  type="button"
+                  onClick={() => setConfirmLogoutPath(pathname)}
                 className={`mt-3 w-full flex items-center gap-2 px-3 py-2.5 rounded-xl bg-rose-50 text-rose-700 hover:bg-rose-100 transition ${
                   collapsed ? "justify-center" : ""
                 }`}
@@ -189,9 +187,9 @@ export default function ProtectedSidebar({
         message="Are you sure you want to logout?"
         confirmText="Logout"
         danger
-        onCancel={() => setConfirmLogout(false)}
+        onCancel={() => setConfirmLogoutPath(null)}
         onConfirm={async () => {
-          setConfirmLogout(false);
+          setConfirmLogoutPath(null);
 
           try {
             const res = await fetch("/api/logout", {

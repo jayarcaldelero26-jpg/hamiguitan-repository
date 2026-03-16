@@ -18,6 +18,7 @@ import {
   SparklesIcon,
   LockClosedIcon,
 } from "@heroicons/react/24/outline";
+import { repoTheme } from "@/app/lib/repoTheme";
 
 type PageTheme = "dark" | "light";
 type SettingsTab = "security" | "appearance" | "account";
@@ -51,6 +52,23 @@ function SecurityStatCard({
   tone: "cyan" | "emerald" | "violet" | "amber";
   dark: boolean;
 }) {
+  const ui = repoTheme(dark ? "dark" : "light");
+  const accentCls =
+    tone === "emerald"
+      ? dark
+        ? "bg-[#8EB69B]/55"
+        : "bg-[#8EB69B]/70"
+      : tone === "violet"
+      ? dark
+        ? "bg-[#8b92de]/60"
+        : "bg-[#9aa2eb]/78"
+      : tone === "amber"
+      ? dark
+        ? "bg-[#d7aa6b]/68"
+        : "bg-[#ddb16f]/82"
+      : dark
+      ? "bg-[#7c8798]/60"
+      : "bg-[#a7b0bd]/78";
   const toneCls =
     tone === "emerald"
       ? dark
@@ -69,13 +87,8 @@ function SecurityStatCard({
       : "text-cyan-700 bg-cyan-50 border-cyan-200";
 
   return (
-    <div
-      className={`rounded-3xl border p-5 ${
-        dark
-          ? "border-cyan-300/12 bg-white/[0.04]"
-          : "border-slate-200 bg-white shadow-sm"
-      }`}
-    >
+    <div className={`${ui.card} relative overflow-hidden p-5`}>
+      <div className={`absolute inset-x-0 top-0 h-2 ${accentCls}`} />
       <div
         className={`inline-flex rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] ${toneCls}`}
       >
@@ -108,16 +121,15 @@ function ChecklistItem({
   ok: boolean;
   dark: boolean;
 }) {
+  const ui = repoTheme(dark ? "dark" : "light");
   return (
     <div
       className={`flex items-center justify-between rounded-2xl border px-4 py-3 ${
-        dark
-          ? "border-cyan-300/10 bg-white/[0.03]"
-          : "border-slate-200 bg-slate-50"
+        dark ? "border-white/8 bg-white/[0.03]" : "border-white/50 bg-white/40"
       }`}
     >
       <span
-        className={`text-sm ${dark ? "text-cyan-100/80" : "text-slate-700"}`}
+        className={`text-sm ${ui.textMuted}`}
       >
         {label}
       </span>
@@ -152,18 +164,17 @@ function TabButton({
   onClick: () => void;
   dark: boolean;
 }) {
+  const ui = repoTheme(dark ? "dark" : "light");
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex items-center gap-2 rounded-2xl border px-4 py-3 text-sm transition ${
+      className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-2xl border px-4 py-3 text-sm transition ${
         active
-          ? dark
-            ? "border-cyan-300/25 bg-cyan-400/10 text-white"
-            : "border-cyan-300 bg-cyan-50 text-cyan-800"
+          ? ui.buttonPrimary
           : dark
-          ? "border-cyan-300/10 bg-white/[0.04] text-cyan-100/75 hover:bg-white/[0.07]"
-          : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+          ? "border-white/10 bg-white/[0.04] text-[#DAF1DE]/75 hover:bg-white/[0.07]"
+          : "border-white/55 bg-white/55 text-[#235347] hover:bg-white/75"
       }`}
     >
       <span className="shrink-0">{icon}</span>
@@ -378,22 +389,17 @@ export default function SettingsPage() {
   };
 
   const dark = pageTheme === "dark";
+  const ui = repoTheme(pageTheme);
 
-  const pageWrap = dark ? "text-slate-100" : "text-slate-900";
-  const heading = dark ? "text-white" : "text-slate-900";
-  const muted = dark ? "text-cyan-100/65" : "text-slate-600";
+  const pageWrap = ui.page;
+  const heading = ui.textMain;
+  const muted = ui.textMuted;
 
-  const cardCls = dark
-    ? "bg-white/[0.04] border border-cyan-300/12 shadow-[0_8px_30px_rgba(0,0,0,0.18)] backdrop-blur-md"
-    : "bg-white border border-slate-200 shadow-[0_10px_28px_rgba(15,23,42,0.08)]";
+  const cardCls = ui.card;
 
-  const inputCls = dark
-    ? "w-full px-4 py-3 pr-12 rounded-2xl border border-cyan-300/12 bg-white/[0.04] text-sm text-white placeholder:text-cyan-100/35 shadow-sm outline-none focus:ring-4 focus:ring-cyan-400/10 focus:border-cyan-300/25 disabled:opacity-70"
-    : "w-full px-4 py-3 pr-12 rounded-2xl border border-slate-300 bg-white text-sm text-slate-900 placeholder:text-slate-400 shadow-sm outline-none focus:ring-4 focus:ring-cyan-100 focus:border-cyan-400 disabled:opacity-70";
+  const inputCls = `${ui.input.replace("pl-11", "pl-4")} pr-12`;
 
-  const previewCardCls = dark
-    ? "rounded-3xl p-5 border border-cyan-300/12 bg-white/[0.04]"
-    : "rounded-3xl p-5 border border-slate-200 bg-slate-50";
+  const previewCardCls = `${ui.cardSoft} p-5`;
 
   const themeLabel = useMemo(() => {
     return pageTheme === "dark" ? "Dark Neon" : "Clean Light";
@@ -403,7 +409,7 @@ export default function SettingsPage() {
 
   if (loadingUser || !user) {
     return (
-      <div className="min-h-full p-6 md:p-10">
+      <div className="min-h-full p-4 sm:p-6 md:p-10">
         <div className="max-w-6xl mx-auto space-y-6">
           <div className="flex items-center gap-3">
             <ShieldCheckIcon className="w-8 h-8 text-cyan-400" />
@@ -424,7 +430,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className={`min-h-full p-6 md:p-10 ${pageWrap}`}>
+    <div className={`min-h-full p-4 sm:p-6 md:p-10 ${pageWrap}`}>
       <ConfirmDialog
         open={showLogoutAfterChange}
         title="Logout"
@@ -476,7 +482,7 @@ export default function SettingsPage() {
           <div className="flex items-center gap-3">
             <ShieldCheckIcon
               className={`w-8 h-8 ${
-                dark ? "text-cyan-300" : "text-cyan-600"
+                dark ? "text-[#8EB69B]" : "text-[#235347]"
               }`}
             />
             <h1 className={`text-3xl md:text-4xl font-bold ${heading}`}>
@@ -494,7 +500,7 @@ export default function SettingsPage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
           <SecurityStatCard
             title="Account Role"
             value={String(user.role || "").toUpperCase()}
@@ -525,14 +531,8 @@ export default function SettingsPage() {
           />
         </div>
 
-        <div
-          className={`rounded-3xl p-4 mb-6 ${
-            dark
-              ? "border border-cyan-300/12 bg-white/[0.03]"
-              : "border border-slate-200 bg-white"
-          }`}
-        >
-          <div className="flex flex-wrap gap-3">
+        <div className={`${ui.shell} p-4 mb-6`}>
+          <div className="flex gap-3 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <TabButton
               active={activeTab === "security"}
               label="Security"
@@ -560,13 +560,14 @@ export default function SettingsPage() {
         {activeTab === "security" && (
           <div className="grid grid-cols-1 xl:grid-cols-[1.15fr_0.85fr] gap-6">
             <div className="space-y-6">
-              <div className={`${cardCls} rounded-3xl p-6`}>
+              <div className={`${cardCls} relative overflow-hidden rounded-3xl p-4 sm:p-6`}>
+                <div className={`absolute inset-x-0 top-0 h-1.5 ${dark ? "bg-[#7c8798]/45" : "bg-[#a7b0bd]/65"}`} />
                 <div className="flex items-start gap-3">
                   <div
                     className={`h-12 w-12 rounded-2xl grid place-items-center ${
                       dark
-                        ? "bg-cyan-400/12 border border-cyan-300/15 text-cyan-100"
-                        : "bg-cyan-50 border border-cyan-200 text-cyan-700"
+                        ? "bg-white/[0.06] border border-white/10 text-[#b8c4d6]"
+                        : "bg-[#eff3f7] border border-white/60 text-[#5d6c80]"
                     }`}
                   >
                     <KeyIcon className="w-6 h-6" />
@@ -683,10 +684,10 @@ export default function SettingsPage() {
                     type="button"
                     onClick={changeMyPassword}
                     disabled={saving}
-                    className={`mt-2 px-4 py-3 rounded-2xl font-semibold transition disabled:opacity-70 ${
+                    className={`mt-2 w-full sm:w-auto min-h-11 px-4 py-3 rounded-2xl font-semibold transition disabled:opacity-70 ${
                       dark
-                        ? "bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-[0_0_18px_rgba(34,211,238,0.18)]"
-                        : "bg-cyan-600 hover:bg-cyan-700 text-white shadow-sm"
+                        ? "bg-[#8EB69B] hover:bg-[#9ec3a9] text-[#051F20] shadow-[0_10px_24px_rgba(142,182,155,0.20)]"
+                        : "bg-[#235347] hover:bg-[#163832] text-white shadow-[0_10px_22px_rgba(35,83,71,0.16)]"
                     }`}
                   >
                     {saving ? "Saving..." : "Save Password"}
@@ -695,7 +696,7 @@ export default function SettingsPage() {
               </div>
 
               {canAdminReset && (
-                <div className={`${cardCls} rounded-3xl p-6`}>
+                <div className={`${cardCls} rounded-3xl p-4 sm:p-6`}>
                   <div className="flex items-start gap-3">
                     <div
                       className={`h-12 w-12 rounded-2xl grid place-items-center ${
@@ -822,11 +823,7 @@ export default function SettingsPage() {
                       type="button"
                       onClick={openAdminResetDialog}
                       disabled={resetting}
-                      className={`mt-2 px-4 py-3 rounded-2xl font-semibold transition disabled:opacity-70 ${
-                        dark
-                          ? "bg-violet-500/90 text-white hover:bg-violet-400"
-                          : "bg-violet-600 text-white hover:bg-violet-700"
-                      }`}
+                      className={`mt-2 w-full sm:w-auto min-h-11 px-4 py-3 rounded-2xl font-semibold transition disabled:opacity-70 ${ui.buttonPrimary}`}
                     >
                       {resetting ? "Resetting..." : "Reset Password"}
                     </button>
@@ -836,13 +833,14 @@ export default function SettingsPage() {
             </div>
 
             <div className="space-y-6">
-              <div className={`${cardCls} rounded-3xl p-6`}>
+              <div className={`${cardCls} relative overflow-hidden rounded-3xl p-4 sm:p-6`}>
+                <div className={`absolute inset-x-0 top-0 h-1.5 ${dark ? "bg-[#8EB69B]/55" : "bg-[#8EB69B]/70"}`} />
                 <div className="flex items-start gap-3">
                   <div
                     className={`h-12 w-12 rounded-2xl grid place-items-center ${
                       dark
-                        ? "bg-amber-500/12 border border-amber-300/15 text-amber-200"
-                        : "bg-amber-50 border border-amber-200 text-amber-700"
+                        ? "bg-[#8EB69B]/10 border border-[#8EB69B]/18 text-[#DAF1DE]"
+                        : "bg-[#edf6f0] border border-white/60 text-[#235347]"
                     }`}
                   >
                     <ExclamationTriangleIcon className="w-6 h-6" />
@@ -889,7 +887,8 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <div className={`${cardCls} rounded-3xl p-6`}>
+              <div className={`${cardCls} relative overflow-hidden rounded-3xl p-4 sm:p-6`}>
+                <div className={`absolute inset-x-0 top-0 h-1.5 ${dark ? "bg-[#d7aa6b]/55" : "bg-[#ddb16f]/70"}`} />
                 <div className="flex items-start gap-3">
                   <div
                     className={`h-12 w-12 rounded-2xl grid place-items-center ${
@@ -939,7 +938,7 @@ export default function SettingsPage() {
 
         {activeTab === "appearance" && (
           <div className="grid grid-cols-1 xl:grid-cols-[1fr_1fr] gap-6">
-            <div className={`${cardCls} rounded-3xl p-6`}>
+            <div className={`${cardCls} rounded-3xl p-4 sm:p-6`}>
               <div className="flex items-start gap-3">
                 <div
                   className={`h-12 w-12 rounded-2xl grid place-items-center ${
@@ -1062,7 +1061,7 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className={`${cardCls} rounded-3xl p-6`}>
+            <div className={`${cardCls} rounded-3xl p-4 sm:p-6`}>
               <div className="flex items-start gap-3">
                 <div
                   className={`h-12 w-12 rounded-2xl grid place-items-center ${
@@ -1167,7 +1166,7 @@ export default function SettingsPage() {
 
         {activeTab === "account" && (
           <div className="grid grid-cols-1 xl:grid-cols-[1fr_1fr] gap-6">
-            <div className={`${cardCls} rounded-3xl p-6`}>
+            <div className={`${cardCls} rounded-3xl p-4 sm:p-6`}>
               <div className="flex items-start gap-3">
                 <div
                   className={`h-12 w-12 rounded-2xl grid place-items-center ${
@@ -1224,7 +1223,7 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className={`${cardCls} rounded-3xl p-6`}>
+            <div className={`${cardCls} rounded-3xl p-4 sm:p-6`}>
               <div className="flex items-start gap-3">
                 <div
                   className={`h-12 w-12 rounded-2xl grid place-items-center ${

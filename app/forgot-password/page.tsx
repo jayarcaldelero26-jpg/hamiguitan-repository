@@ -210,7 +210,7 @@ export default function ForgotPasswordPage() {
 
               <button
                 type="button"
-                className={styles.button}
+                className={`${styles.button} app-primary-button`}
                 disabled={loading}
                 onClick={sendCode}
               >
@@ -255,7 +255,7 @@ export default function ForgotPasswordPage() {
 
               <button
                 type="button"
-                className={styles.button}
+                className={`${styles.button} app-primary-button`}
                 disabled={loading}
                 onClick={verifyCode}
               >

@@ -1,38 +1,35 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import { supabaseAdmin } from "@/app/lib/db";
+import { getCurrentUser } from "@/app/lib/auth";
 
-const SECRET = process.env.JWT_SECRET!;
+function isValidEmail(email: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i.test(email.trim());
+}
 
 export async function POST(req: Request) {
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get("auth_token")?.value;
+    const me = await getCurrentUser();
 
-    if (!token) {
+    if (!me) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    let payload: any;
-    try {
-      payload = jwt.verify(token, SECRET);
-    } catch {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-    }
-
-    if (payload.role !== "admin") {
+    if (me.role !== "admin") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const { email, newPassword } = await req.json();
+    const body = await req.json();
 
-    const cleanEmail = String(email || "").trim().toLowerCase();
-    const cleanPassword = String(newPassword || "");
+    const cleanEmail = String(body?.email || "").trim().toLowerCase();
+    const cleanPassword = String(body?.newPassword || "");
 
     if (!cleanEmail || !cleanPassword) {
-      return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+      return NextResponse.json({ error: "Missing fields." }, { status: 400 });
+    }
+
+    if (!isValidEmail(cleanEmail)) {
+      return NextResponse.json({ error: "Invalid email format." }, { status: 400 });
     }
 
     if (cleanPassword.length < 8) {
@@ -50,28 +47,31 @@ export async function POST(req: Request) {
 
     if (findError) {
       console.error("RESET PASSWORD FIND ERROR:", findError);
-      return NextResponse.json({ error: "Server error" }, { status: 500 });
+      return NextResponse.json({ error: "Server error." }, { status: 500 });
     }
 
     if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return NextResponse.json({ error: "User not found." }, { status: 404 });
     }
 
     const hashed = await bcrypt.hash(cleanPassword, 10);
 
     const { error: updateError } = await supabaseAdmin
       .from("users")
-      .update({ password: hashed })
+      .update({
+        password: hashed,
+        mustChangePassword: 1,
+      })
       .eq("email", cleanEmail);
 
     if (updateError) {
       console.error("RESET PASSWORD UPDATE ERROR:", updateError);
-      return NextResponse.json({ error: "Server error" }, { status: 500 });
+      return NextResponse.json({ error: "Server error." }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, email: cleanEmail });
-  } catch (e) {
-    console.error("RESET PASSWORD ERROR:", e);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+  } catch (error) {
+    console.error("RESET PASSWORD ERROR:", error);
+    return NextResponse.json({ error: "Server error." }, { status: 500 });
   }
 }

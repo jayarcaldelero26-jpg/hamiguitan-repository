@@ -2,10 +2,15 @@ export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcrypt";
+import crypto from "crypto";
 import { supabaseAdmin } from "@/app/lib/db";
 
 function isStrongPassword(password: string) {
   return typeof password === "string" && password.length >= 8;
+}
+
+function sha256(value: string) {
+  return crypto.createHash("sha256").update(value).digest("hex");
 }
 
 export async function POST(req: NextRequest) {
@@ -28,10 +33,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const tokenHash = sha256(token);
+
     const { data: resetRow, error: tokenError } = await supabaseAdmin
       .from("password_resets")
       .select("id, user_id, expires_at, verified")
-      .eq("token", token)
+      .eq("token", tokenHash)
       .eq("verified", true)
       .maybeSingle();
 
@@ -67,7 +74,10 @@ export async function POST(req: NextRequest) {
 
     const { error: updateError } = await supabaseAdmin
       .from("users")
-      .update({ password: hashedPassword })
+      .update({
+        password: hashedPassword,
+        mustChangePassword: 0,
+      })
       .eq("id", resetRow.user_id);
 
     if (updateError) {

@@ -1,11 +1,16 @@
 export const runtime = "nodejs";
 
-import { randomBytes } from "crypto";
+import bcrypt from "bcrypt";
+import { randomBytes, createHash } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/db";
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
+}
+
+function sha256(value: string) {
+  return createHash("sha256").update(value).digest("hex");
 }
 
 export async function POST(req: NextRequest) {
@@ -40,12 +45,18 @@ export async function POST(req: NextRequest) {
       .from("password_resets")
       .select("id, user_id, token, expires_at, verified")
       .eq("user_id", user.id)
-      .eq("token", code)
       .maybeSingle();
 
     if (resetError || !resetRow) {
       return NextResponse.json(
         { error: "Invalid verification code." },
+        { status: 400 }
+      );
+    }
+
+    if (resetRow.verified) {
+      return NextResponse.json(
+        { error: "Verification code already used. Please request a new one." },
         { status: 400 }
       );
     }
@@ -63,12 +74,22 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const codeMatches = await bcrypt.compare(code, resetRow.token);
+
+    if (!codeMatches) {
+      return NextResponse.json(
+        { error: "Invalid verification code." },
+        { status: 400 }
+      );
+    }
+
     const resetToken = randomBytes(32).toString("hex");
+    const resetTokenHash = sha256(resetToken);
 
     const { error: updateError } = await supabaseAdmin
       .from("password_resets")
       .update({
-        token: resetToken, // replace code with actual reset token
+        token: resetTokenHash,
         verified: true,
       })
       .eq("id", resetRow.id);

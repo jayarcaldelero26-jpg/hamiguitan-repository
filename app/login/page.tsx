@@ -226,7 +226,7 @@ export default function LoginPage() {
 
           <button
             type="button"
-            className={styles.button}
+            className={`${styles.button} app-primary-button`}
             disabled={loading || leaving}
             onClick={handleLogin}
           >

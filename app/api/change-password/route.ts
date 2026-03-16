@@ -1,25 +1,14 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import { supabaseAdmin } from "@/app/lib/db";
-
-const SECRET = process.env.JWT_SECRET!;
+import { getCurrentUser } from "@/app/lib/auth";
 
 export async function POST(req: Request) {
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get("auth_token")?.value;
+    const me = await getCurrentUser();
 
-    if (!token) {
+    if (!me) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    let payload: any;
-    try {
-      payload = jwt.verify(token, SECRET);
-    } catch {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
 
     const { currentPassword, newPassword } = await req.json();
@@ -38,7 +27,7 @@ export async function POST(req: Request) {
     const { data: user, error: findError } = await supabaseAdmin
       .from("users")
       .select("id, password")
-      .eq("id", payload.id)
+      .eq("id", me.id)
       .maybeSingle();
 
     if (findError) {
@@ -63,7 +52,7 @@ export async function POST(req: Request) {
     const { error: updateError } = await supabaseAdmin
       .from("users")
       .update({ password: hashed })
-      .eq("id", payload.id);
+      .eq("id", me.id);
 
     if (updateError) {
       console.error("CHANGE PASSWORD UPDATE ERROR:", updateError);

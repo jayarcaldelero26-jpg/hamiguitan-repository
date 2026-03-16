@@ -1,6 +1,7 @@
 export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
+import bcrypt from "bcrypt";
 import { supabaseAdmin } from "@/app/lib/db";
 import { sendResetCodeEmail } from "@/app/lib/mailer";
 
@@ -58,6 +59,7 @@ export async function POST(req: NextRequest) {
     }
 
     const code = makeCode();
+    const hashedCode = await bcrypt.hash(code, 10);
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 
     const { error: deleteError } = await supabaseAdmin
@@ -77,7 +79,7 @@ export async function POST(req: NextRequest) {
       .from("password_resets")
       .insert({
         user_id: user.id,
-        token: code,       // temporarily stores 6-digit code
+        token: hashedCode,
         expires_at: expiresAt,
         verified: false,
       });
@@ -90,7 +92,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    await sendResetCodeEmail(user.email, code);
+    try {
+      await sendResetCodeEmail(user.email, code);
+    } catch (mailError) {
+      console.error("SEND RESET CODE EMAIL ERROR:", mailError);
+
+      await supabaseAdmin
+        .from("password_resets")
+        .delete()
+        .eq("user_id", user.id);
+
+      return NextResponse.json(
+        { error: "Failed to send verification code." },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       ok: true,

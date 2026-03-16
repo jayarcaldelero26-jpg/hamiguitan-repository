@@ -1,27 +1,22 @@
 // app/lib/googleDrive.ts
-import { google } from "googleapis";
+import "server-only";
 
-function requiredEnv(name: string) {
-  const value = process.env[name];
-  if (!value) {
-    throw new Error(`Missing environment variable: ${name}`);
-  }
-  return value;
-}
+import { google, drive_v3 } from "googleapis";
+import { serverEnv } from "@/app/lib/serverEnv";
 
 export function createOAuthClient() {
   return new google.auth.OAuth2(
-    requiredEnv("GOOGLE_CLIENT_ID"),
-    requiredEnv("GOOGLE_CLIENT_SECRET"),
-    requiredEnv("GOOGLE_REDIRECT_URI")
+    serverEnv.googleClientId,
+    serverEnv.googleClientSecret,
+    serverEnv.googleRedirectUri
   );
 }
 
-export function getDriveClient() {
+export function getDriveClient(): drive_v3.Drive {
   const oauth = createOAuthClient();
 
   oauth.setCredentials({
-    refresh_token: requiredEnv("GOOGLE_REFRESH_TOKEN"),
+    refresh_token: serverEnv.googleRefreshToken,
   });
 
   return google.drive({ version: "v3", auth: oauth });
@@ -32,11 +27,16 @@ export function normalizeDriveCategory(input: string) {
 
   if (s === "academe") return "Academe";
   if (s === "stakeholder" || s === "stakeholders") return "Stakeholders";
-  if (s === "pamo activity" || s === "pamo" || s === "activity" || s === "activities") {
+  if (
+    s === "pamo activity" ||
+    s === "pamo" ||
+    s === "activity" ||
+    s === "activities"
+  ) {
     return "PAMO Activity";
   }
 
-  return "General";
+  return "";
 }
 
 export function normalizeFolderName(input: string) {
@@ -44,7 +44,7 @@ export function normalizeFolderName(input: string) {
 }
 
 export async function findOrCreateFolder(
-  drive: any,
+  drive: drive_v3.Drive,
   name: string,
   parentId?: string
 ): Promise<string> {
@@ -91,35 +91,38 @@ export async function findOrCreateFolder(
 }
 
 export async function listChildFolders(
-  drive: any,
+  drive: drive_v3.Drive,
   parentId: string
 ): Promise<string[]> {
   const folders: string[] = [];
   let pageToken: string | undefined = undefined;
 
   do {
-    const res: any = await drive.files.list({
-      q: [
-        `mimeType='application/vnd.google-apps.folder'`,
-        `'${parentId}' in parents`,
-        `trashed=false`,
-      ].join(" and "),
-      fields: "nextPageToken, files(id,name)",
-      spaces: "drive",
-      orderBy: "name_natural",
-      pageSize: 1000,
-      pageToken,
-      supportsAllDrives: true,
-      includeItemsFromAllDrives: true,
-    });
+    const res: drive_v3.Schema$FileList = (
+      await drive.files.list({
+        q: [
+          `mimeType='application/vnd.google-apps.folder'`,
+          `'${parentId}' in parents`,
+          `trashed=false`,
+        ].join(" and "),
+        fields: "nextPageToken, files(id,name)",
+        spaces: "drive",
+        orderBy: "name_natural",
+        pageSize: 1000,
+        pageToken,
+        supportsAllDrives: true,
+        includeItemsFromAllDrives: true,
+      })
+    ).data;
 
-    const files = res.data.files || [];
+    const files = res.files || [];
+
     for (const f of files) {
       const name = normalizeFolderName(f.name || "");
       if (name) folders.push(name);
     }
 
-    pageToken = res.data.nextPageToken || undefined;
+    pageToken = res.nextPageToken || undefined;
   } while (pageToken);
 
   return Array.from(new Set(folders)).sort((a, b) => a.localeCompare(b));

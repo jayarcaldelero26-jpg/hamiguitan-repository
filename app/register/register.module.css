@@ -62,18 +62,21 @@
   padding: 26px 30px 22px;
   background: linear-gradient(
     180deg,
-    rgba(30, 39, 48, 0.16),
-    rgba(14, 20, 28, 0.22)
+    rgba(18, 26, 34, 0.62),
+    rgba(10, 16, 24, 0.72)
   );
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   box-shadow:
-    0 16px 44px rgba(0, 0, 0, 0.28),
-    0 0 26px rgba(0, 238, 255, 0.07),
+    0 16px 44px rgba(0, 0, 0, 0.30),
+    0 0 22px rgba(0, 238, 255, 0.08),
+    0 0 42px rgba(0, 238, 255, 0.05),
     inset 0 0 0 1px rgba(255, 255, 255, 0.04);
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  isolation: isolate;
 }
 
 .card::before {
@@ -82,9 +85,41 @@
   inset: 0;
   border-radius: 30px;
   pointer-events: none;
+  z-index: 1;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
     inset 0 0 18px rgba(255, 255, 255, 0.02);
+}
+
+.card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 30px;
+  padding: 1.5px;
+  pointer-events: none;
+  z-index: 2;
+  background:
+    linear-gradient(
+      120deg,
+      rgba(0, 0, 0, 0) 0%,
+      rgba(0, 234, 255, 0) 18%,
+      rgba(0, 234, 255, 0.82) 28%,
+      rgba(122, 44, 255, 0.72) 36%,
+      rgba(0, 234, 255, 0) 46%,
+      rgba(0, 0, 0, 0) 100%
+    );
+  background-size: 250% 250%;
+  animation: runningOutline 7s linear infinite;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  opacity: 0.95;
 }
 
 .cardEnter {
@@ -99,7 +134,7 @@
 
 .cardTop {
   position: relative;
-  z-index: 2;
+  z-index: 3;
   flex: 0 0 auto;
 }
 
@@ -110,7 +145,7 @@
   gap: 10px;
   margin-bottom: 14px;
   position: relative;
-  z-index: 2;
+  z-index: 3;
   flex-wrap: nowrap;
 }
 
@@ -154,7 +189,7 @@
 
 .brandBlock {
   position: relative;
-  z-index: 2;
+  z-index: 3;
   text-align: center;
   margin-bottom: 20px;
 }
@@ -181,7 +216,8 @@
   overflow: visible;
   text-shadow:
     0 0 8px rgba(255, 255, 255, 0.08),
-    0 0 14px rgba(0, 238, 255, 0.04);
+    0 0 14px rgba(0, 238, 255, 0.07),
+    0 0 28px rgba(0, 238, 255, 0.04);
 }
 
 .brandRegister {
@@ -191,11 +227,12 @@
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: #8ff7ff;
+  text-shadow: 0 0 12px rgba(0, 238, 255, 0.12);
 }
 
 .formBlock {
   position: relative;
-  z-index: 2;
+  z-index: 3;
   width: 100%;
   max-width: 640px;
   margin: 0 auto;
@@ -258,19 +295,26 @@
   min-height: 54px;
   padding: 0 15px;
   border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.07);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
     0 6px 14px rgba(0, 0, 0, 0.08);
-  transition: 0.22s ease;
+  transition:
+    border-color 0.22s ease,
+    box-shadow 0.22s ease,
+    transform 0.22s ease,
+    background 0.22s ease;
 }
 
 .inputShell:focus-within {
-  border-color: rgba(64, 235, 255, 0.55);
+  border-color: rgba(64, 235, 255, 0.58);
+  background: rgba(7, 18, 25, 0.88);
+  transform: translateY(-1px);
   box-shadow:
     0 0 0 1px rgba(64, 235, 255, 0.18),
-    0 0 16px rgba(0, 238, 255, 0.08),
+    0 0 14px rgba(0, 238, 255, 0.12),
+    0 0 26px rgba(0, 238, 255, 0.08),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
@@ -278,7 +322,8 @@
   flex: 0 0 auto;
   font-size: 18px;
   line-height: 1;
-  color: rgba(255, 255, 255, 0.92);
+  color: rgba(172, 247, 255, 0.96);
+  text-shadow: 0 0 10px rgba(0, 238, 255, 0.18);
 }
 
 .input,
@@ -295,7 +340,7 @@
 }
 
 .input::placeholder {
-  color: rgba(255, 255, 255, 0.68);
+  color: rgba(255, 255, 255, 0.62);
 }
 
 .select {
@@ -386,7 +431,7 @@
   border-color: rgba(0, 238, 255, 0.55);
   background: rgba(0, 238, 255, 0.08);
   box-shadow:
-    0 0 14px rgba(0, 238, 255, 0.1),
+    0 0 14px rgba(0, 238, 255, 0.10),
     inset 0 0 16px rgba(0, 238, 255, 0.03);
 }
 
@@ -399,12 +444,14 @@
   margin-top: 20px;
   width: 100%;
   min-height: 56px;
-  border: 1px solid rgba(66, 255, 246, 0.38);
+  border: 1px solid rgba(87, 255, 246, 0.26);
   border-radius: 999px;
   background: linear-gradient(
-    180deg,
-    rgba(24, 197, 179, 0.96),
-    rgba(10, 228, 255, 0.90)
+    90deg,
+    #00d9ff 0%,
+    #00f0ff 35%,
+    #3f8cff 68%,
+    #7a2cff 100%
   );
   color: #ffffff;
   font-size: 16px;
@@ -415,18 +462,24 @@
   justify-content: center;
   gap: 12px;
   cursor: pointer;
-  transition: 0.24s ease;
+  transition:
+    transform 0.24s ease,
+    box-shadow 0.24s ease,
+    filter 0.24s ease;
   box-shadow:
-    0 0 12px rgba(0, 238, 255, 0.15),
-    0 0 22px rgba(0, 238, 255, 0.10),
+    0 0 10px rgba(0, 238, 255, 0.18),
+    0 0 22px rgba(0, 153, 255, 0.14),
+    0 0 32px rgba(122, 44, 255, 0.14),
     inset 0 1px 0 rgba(255, 255, 255, 0.24);
 }
 
 .button:hover {
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  filter: brightness(1.03);
   box-shadow:
-    0 0 16px rgba(0, 238, 255, 0.20),
-    0 0 28px rgba(0, 238, 255, 0.12),
+    0 0 14px rgba(0, 238, 255, 0.24),
+    0 0 30px rgba(0, 153, 255, 0.18),
+    0 0 42px rgba(122, 44, 255, 0.18),
     inset 0 1px 0 rgba(255, 255, 255, 0.30);
 }
 
@@ -510,23 +563,35 @@
   }
 }
 
+@keyframes runningOutline {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 220% 50%;
+  }
+}
+
 @keyframes subtlePulse {
   0% {
     box-shadow:
-      0 16px 44px rgba(0, 0, 0, 0.28),
-      0 0 26px rgba(0, 238, 255, 0.07),
+      0 16px 44px rgba(0, 0, 0, 0.30),
+      0 0 22px rgba(0, 238, 255, 0.08),
+      0 0 42px rgba(0, 238, 255, 0.05),
       inset 0 0 0 1px rgba(255, 255, 255, 0.04);
   }
   50% {
     box-shadow:
-      0 20px 52px rgba(0, 0, 0, 0.30),
-      0 0 32px rgba(0, 238, 255, 0.09),
+      0 20px 52px rgba(0, 0, 0, 0.32),
+      0 0 28px rgba(0, 238, 255, 0.11),
+      0 0 54px rgba(0, 238, 255, 0.07),
       inset 0 0 0 1px rgba(255, 255, 255, 0.05);
   }
   100% {
     box-shadow:
-      0 16px 44px rgba(0, 0, 0, 0.28),
-      0 0 26px rgba(0, 238, 255, 0.07),
+      0 16px 44px rgba(0, 0, 0, 0.30),
+      0 0 22px rgba(0, 238, 255, 0.08),
+      0 0 42px rgba(0, 238, 255, 0.05),
       inset 0 0 0 1px rgba(255, 255, 255, 0.04);
   }
 }
@@ -562,6 +627,11 @@
     max-width: 100%;
     max-height: 94vh;
     padding: 22px 18px 20px;
+    border-radius: 24px;
+  }
+
+  .card::before,
+  .card::after {
     border-radius: 24px;
   }
 

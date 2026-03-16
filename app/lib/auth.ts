@@ -1,8 +1,16 @@
+import "server-only";
+
 import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
 import { supabaseAdmin } from "@/app/lib/db";
+import { serverEnv } from "@/app/lib/serverEnv";
 
-const SECRET = process.env.JWT_SECRET!;
+type TokenPayload = {
+  id: number;
+  name?: string;
+  email?: string;
+  role?: string;
+};
 
 export type CurrentUser = {
   id: number;
@@ -30,10 +38,15 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
 
   if (!token) return null;
 
-  let payload: any;
+  let payload: TokenPayload;
+
   try {
-    payload = jwt.verify(token, SECRET);
+    payload = jwt.verify(token, serverEnv.jwtSecret) as TokenPayload;
   } catch {
+    return null;
+  }
+
+  if (!payload?.id || !Number.isInteger(Number(payload.id))) {
     return null;
   }
 

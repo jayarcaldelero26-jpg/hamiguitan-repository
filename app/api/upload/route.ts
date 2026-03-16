@@ -2,18 +2,16 @@ export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
 import { Readable } from "stream";
+import type { ReadableStream as NodeReadableStream } from "stream/web";
 import { supabaseAdmin } from "@/app/lib/db";
 import { getCurrentUser } from "@/app/lib/auth";
+import { serverEnv } from "@/app/lib/serverEnv";
 import {
   getDriveClient,
   findOrCreateFolder,
   normalizeDriveCategory,
   normalizeFolderName,
 } from "@/app/lib/googleDrive";
-
-const ACADEME_ID = process.env.DRIVE_ACADEME_FOLDER_ID!;
-const STAKEHOLDERS_ID = process.env.DRIVE_STAKEHOLDERS_FOLDER_ID!;
-const PAMO_ID = process.env.DRIVE_PAMO_FOLDER_ID!;
 
 const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100 MB
 
@@ -23,10 +21,14 @@ function requiredString(v: FormDataEntryValue | null) {
 }
 
 function getCategoryFolderId(category: string) {
-  if (category === "Academe") return ACADEME_ID;
-  if (category === "Stakeholders") return STAKEHOLDERS_ID;
-  if (category === "PAMO Activity") return PAMO_ID;
+  if (category === "Academe") return serverEnv.driveAcademeFolderId;
+  if (category === "Stakeholders") return serverEnv.driveStakeholdersFolderId;
+  if (category === "PAMO Activity") return serverEnv.drivePamoFolderId;
   return "";
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
 }
 
 export async function POST(req: NextRequest) {
@@ -46,18 +48,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    if (!ACADEME_ID || !STAKEHOLDERS_ID || !PAMO_ID) {
-      return NextResponse.json(
-        { error: "Drive folder IDs are not configured." },
-        { status: 500 }
-      );
-    }
-
     const formData = await req.formData();
 
     const file = formData.get("file");
     if (!file || typeof file === "string") {
-      return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
+      return NextResponse.json({ error: "No file uploaded." }, { status: 400 });
     }
 
     const rawCategory = requiredString(formData.get("category"));
@@ -72,10 +67,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (!dateReceived) {
-      return NextResponse.json(
-        { error: "Date received is required." },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Date received is required." }, { status: 400 });
     }
 
     const category = normalizeDriveCategory(rawCategory);
@@ -110,17 +102,11 @@ export async function POST(req: NextRequest) {
     const fileName = fileObj.name || "upload";
     const mimeType = fileObj.type || "application/octet-stream";
 
-    const arrayBuffer = await fileObj.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-
-    if (!buffer.length) {
-      return NextResponse.json(
-        { error: "Selected file is empty." },
-        { status: 400 }
-      );
+    if (!fileObj.size) {
+      return NextResponse.json({ error: "Selected file is empty." }, { status: 400 });
     }
 
-    if (buffer.length > MAX_FILE_SIZE) {
+    if (fileObj.size > MAX_FILE_SIZE) {
       return NextResponse.json(
         { error: "Maximum file size is 100MB." },
         { status: 400 }
@@ -137,7 +123,7 @@ export async function POST(req: NextRequest) {
       year,
       fileName,
       mimeType,
-      size: buffer.length,
+      size: fileObj.size,
     });
 
     const drive = getDriveClient();
@@ -158,7 +144,7 @@ export async function POST(req: NextRequest) {
       },
       media: {
         mimeType,
-        body: Readable.from(buffer),
+        body: Readable.fromWeb(fileObj.stream() as unknown as NodeReadableStream),
       },
       fields: "id,name,webViewLink",
       supportsAllDrives: true,
@@ -169,21 +155,6 @@ export async function POST(req: NextRequest) {
     if (!fileId) {
       throw new Error("Google Drive did not return a file ID.");
     }
-
-    console.time("drive-permission");
-    try {
-      await drive.permissions.create({
-        fileId,
-        requestBody: {
-          type: "anyone",
-          role: "reader",
-        },
-        supportsAllDrives: true,
-      });
-    } catch (permError) {
-      console.error("UPLOAD PERMISSION WARNING:", permError);
-    }
-    console.timeEnd("drive-permission");
 
     const uploadedAt = new Date().toISOString();
 
@@ -231,7 +202,7 @@ export async function POST(req: NextRequest) {
       category,
       folder: folder || "",
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("UPLOAD ERROR:", error);
 
     if (uploadTotalStarted) {
@@ -241,7 +212,7 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json(
-      { error: error?.message || "Upload failed." },
+      { error: getErrorMessage(error, "Upload failed.") },
       { status: 500 }
     );
   }

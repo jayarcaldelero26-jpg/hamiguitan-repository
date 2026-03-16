@@ -3,13 +3,20 @@ import type { NextRequest } from "next/server";
 
 export function middleware(req: NextRequest) {
   const token = req.cookies.get("auth_token")?.value;
+  const { pathname } = req.nextUrl;
 
-  // allow login page
-  if (req.nextUrl.pathname.startsWith("/login")) {
+  // public routes
+  if (
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/register") ||
+    pathname.startsWith("/reset-password") ||
+    pathname.startsWith("/api/login") ||
+    pathname.startsWith("/api/register") ||
+    pathname.startsWith("/api/auth/forgot-password")
+  ) {
     return NextResponse.next();
   }
 
-  // protect dashboard & admin
   if (!token) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
@@ -18,5 +25,11 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/admin/:path*"],
+  matcher: [
+    "/dashboard/:path*",
+    "/admin/:path*",
+    "/research/:path*",
+    "/upload/:path*",
+    "/settings/:path*",
+  ],
 };

@@ -2,44 +2,37 @@ export const runtime = "nodejs";
 
 import { NextResponse, type NextRequest } from "next/server";
 import { supabaseAdmin } from "@/app/lib/db";
-import jwt from "jsonwebtoken";
+import { getCurrentUser } from "@/app/lib/auth";
 import { getDriveClient } from "@/app/lib/googleDrive";
 
-const SECRET = process.env.JWT_SECRET!;
-
-function getToken(req: NextRequest) {
-  return req.cookies.get("auth_token")?.value || "";
+function isValidId(value: number) {
+  return Number.isInteger(value) && value > 0;
 }
 
 export async function DELETE(req: NextRequest) {
   let totalStarted = false;
+  let driveDeleteFailed = false;
 
   try {
     console.time("delete-total");
     totalStarted = true;
 
-    const token = getToken(req);
-    if (!token) {
+    const me = await getCurrentUser();
+
+    if (!me) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    let user: any;
-    try {
-      user = jwt.verify(token, SECRET);
-    } catch {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-    }
-
-    if (user.role !== "admin") {
+    if (me.role !== "admin") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const { searchParams } = new URL(req.url);
-    const idStr = searchParams.get("id");
+    const idStr = String(searchParams.get("id") || "").trim();
     const id = Number(idStr);
 
-    if (!idStr || Number.isNaN(id)) {
-      return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+    if (!isValidId(id)) {
+      return NextResponse.json({ error: "Invalid id." }, { status: 400 });
     }
 
     console.time("delete-find-doc");
@@ -54,11 +47,14 @@ export async function DELETE(req: NextRequest) {
 
     if (findError) {
       console.error("DELETE DOCUMENT FIND ERROR:", findError);
-      return NextResponse.json({ error: "Failed to find document" }, { status: 500 });
+      return NextResponse.json(
+        { error: "Failed to find document." },
+        { status: 500 }
+      );
     }
 
     if (!doc) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
+      return NextResponse.json({ error: "Document not found." }, { status: 404 });
     }
 
     if (doc.fileId) {
@@ -72,9 +68,15 @@ export async function DELETE(req: NextRequest) {
         });
 
         console.timeEnd("delete-drive-file");
-      } catch (e) {
-        console.error("DRIVE DELETE FAILED:", e);
-        // keep going so DB record still gets deleted
+      } catch (error) {
+        driveDeleteFailed = true;
+        console.error("DRIVE DELETE FAILED:", {
+          documentId: doc.id,
+          fileId: doc.fileId,
+          requestedByUserId: me.id,
+          error,
+        });
+        // Continue deleting DB record even if Drive delete fails
       }
     }
 
@@ -89,10 +91,21 @@ export async function DELETE(req: NextRequest) {
 
     if (deleteError) {
       console.error("DELETE DOCUMENT DB ERROR:", deleteError);
-      return NextResponse.json({ error: "Failed to delete document" }, { status: 500 });
+      return NextResponse.json(
+        { error: "Failed to delete document." },
+        { status: 500 }
+      );
     }
 
     console.timeEnd("delete-total");
+
+    if (driveDeleteFailed) {
+      console.warn("DOCUMENT DELETE COMPLETED WITH DRIVE ORPHAN RISK:", {
+        documentId: doc.id,
+        fileId: doc.fileId,
+        requestedByUserId: me.id,
+      });
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -104,6 +117,9 @@ export async function DELETE(req: NextRequest) {
       } catch {}
     }
 
-    return NextResponse.json({ error: "Failed to delete document" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to delete document." },
+      { status: 500 }
+    );
   }
 }

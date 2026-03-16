@@ -10,7 +10,8 @@ export async function GET() {
     }
 
     return NextResponse.json(me);
-  } catch {
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+  } catch (error) {
+    console.error("ME ROUTE ERROR:", error);
+    return NextResponse.json({ error: "Server error." }, { status: 500 });
   }
 }

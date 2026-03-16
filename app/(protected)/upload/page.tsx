@@ -7,6 +7,7 @@ import { useAuth } from "@/app/components/AuthProvider";
 import { useDocuments } from "@/app/components/DocumentsProvider";
 import { supabaseBrowser } from "@/app/lib/supabaseClient";
 import { motion } from "framer-motion";
+import { repoTheme } from "@/app/lib/repoTheme";
 import {
   ArrowUpTrayIcon,
   DocumentArrowUpIcon,
@@ -41,10 +42,18 @@ function formatBytes(bytes: number) {
   return `${v.toFixed(i === 0 ? 0 : 1)} ${sizes[i]}`;
 }
 
-function safeArray(v: any): string[] {
+function safeArray(v: unknown): string[] {
   return Array.isArray(v)
     ? v.filter((x) => typeof x === "string").map((x) => x.trim()).filter(Boolean)
     : [];
+}
+
+function isAbortError(error: unknown) {
+  return error instanceof Error && error.name === "AbortError";
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
 }
 
 function classNames(...xs: Array<string | false | null | undefined>) {
@@ -165,8 +174,8 @@ export default function UploadPage() {
       try {
         setLoadingFolders(true);
         await fetchFolders(controller.signal);
-      } catch (err: any) {
-        if (err?.name === "AbortError") return;
+      } catch (err: unknown) {
+        if (isAbortError(err)) return;
 
         setFolders({
           academe: [],
@@ -459,7 +468,7 @@ export default function UploadPage() {
       await wait(300);
 
       setSuccessOpen(true);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("UPLOAD PAGE ERROR:", err);
 
       if (stageTimer) {
@@ -469,8 +478,9 @@ export default function UploadPage() {
 
       setUploadPercent(0);
       setUploadStage("Upload failed");
-      setUploadDetail(err?.message || "Upload failed. Please try again.");
-      setErrorMsg(err?.message || "Upload failed. Please try again.");
+      const message = getErrorMessage(err, "Upload failed. Please try again.");
+      setUploadDetail(message);
+      setErrorMsg(message);
       setErrorOpen(true);
     } finally {
       if (stageTimer) clearInterval(stageTimer);
@@ -479,18 +489,13 @@ export default function UploadPage() {
   }
 
   const dark = pageTheme === "dark";
-
-  const inputBase = dark
-    ? "mt-2 w-full rounded-2xl border px-4 py-3 bg-white/[0.04] border-cyan-300/15 text-white placeholder-cyan-100/35 outline-none text-sm focus:ring-4 focus:ring-cyan-400/10 focus:border-cyan-300/30"
-    : "mt-2 w-full rounded-2xl border px-4 py-3 bg-white border-slate-300 text-slate-900 placeholder-slate-400 outline-none text-sm focus:ring-4 focus:ring-cyan-100 focus:border-cyan-400";
-
-  const sectionCard = dark
-    ? "bg-white/[0.04] border border-cyan-300/12 rounded-3xl shadow-[0_8px_30px_rgba(0,0,0,0.18)] backdrop-blur-md overflow-hidden"
-    : "bg-white/85 border border-slate-200 rounded-3xl shadow-[0_10px_28px_rgba(15,23,42,0.08)] overflow-hidden";
+  const ui = repoTheme(pageTheme);
+  const inputBase = `${ui.input} mt-2 pl-4`;
+  const sectionCard = `${ui.card} overflow-hidden`;
 
   if (loadingMe) {
     return (
-      <div className={`p-6 md:p-10 min-h-full ${dark ? "text-slate-100" : "text-slate-900"}`}>
+      <div className={`${ui.page} p-4 sm:p-6 md:p-10 min-h-full`}>
         <div className="max-w-[1250px] mx-auto">
           <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
             <div className="flex items-start gap-3">
@@ -525,10 +530,10 @@ export default function UploadPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mt-6">
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 sm:gap-6 mt-6">
             <div className={`lg:col-span-3 ${sectionCard}`}>
               <div
-                className={`p-5 border-b ${
+                className={`p-4 sm:p-5 border-b ${
                   dark ? "border-cyan-300/12 bg-white/[0.03]" : "border-slate-200 bg-slate-50"
                 }`}
               >
@@ -549,7 +554,7 @@ export default function UploadPage() {
                 </div>
               </div>
 
-              <div className="p-6 space-y-5">
+              <div className="p-4 sm:p-6 space-y-5">
                 <div className="grid md:grid-cols-2 gap-4">
                   <Skeleton className="h-24 w-full" dark={dark} />
                   <Skeleton className="h-24 w-full" dark={dark} />
@@ -565,7 +570,7 @@ export default function UploadPage() {
 
             <div className={`lg:col-span-2 ${sectionCard}`}>
               <div
-                className={`p-5 border-b ${
+                className={`p-4 sm:p-5 border-b ${
                   dark ? "border-cyan-300/12 bg-white/[0.03]" : "border-slate-200 bg-slate-50"
                 }`}
               >
@@ -573,10 +578,10 @@ export default function UploadPage() {
                 <Skeleton className="h-3 w-52 mt-2 rounded-full" dark={dark} />
               </div>
 
-              <div className="p-6 space-y-4">
+              <div className="p-4 sm:p-6 space-y-4">
                 <Skeleton className="h-20 w-full" dark={dark} />
                 <Skeleton className="h-20 w-full" dark={dark} />
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <Skeleton className="h-20 w-full" dark={dark} />
                   <Skeleton className="h-20 w-full" dark={dark} />
                 </div>
@@ -595,7 +600,7 @@ export default function UploadPage() {
   if (me.role !== "admin" && me.role !== "co_admin") return null;
 
   return (
-    <div className={`p-6 md:p-10 min-h-full ${dark ? "text-slate-100" : "text-slate-900"}`}>
+    <div className={`${ui.page} p-4 sm:p-6 md:p-10 min-h-full`}>
       <ConfirmDialog
         open={successOpen}
         title="Upload Complete"
@@ -629,10 +634,10 @@ export default function UploadPage() {
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
           <div className="flex items-start gap-3">
             <div
-              className={`h-14 w-14 rounded-3xl grid place-items-center ${
+              className={`h-14 w-14 rounded-3xl grid place-items-center shadow-[0_12px_28px_rgba(0,0,0,0.08)] ${
                 dark
-                  ? "bg-cyan-400/12 border border-cyan-300/20 text-cyan-100 shadow-[0_0_18px_rgba(34,211,238,0.14)]"
-                  : "bg-cyan-50 border border-cyan-200 text-cyan-700"
+                  ? "bg-[#d7aa6b]/12 border border-[#d7aa6b]/20 text-[#f0cf97] shadow-[0_0_18px_rgba(215,170,107,0.14)]"
+                  : "bg-[#fff3e3] border border-[#f3d6ac] text-[#9d6c26]"
               }`}
             >
               <ArrowUpTrayIcon className="w-7 h-7" />
@@ -650,11 +655,11 @@ export default function UploadPage() {
                   Upload Document
                 </h1>
                 <span
-                  className={`text-[10px] font-semibold uppercase tracking-wide px-2.5 py-1 rounded-full border ${
-                    dark
-                      ? "bg-cyan-400/10 text-cyan-100 border-cyan-300/20"
-                      : "bg-cyan-50 text-cyan-700 border-cyan-200"
-                  }`}
+                    className={`text-[10px] font-semibold uppercase tracking-wide px-2.5 py-1 rounded-full border ${
+                      dark
+                        ? "bg-white/[0.05] text-[#DAF1DE] border-white/10"
+                        : "bg-white/55 text-[#235347] border-white/60"
+                    }`}
                 >
                   Admin Only
                 </span>
@@ -706,27 +711,28 @@ export default function UploadPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mt-6">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 sm:gap-6 mt-6">
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.16 }}
-            className={`lg:col-span-3 ${sectionCard}`}
+            className={`lg:col-span-3 relative ${sectionCard}`}
           >
+            <div className={`absolute inset-x-0 top-0 h-2 ${dark ? "bg-[#d7aa6b]/68" : "bg-[#ddb16f]/82"}`} />
             <div
-              className={`p-5 border-b ${
+              className={`p-4 sm:p-5 border-b ${
                 dark
-                  ? "border-cyan-300/12 bg-[linear-gradient(90deg,rgba(34,211,238,0.10)_0%,rgba(6,23,36,0.2)_45%,rgba(34,211,238,0.07)_100%)]"
-                  : "border-slate-200 bg-gradient-to-r from-cyan-50 to-white"
+                  ? "border-white/8 bg-[linear-gradient(90deg,rgba(142,182,155,0.12)_0%,rgba(11,43,38,0.18)_45%,rgba(142,182,155,0.08)_100%)]"
+                  : "border-white/50 bg-gradient-to-r from-[#edf6f0] to-white"
               }`}
             >
               <div className="flex items-center gap-3">
                 <div
-                  className={`h-11 w-11 rounded-2xl grid place-items-center ${
+                  className={`h-11 w-11 rounded-2xl grid place-items-center shadow-[0_10px_24px_rgba(0,0,0,0.08)] ${
                     dark
-                      ? "bg-cyan-400/10 border border-cyan-300/15 text-cyan-100"
-                      : "bg-cyan-50 border border-cyan-200 text-cyan-700"
-                  }`}
+                      ? "bg-[#7ea8d9]/10 border border-[#97bbe4]/18 text-[#c8d8f0]"
+                      : "bg-[#edf4fb] border border-[#d7e4f0] text-[#4d6f99]"
+                    }`}
                 >
                   <DocumentArrowUpIcon className="w-6 h-6" />
                 </div>
@@ -746,7 +752,7 @@ export default function UploadPage() {
               </div>
             </div>
 
-            <div className="p-6 space-y-5">
+            <div className="p-4 sm:p-6 space-y-5">
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <label
@@ -754,7 +760,7 @@ export default function UploadPage() {
                       dark ? "text-white" : "text-slate-800"
                     }`}
                   >
-                    <TagIcon className={`w-4 h-4 ${dark ? "text-cyan-200" : "text-cyan-600"}`} />
+                    <TagIcon className={`w-4 h-4 ${dark ? "text-[#8EB69B]" : "text-[#235347]"}`} />
                     Category <span className="text-rose-500">*</span>
                   </label>
                   <select
@@ -789,7 +795,7 @@ export default function UploadPage() {
                     }`}
                   >
                     <CalendarDaysIcon
-                      className={`w-4 h-4 ${dark ? "text-cyan-200" : "text-cyan-600"}`}
+                      className={`w-4 h-4 ${dark ? "text-[#d7aa6b]" : "text-[#9d6c26]"}`}
                     />
                     Date Received <span className="text-rose-500">*</span>
                   </label>
@@ -814,9 +820,9 @@ export default function UploadPage() {
                     dark ? "text-white" : "text-slate-800"
                   }`}
                 >
-                  <DocumentTextIcon
-                    className={`w-4 h-4 ${dark ? "text-cyan-200" : "text-cyan-600"}`}
-                  />
+                    <DocumentTextIcon
+                      className={`w-4 h-4 ${dark ? "text-[#c8d8f0]" : "text-[#4d6f99]"}`}
+                    />
                   Document Title <span className="text-rose-500">*</span>
                 </label>
                 <input
@@ -833,7 +839,7 @@ export default function UploadPage() {
                     dark ? "text-white" : "text-slate-800"
                   }`}
                 >
-                  <FolderIcon className={`w-4 h-4 ${dark ? "text-cyan-200" : "text-cyan-600"}`} />
+                  <FolderIcon className={`w-4 h-4 ${dark ? "text-[#8EB69B]" : "text-[#235347]"}`} />
                   {folderLabel} {folderRequired && <span className="text-rose-500">*</span>}
                 </label>
 
@@ -913,18 +919,18 @@ export default function UploadPage() {
 
                   <div className="flex flex-col md:flex-row md:items-center gap-4">
                     <div
-                      className={`h-14 w-14 rounded-2xl grid place-items-center ${
-                        dark
-                          ? "bg-cyan-400/12 border border-cyan-300/18 text-cyan-100 shadow-[0_0_18px_rgba(34,211,238,0.10)]"
-                          : "bg-cyan-50 border border-cyan-200 text-cyan-700"
-                      }`}
+                        className={`h-14 w-14 rounded-2xl grid place-items-center shadow-[0_10px_24px_rgba(0,0,0,0.08)] ${
+                          dark
+                            ? "bg-[#d7aa6b]/12 border border-[#d7aa6b]/18 text-[#f0cf97]"
+                            : "bg-[#fff3e3] border border-[#f3d6ac] text-[#9d6c26]"
+                        }`}
                     >
                       <ArrowUpTrayIcon className="w-7 h-7" />
                     </div>
 
-                    <div className="flex-1">
+                    <div className="min-w-0 flex-1">
                       <div
-                        className={`font-semibold text-xl leading-tight ${
+                        className={`font-semibold text-lg sm:text-xl leading-tight ${
                           dark ? "text-white" : "text-slate-900"
                         }`}
                       >
@@ -936,7 +942,7 @@ export default function UploadPage() {
                           type="button"
                           onClick={pickFile}
                           className={`font-semibold underline underline-offset-4 ${
-                            dark ? "text-cyan-300 hover:text-cyan-200" : "text-cyan-700 hover:text-cyan-800"
+                            dark ? "text-[#f0cf97] hover:text-[#f6ddb0]" : "text-[#9d6c26] hover:text-[#83581d]"
                           }`}
                         >
                           browse
@@ -948,8 +954,8 @@ export default function UploadPage() {
                         <div
                           className={`mt-4 flex items-center justify-between gap-3 rounded-2xl px-4 py-3 ${
                             dark
-                              ? "bg-white/[0.05] border border-cyan-300/10"
-                              : "bg-white border border-slate-200"
+                              ? "bg-white/[0.05] border border-white/10"
+                              : "bg-white border border-white/60"
                           }`}
                         >
                           <div className="min-w-0">
@@ -963,10 +969,10 @@ export default function UploadPage() {
                           <button
                             type="button"
                             onClick={clearFile}
-                            className={`h-9 w-9 rounded-xl grid place-items-center ${
+                            className={`h-11 w-11 rounded-xl grid place-items-center ${
                               dark
-                                ? "border border-cyan-300/12 bg-white/[0.04] hover:bg-white/[0.08] text-cyan-100"
-                                : "border border-slate-200 bg-white hover:bg-slate-50 text-slate-600"
+                                ? "border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] text-[#DAF1DE]"
+                                : "border border-white/60 bg-white/75 hover:bg-white text-[#5d6c80]"
                             }`}
                             title="Remove file"
                           >
@@ -992,10 +998,8 @@ export default function UploadPage() {
                   onClick={handleUpload}
                   disabled={uploading || !requiredOk}
                   className={classNames(
-                    "w-full inline-flex items-center justify-center gap-2 px-5 py-4 rounded-2xl transition text-sm font-semibold disabled:opacity-60 disabled:cursor-not-allowed",
-                    dark
-                      ? "bg-cyan-500/90 text-slate-950 hover:bg-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.15)]"
-                      : "bg-cyan-600 text-white hover:bg-cyan-700 shadow-sm"
+                    "w-full min-h-11 inline-flex items-center justify-center gap-2 px-5 py-4 rounded-2xl transition-all duration-200 text-sm font-semibold disabled:opacity-60 disabled:cursor-not-allowed disabled:transform-none",
+                    ui.buttonPrimary
                   )}
                 >
                   <DocumentArrowUpIcon className="w-5 h-5" />
@@ -1006,16 +1010,16 @@ export default function UploadPage() {
                   <div
                     className={`mt-4 rounded-3xl p-4 ${
                       dark
-                        ? "border border-cyan-300/15 bg-cyan-400/5"
-                        : "border border-cyan-200 bg-cyan-50"
+                        ? "border border-[#d7aa6b]/20 bg-[#d7aa6b]/8"
+                        : "border border-[#f3d6ac] bg-[#fff3e3]"
                     }`}
                   >
                     <div className="flex items-start gap-3">
                       <div
                         className={`mt-1 h-4 w-4 rounded-full border-2 animate-spin ${
                           dark
-                            ? "border-cyan-300 border-t-transparent"
-                            : "border-cyan-600 border-t-transparent"
+                            ? "border-[#f0cf97] border-t-transparent"
+                            : "border-[#9d6c26] border-t-transparent"
                         }`}
                       />
                       <div className="flex-1 min-w-0">
@@ -1023,19 +1027,19 @@ export default function UploadPage() {
                           <p className={`text-sm font-semibold ${dark ? "text-white" : "text-slate-900"}`}>
                             {uploadStage || "Uploading document"}
                           </p>
-                          <span className={`text-[11px] font-semibold ${dark ? "text-cyan-100/75" : "text-slate-600"}`}>
+                          <span className={`text-[11px] font-semibold ${dark ? "text-[#f0cf97]/85" : "text-[#9d6c26]"}`}>
                             {uploadPercent}%
                           </span>
                         </div>
 
-                        <p className={`mt-1 text-[12px] leading-5 ${dark ? "text-cyan-100/70" : "text-slate-600"}`}>
+                        <p className={`mt-1 text-[12px] leading-5 ${dark ? "text-[#f6ddb0]/80" : "text-[#8a6a33]"}`}>
                           {uploadDetail || "Please wait while your document is being processed."}
                         </p>
 
-                        <div className={`mt-3 h-2 w-full overflow-hidden rounded-full ${dark ? "bg-white/10" : "bg-cyan-100"}`}>
+                        <div className={`mt-3 h-2 w-full overflow-hidden rounded-full ${dark ? "bg-white/10" : "bg-[#f7e9cf]"}`}>
                           <div
                             className={`h-full rounded-full transition-all duration-500 ${
-                              dark ? "bg-cyan-300" : "bg-cyan-600"
+                              dark ? "bg-[#f0cf97]" : "bg-[#9d6c26]"
                             }`}
                             style={{ width: `${uploadPercent}%` }}
                           />
@@ -1056,10 +1060,11 @@ export default function UploadPage() {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.16, delay: 0.02 }}
-            className={`lg:col-span-2 ${sectionCard}`}
+            className={`lg:col-span-2 relative ${sectionCard}`}
           >
+            <div className={`absolute inset-x-0 top-0 h-2 ${dark ? "bg-[#7ea8d9]/58" : "bg-[#97bbe4]/72"}`} />
             <div
-              className={`p-5 border-b ${
+              className={`p-4 sm:p-5 border-b ${
                 dark ? "border-cyan-300/12 bg-white/[0.03]" : "border-slate-200 bg-slate-50"
               }`}
             >
@@ -1071,7 +1076,7 @@ export default function UploadPage() {
               </div>
             </div>
 
-            <div className="p-6 space-y-4">
+            <div className="p-4 sm:p-6 space-y-4">
               <div
                 className={`rounded-3xl p-4 ${
                   dark ? "border border-cyan-300/10 bg-white/[0.03]" : "border border-slate-200 bg-slate-50"
@@ -1104,7 +1109,7 @@ export default function UploadPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div
                   className={`rounded-3xl p-4 ${
                     dark ? "border border-cyan-300/10 bg-white/[0.03]" : "border border-slate-200 bg-slate-50"

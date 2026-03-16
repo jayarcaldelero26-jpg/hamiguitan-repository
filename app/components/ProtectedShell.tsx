@@ -14,8 +14,14 @@ import {
   ShieldCheckIcon,
 } from "@heroicons/react/24/outline";
 import { useAuth } from "@/app/components/AuthProvider";
+import { repoTheme } from "@/app/lib/repoTheme";
 
 type PageTheme = "dark" | "light";
+
+function getStoredPageTheme(): PageTheme {
+  if (typeof window === "undefined") return "dark";
+  return localStorage.getItem("page-theme") === "light" ? "light" : "dark";
+}
 
 function initials(name: string) {
   const parts = (name || "").trim().split(/\s+/).filter(Boolean);
@@ -50,7 +56,7 @@ function roleLabel(role?: string) {
 }
 
 function darkButtonStyle() {
-  return "bg-white/[0.05] text-white border-cyan-300/12 hover:bg-white/[0.08]";
+  return "bg-white/[0.05] text-[#DAF1DE] border-white/10 hover:bg-white/[0.08]";
 }
 
 export default function ProtectedShell({
@@ -63,7 +69,8 @@ export default function ProtectedShell({
   const { user, loading, logout } = useAuth();
 
   const [collapsed, setCollapsed] = useState(false);
-  const [confirmLogout, setConfirmLogout] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [confirmLogoutPath, setConfirmLogoutPath] = useState<string | null>(null);
   const [pageTheme, setPageTheme] = useState<PageTheme>("dark");
 
   const [logoutSuccessOpen, setLogoutSuccessOpen] = useState(false);
@@ -71,36 +78,15 @@ export default function ProtectedShell({
   const [logoutErrorMsg, setLogoutErrorMsg] = useState("Please try again.");
 
   useEffect(() => {
-    setConfirmLogout(false);
-  }, [pathname]);
-
-  useEffect(() => {
-    const saved =
-      typeof window !== "undefined"
-        ? (localStorage.getItem("page-theme") as PageTheme | null)
-        : null;
-
-    if (saved === "dark" || saved === "light") {
-      setPageTheme(saved);
-      document.documentElement.dataset.pageTheme = saved;
-    } else {
-      document.documentElement.dataset.pageTheme = "dark";
-    }
-  }, []);
+    document.documentElement.dataset.pageTheme = pageTheme;
+  }, [pageTheme]);
 
   useEffect(() => {
     const onThemeChanged = () => {
-      const saved =
-        typeof window !== "undefined"
-          ? (localStorage.getItem("page-theme") as PageTheme | null)
-          : null;
-
-      if (saved === "dark" || saved === "light") {
-        setPageTheme(saved);
-        document.documentElement.dataset.pageTheme = saved;
-      }
+      setPageTheme(getStoredPageTheme());
     };
 
+    onThemeChanged();
     window.addEventListener("page-theme-changed", onThemeChanged);
     return () =>
       window.removeEventListener("page-theme-changed", onThemeChanged);
@@ -123,8 +109,20 @@ export default function ProtectedShell({
     if (canViewRegisteredStaff(user.role)) router.prefetch("/admin/users");
   }, [router, user]);
 
+  useEffect(() => {
+    const onResize = () => {
+      if (window.innerWidth >= 768) {
+        setMobileNavOpen(false);
+      }
+    };
+
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
   const handleNavigate = useCallback(
     (href: string) => {
+      setMobileNavOpen(false);
       if (pathname === href) return;
       router.push(href);
     },
@@ -133,12 +131,15 @@ export default function ProtectedShell({
 
   const pageBg =
     pageTheme === "dark"
-      ? "bg-[radial-gradient(circle_at_top_left,#0b2c3a_0%,#07131f_28%,#04101a_58%,#020817_100%)]"
-      : "bg-[linear-gradient(180deg,#eef6f7_0%,#f7fbfc_48%,#edf5f6_100%)]";
+      ? "bg-[radial-gradient(circle_at_top_left,#163832_0%,#0B2B26_30%,#051F20_58%,#03171A_100%)]"
+      : "bg-[linear-gradient(180deg,#edf6f0_0%,#f6fbf8_48%,#e6efe9_100%)]";
+
+  const ui = repoTheme(pageTheme);
 
   const navBtn = useCallback(
     (href: string, label: string, icon: React.ReactNode) => {
       const active = pathname === href;
+      const showLabel = !collapsed || mobileNavOpen;
 
       return (
         <button
@@ -146,12 +147,12 @@ export default function ProtectedShell({
           type="button"
           onClick={() => handleNavigate(href)}
           aria-current={active ? "page" : undefined}
-          className={`group relative w-full flex items-center gap-3 px-3 py-3 rounded-2xl transition-all duration-200 border ${
-            collapsed ? "justify-center" : ""
+          className={`group relative w-full min-h-11 flex items-center gap-3 px-3 py-3 rounded-2xl transition-all duration-200 border ${
+            showLabel ? "" : "justify-center"
           } ${
             active
-              ? "bg-cyan-400/12 text-white border-cyan-300/25"
-              : "text-white border-transparent hover:bg-cyan-400/8 hover:border-cyan-300/15"
+              ? "bg-white/[0.08] text-white border-white/12 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
+              : "text-white border-transparent hover:bg-white/[0.05] hover:border-white/10"
           }`}
         >
           {active && (
@@ -160,7 +161,7 @@ export default function ProtectedShell({
 
           <span className="shrink-0 text-white">{icon}</span>
 
-          {!collapsed && (
+          {showLabel && (
             <span className="font-semibold text-[14px] tracking-[0.01em] text-white">
               {label}
             </span>
@@ -168,7 +169,7 @@ export default function ProtectedShell({
         </button>
       );
     },
-    [collapsed, handleNavigate, pathname]
+    [collapsed, handleNavigate, mobileNavOpen, pathname]
   );
 
   const navItems = useMemo(() => {
@@ -215,10 +216,13 @@ export default function ProtectedShell({
     return items.filter((item) => item.show);
   }, [user]);
 
+  const confirmLogout = confirmLogoutPath === pathname;
+  const showSidebarLabels = !collapsed || mobileNavOpen;
+
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#020817]">
-        <div className="bg-[#071c2a] rounded-2xl border border-cyan-300/15 p-6 w-[360px] text-center">
+      <div className={`min-h-[100dvh] flex items-center justify-center ${pageBg}`}>
+        <div className={`${ui.card} p-6 w-[min(360px,calc(100vw-2rem))] text-center`}>
           <div className="animate-pulse">
             <div className="h-10 w-10 rounded-full bg-cyan-300/20 mx-auto mb-4" />
             <div className="h-4 bg-cyan-300/10 rounded mb-2" />
@@ -241,42 +245,57 @@ export default function ProtectedShell({
         Skip to main content
       </a>
 
-      <div className="h-screen overflow-hidden bg-[#020817]">
+      <div className={`h-[100dvh] overflow-hidden ${pageBg}`}>
         <div className="flex h-full">
+          {mobileNavOpen && (
+            <button
+              type="button"
+              aria-label="Close navigation"
+              className="fixed inset-0 z-40 bg-black/45 backdrop-blur-[2px] md:hidden"
+              onClick={() => setMobileNavOpen(false)}
+            />
+          )}
+
           <aside
             aria-label="Sidebar"
-            className={`h-full shrink-0 overflow-hidden border-r p-5 flex flex-col bg-[linear-gradient(180deg,#03121d_0%,#071c2a_55%,#061724_100%)] border-cyan-400/15 transition-all duration-200 ease-out ${
-              collapsed ? "w-[88px]" : "w-[290px]"
-            }`}
+            className={`fixed inset-y-0 left-0 z-50 h-full overflow-hidden border-r p-5 flex flex-col bg-[linear-gradient(180deg,#04191a_0%,#0B2B26_52%,#163832_100%)] border-white/10 transition-all duration-200 ease-out md:relative md:z-auto md:translate-x-0 ${
+              mobileNavOpen ? "translate-x-0" : "-translate-x-full"
+            } ${
+              collapsed ? "md:w-[88px]" : "md:w-[290px]"
+            } w-[min(84vw,290px)]`}
           >
-            <div
-              role="banner"
-              className="flex items-center justify-between"
-            >
+            <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top_left,rgba(142,182,155,0.12),transparent_36%),radial-gradient(circle_at_bottom_left,rgba(35,83,71,0.22),transparent_40%)]" />
+            <div role="banner" className="flex items-center justify-between">
               <button
                 type="button"
-                onClick={() => setCollapsed((v) => !v)}
-                className="p-2.5 rounded-xl hover:bg-cyan-400/10 transition border border-transparent hover:border-cyan-300/15"
+                onClick={() => {
+                  if (typeof window !== "undefined" && window.innerWidth < 768) {
+                    setMobileNavOpen(false);
+                    return;
+                  }
+                  setCollapsed((v) => !v);
+                }}
+                className="min-h-11 min-w-11 p-2.5 rounded-xl hover:bg-white/[0.08] transition border border-transparent hover:border-white/10"
                 title="Toggle sidebar"
                 aria-label="Toggle sidebar"
               >
                 <Bars3Icon className="w-6 h-6 text-white" />
               </button>
 
-              {!collapsed && (
-                <span className="text-[11px] px-2.5 py-1 rounded-full bg-cyan-400/10 text-white font-semibold border border-cyan-300/15">
+              {showSidebarLabels && (
+                <span className="text-[11px] px-2.5 py-1 rounded-full bg-white/[0.05] text-[#DAF1DE] font-semibold border border-white/10">
                   {roleLabel(user.role)}
                 </span>
               )}
             </div>
 
-            <div className={`mt-6 ${collapsed ? "text-center" : ""}`}>
+            <div className={`mt-6 ${showSidebarLabels ? "" : "text-center"}`}>
               <div className="flex items-center gap-3">
-                <div className="h-12 w-12 rounded-2xl bg-cyan-400/12 text-white border border-cyan-300/15 grid place-items-center font-extrabold">
+                <div className="h-12 w-12 rounded-2xl bg-white/[0.06] text-[#DAF1DE] border border-white/10 grid place-items-center font-extrabold">
                   {initials(user.name)}
                 </div>
 
-                {!collapsed && (
+                {showSidebarLabels && (
                   <div className="min-w-0">
                     <div className="font-extrabold text-white text-[16px] leading-tight tracking-[0.02em]">
                       Hamiguitan
@@ -288,32 +307,32 @@ export default function ProtectedShell({
                 )}
               </div>
 
-              {!collapsed && (
-                <div className="mt-4 rounded-2xl border border-cyan-300/12 bg-cyan-400/5 px-3 py-3">
-                  <div className="flex items-center gap-2 text-white">
-                    <ShieldCheckIcon className="w-4 h-4 text-white" />
+              {showSidebarLabels && (
+                <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-3">
+                  <div className="flex items-center gap-2 text-[#DAF1DE]">
+                    <ShieldCheckIcon className="w-4 h-4 text-[#8EB69B]" />
                     <span className="text-[12px] font-semibold">
                       Secure Access Panel
                     </span>
                   </div>
-                  <p className="mt-1 text-[11px] leading-5 text-white/65">
+                  <p className="mt-1 text-[11px] leading-5 text-[#DAF1DE]/65">
                     Manage documents, uploads, settings, and staff records.
                   </p>
                 </div>
               )}
             </div>
 
-            <div className="mt-7 mb-3 h-px bg-gradient-to-r from-transparent via-cyan-300/15 to-transparent" />
+            <div className="mt-7 mb-3 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent" />
 
-            <nav aria-label="Primary navigation" className="space-y-2">
+            <nav aria-label="Primary navigation" className="space-y-2 overflow-y-auto pr-1">
               {navItems.map((item) => navBtn(item.href, item.label, item.icon))}
             </nav>
 
             <div className="mt-auto pt-5">
-              {!collapsed && (
-                <div className="rounded-2xl border p-3.5 bg-cyan-400/6 border-cyan-300/12">
-                  <div className="text-[11px] text-white/60">Signed in as</div>
-                  <div className="font-semibold text-white truncate text-sm mt-1">
+              {showSidebarLabels && (
+                <div className="rounded-2xl border p-3.5 bg-white/[0.04] border-white/10">
+                  <div className="text-[11px] text-[#DAF1DE]/60">Signed in as</div>
+                  <div className="font-semibold text-[#DAF1DE] truncate text-sm mt-1">
                     {user.email}
                   </div>
                 </div>
@@ -321,14 +340,14 @@ export default function ProtectedShell({
 
               <button
                 type="button"
-                onClick={() => setConfirmLogout(true)}
-                className={`mt-3 w-full flex items-center gap-2 px-3 py-3 rounded-2xl border transition ${
-                  collapsed ? "justify-center" : ""
+                onClick={() => setConfirmLogoutPath(pathname)}
+                className={`mt-3 w-full min-h-11 flex items-center gap-2 px-3 py-3 rounded-2xl border transition ${
+                  showSidebarLabels ? "" : "justify-center"
                 } ${darkButtonStyle()}`}
                 aria-label="Logout"
               >
                 <ArrowRightOnRectangleIcon className="w-5 h-5" />
-                {!collapsed && (
+                {showSidebarLabels && (
                   <span className="font-semibold text-sm">Logout</span>
                 )}
               </button>
@@ -340,7 +359,29 @@ export default function ProtectedShell({
             role="main"
             className={`flex-1 h-full overflow-y-auto transition-colors duration-300 ${pageBg}`}
           >
-            <div className="min-h-full">{children}</div>
+            <div className="sticky top-0 z-30 border-b border-white/10 bg-[#04191a]/90 px-4 py-3 backdrop-blur md:hidden">
+              <div className="flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => setMobileNavOpen(true)}
+                  className="min-h-11 min-w-11 rounded-xl border border-white/10 bg-white/[0.05] text-white grid place-items-center"
+                  aria-label="Open navigation"
+                >
+                  <Bars3Icon className="w-6 h-6" />
+                </button>
+
+                <div className="min-w-0 text-right">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/55">
+                    Repository
+                  </div>
+                  <div className="truncate text-sm font-semibold text-white">
+                    {user.name}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className={`min-h-full ${ui.page}`}>{children}</div>
           </main>
         </div>
       </div>
@@ -352,9 +393,9 @@ export default function ProtectedShell({
         confirmText="Logout"
         cancelText="Cancel"
         variant="danger"
-        onCancel={() => setConfirmLogout(false)}
+        onCancel={() => setConfirmLogoutPath(null)}
         onConfirm={async () => {
-          setConfirmLogout(false);
+          setConfirmLogoutPath(null);
 
           const ok = await logout();
 

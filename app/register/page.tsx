@@ -473,7 +473,7 @@ export default function RegisterPage() {
               type="button"
               onClick={submit}
               disabled={loading || leaving}
-              className={styles.button}
+              className={`${styles.button} app-primary-button`}
             >
               {loading && <Spinner />}
               <span>{loading ? "Registering..." : "Create Account"}</span>

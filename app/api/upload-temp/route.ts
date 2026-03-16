@@ -1,24 +1,12 @@
 export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
 import { randomUUID } from "crypto";
 import { supabaseAdmin } from "@/app/lib/db";
+import { getCurrentUser } from "@/app/lib/auth";
+import { serverEnv } from "@/app/lib/serverEnv";
 
-const SECRET = process.env.JWT_SECRET!;
-const TEMP_BUCKET = "temp-uploads";
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
-
-function getTokenPayload(req: NextRequest) {
-  const token = req.cookies.get("auth_token")?.value;
-  if (!token) return null;
-
-  try {
-    return jwt.verify(token, SECRET) as any;
-  } catch {
-    return null;
-  }
-}
 
 function normalizeRole(role?: string) {
   return (role || "").trim().toLowerCase();
@@ -28,14 +16,22 @@ function sanitizeFileName(name: string) {
   return name.replace(/[^\w.\-() ]+/g, "_");
 }
 
-export async function POST(req: NextRequest) {
-  const payload = getTokenPayload(req);
+function getErrorName(error: unknown) {
+  return error instanceof Error ? error.name : undefined;
+}
 
-  if (!payload) {
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
+}
+
+export async function POST(req: NextRequest) {
+  const me = await getCurrentUser();
+
+  if (!me) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const role = normalizeRole(payload?.role);
+  const role = normalizeRole(me.role);
   if (role !== "admin" && role !== "co_admin") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
@@ -55,12 +51,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const safeFileName = sanitizeFileName(file.name);
+    const safeFileName = sanitizeFileName(file.name || "upload");
     const uniqueId = randomUUID();
-    const tempPath = `${payload?.id || "user"}/${uniqueId}-${safeFileName}`;
+    const tempPath = `${me.id}/${uniqueId}-${safeFileName}`;
 
     console.log("UPLOAD TEMP START:", {
-      userId: payload?.id || "user",
+      userId: me.id,
       tempPath,
       fileName: file.name,
       safeFileName,
@@ -68,10 +64,7 @@ export async function POST(req: NextRequest) {
       type: file.type || "application/octet-stream",
     });
 
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-
-    if (!buffer.length) {
+    if (!file.size) {
       return NextResponse.json(
         { error: "Uploaded file is empty." },
         { status: 400 }
@@ -79,8 +72,8 @@ export async function POST(req: NextRequest) {
     }
 
     const { data, error } = await supabaseAdmin.storage
-      .from(TEMP_BUCKET)
-      .upload(tempPath, buffer, {
+      .from(serverEnv.tempUploadsBucket)
+      .upload(tempPath, file, {
         cacheControl: "3600",
         upsert: false,
         contentType: file.type || "application/octet-stream",
@@ -89,9 +82,9 @@ export async function POST(req: NextRequest) {
     if (error) {
       console.error("UPLOAD TEMP STORAGE ERROR:", {
         message: error.message,
-        name: (error as any)?.name,
+        name: getErrorName(error),
         tempPath,
-        bucket: TEMP_BUCKET,
+        bucket: serverEnv.tempUploadsBucket,
       });
 
       return NextResponse.json(
@@ -99,7 +92,7 @@ export async function POST(req: NextRequest) {
           error: error.message || "Failed to upload temporary file.",
           details: {
             tempPath,
-            bucket: TEMP_BUCKET,
+            bucket: serverEnv.tempUploadsBucket,
           },
         },
         { status: 500 }
@@ -120,12 +113,12 @@ export async function POST(req: NextRequest) {
       mimeType: file.type || "application/octet-stream",
       fileSize: file.size,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("UPLOAD TEMP ERROR:", error);
 
     return NextResponse.json(
       {
-        error: error?.message || "Temporary upload failed.",
+        error: getErrorMessage(error, "Temporary upload failed."),
       },
       { status: 500 }
     );

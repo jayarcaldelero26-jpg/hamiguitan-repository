@@ -51,6 +51,11 @@ type UsersContextType = {
 
 const UsersContext = createContext<UsersContextType | undefined>(undefined);
 
+type UserRowInput = Partial<UserRow> & {
+  id?: number | string | null;
+  role?: string | null;
+};
+
 function normalizeRole(role?: string): UserRole | "" {
   const r = (role || "").trim().toLowerCase();
   if (r === "admin" || r === "co_admin" || r === "staff") return r;
@@ -62,7 +67,7 @@ function canViewUsers(role?: string) {
   return r === "admin" || r === "co_admin";
 }
 
-function normalizeUserRow(u: any): UserRow {
+function normalizeUserRow(u: UserRowInput): UserRow {
   return {
     ...u,
     id: Number(u.id),
@@ -154,7 +159,7 @@ export function UsersProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        const rows: UserRow[] = Array.isArray(data?.users)
+      const rows: UserRowInput[] = Array.isArray(data?.users)
           ? data.users
           : Array.isArray(data)
           ? data
@@ -164,8 +169,8 @@ export function UsersProvider({ children }: { children: ReactNode }) {
 
         setUsers(rows.map(normalizeUserRow));
         hasFetchedRef.current = true;
-      } catch (error: any) {
-        if (error?.name === "AbortError") return;
+      } catch (error: unknown) {
+        if (error instanceof Error && error.name === "AbortError") return;
         console.error("USERS LOAD FAILED:", error);
         if (mountedRef.current) {
           setUsers([]);
