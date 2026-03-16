@@ -119,7 +119,7 @@ function StatSkeleton({ dark }: { dark: boolean }) {
   const ui = repoTheme(dark ? "dark" : "light");
 
   return (
-    <div className={`${ui.card} p-6`}>
+    <div className={`${ui.card} p-5 sm:p-6`}>
       <SkeletonBlock dark={dark} className="h-3 w-24 rounded-full" />
       <SkeletonBlock dark={dark} className="h-11 w-24 mt-4" />
       <div className="mt-5 flex flex-wrap gap-2">
@@ -135,7 +135,7 @@ function RecentUploadsSkeleton({ dark }: { dark: boolean }) {
   const ui = repoTheme(dark ? "dark" : "light");
 
   return (
-    <div className={`${ui.card} p-6`}>
+    <div className={`${ui.card} p-5 sm:p-6`}>
       <div className="flex items-center justify-between">
         <SkeletonBlock dark={dark} className="h-6 w-32" />
         <SkeletonBlock dark={dark} className="h-4 w-14 rounded-full" />
@@ -269,10 +269,10 @@ function DashboardStatCard({
   const textSoft = ui.textSoft;
 
   return (
-    <div className={`${ui.card} relative overflow-hidden p-6 md:p-7`}>
+    <div className={`${ui.card} relative overflow-hidden p-5 sm:p-6 md:p-7`}>
       <div className={`absolute inset-x-0 top-0 h-2 ${accent}`} />
       <div
-        className={`pointer-events-none absolute inset-x-6 top-0 h-20 rounded-b-[32px] blur-2xl ${
+        className={`pointer-events-none absolute inset-x-6 top-0 h-20 rounded-b-[32px] blur-xl md:blur-2xl ${
           dark ? "opacity-35" : "opacity-60"
         } ${accent}`}
       />
@@ -898,7 +898,7 @@ export default function Dashboard() {
 
           <motion.div
             {...fadeUpDelayed(0.08)}
-            className={`${ui.shell} mb-5 overflow-hidden p-5 shadow-[0_18px_40px_rgba(35,83,71,0.10)]`}
+            className={`${ui.shell} mb-5 overflow-hidden p-4 sm:p-5 shadow-[0_12px_24px_rgba(35,83,71,0.08)] md:shadow-[0_18px_40px_rgba(35,83,71,0.10)]`}
           >
             <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
               <div>

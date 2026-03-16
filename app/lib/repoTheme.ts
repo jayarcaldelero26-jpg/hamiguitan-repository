@@ -12,12 +12,12 @@ export function repoTheme(pageTheme: PageTheme) {
       : "min-h-full bg-[linear-gradient(135deg,#DAF1DE_0%,#d7e8dd_35%,#cfe1d7_65%,#e5efea_100%)] text-[#163832]",
 
     shell: dark
-      ? "bg-white/[0.03] border border-white/8 shadow-[0_18px_50px_rgba(0,0,0,0.28)] backdrop-blur-xl rounded-[28px]"
-      : "bg-white/42 border border-white/45 shadow-[0_18px_45px_rgba(22,56,50,0.10)] backdrop-blur-xl rounded-[28px]",
+      ? "bg-white/[0.03] border border-white/8 shadow-[0_12px_28px_rgba(0,0,0,0.18)] md:shadow-[0_18px_50px_rgba(0,0,0,0.28)] backdrop-blur-sm md:backdrop-blur-xl rounded-[28px]"
+      : "bg-white/42 border border-white/45 shadow-[0_10px_24px_rgba(22,56,50,0.08)] md:shadow-[0_18px_45px_rgba(22,56,50,0.10)] backdrop-blur-sm md:backdrop-blur-xl rounded-[28px]",
 
     card: dark
-      ? "bg-[linear-gradient(180deg,rgba(35,83,71,0.58),rgba(11,43,38,0.82))] border border-white/8 shadow-[0_16px_40px_rgba(0,0,0,0.22)] backdrop-blur-xl rounded-[26px]"
-      : "bg-white/55 border border-white/50 shadow-[0_14px_34px_rgba(22,56,50,0.10)] backdrop-blur-xl rounded-[26px]",
+      ? "bg-[linear-gradient(180deg,rgba(35,83,71,0.58),rgba(11,43,38,0.82))] border border-white/8 shadow-[0_10px_24px_rgba(0,0,0,0.16)] md:shadow-[0_16px_40px_rgba(0,0,0,0.22)] backdrop-blur-sm md:backdrop-blur-xl rounded-[26px]"
+      : "bg-white/55 border border-white/50 shadow-[0_8px_20px_rgba(22,56,50,0.08)] md:shadow-[0_14px_34px_rgba(22,56,50,0.10)] backdrop-blur-sm md:backdrop-blur-xl rounded-[26px]",
 
     cardSoft: dark
       ? "bg-white/[0.04] border border-white/8 rounded-[22px]"

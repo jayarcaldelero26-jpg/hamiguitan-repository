@@ -186,7 +186,7 @@ function GroupCard({
   return (
     <div className={`${cardCls} relative overflow-hidden`}>
       <div className={`absolute inset-x-0 top-0 h-2 ${accentBar}`} />
-      <div className={`px-5 py-4 border-b ${headerCls}`}>
+      <div className={`px-4 sm:px-5 py-3.5 sm:py-4 border-b ${headerCls}`}>
         <div className="flex items-center justify-between gap-3">
           <div>
             <h2 className={`text-xl md:text-2xl font-semibold ${titleCls}`}>{title}</h2>
@@ -205,7 +205,7 @@ function GroupCard({
         </div>
       </div>
 
-      <div className="p-4 space-y-3 min-h-[280px]">
+      <div className="p-3 sm:p-4 space-y-3 min-h-[220px] sm:min-h-[280px]">
         {loading ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
@@ -261,8 +261,8 @@ function GroupCard({
                 className={`border rounded-[22px] overflow-hidden transition ${subBg} ${subBorder} ${
                   open
                     ? dark
-                      ? "shadow-[0_16px_40px_rgba(0,0,0,0.22)]"
-                      : "shadow-[0_16px_36px_rgba(17,24,39,0.08)]"
+                      ? "shadow-[0_10px_24px_rgba(0,0,0,0.16)] sm:shadow-[0_16px_40px_rgba(0,0,0,0.22)]"
+                      : "shadow-[0_10px_20px_rgba(17,24,39,0.06)] sm:shadow-[0_16px_36px_rgba(17,24,39,0.08)]"
                     : ""
                 }`}
               >
@@ -329,7 +329,7 @@ function GroupCard({
                       {items.map((d) => (
                         <div
                           key={d.id}
-                          className={`rounded-[20px] border shadow-sm p-3 transition-all duration-200 ${subBg} ${subBorder} ${
+                          className={`rounded-[20px] border p-3 transition-colors duration-150 ${subBg} ${subBorder} ${
                             dark ? "hover:bg-white/[0.05]" : "hover:bg-white"
                           }`}
                         >

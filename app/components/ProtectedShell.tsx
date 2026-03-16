@@ -147,7 +147,7 @@ export default function ProtectedShell({
           type="button"
           onClick={() => handleNavigate(href)}
           aria-current={active ? "page" : undefined}
-          className={`group relative w-full min-h-11 flex items-center gap-3 px-3 py-3 rounded-2xl transition-all duration-200 border ${
+          className={`group relative w-full min-h-11 flex items-center gap-3 px-3 py-3 rounded-2xl transition-colors duration-150 border ${
             showLabel ? "" : "justify-center"
           } ${
             active
@@ -251,14 +251,14 @@ export default function ProtectedShell({
             <button
               type="button"
               aria-label="Close navigation"
-              className="fixed inset-0 z-40 bg-black/45 backdrop-blur-[2px] md:hidden"
+              className="fixed inset-0 z-40 bg-black/45 md:hidden"
               onClick={() => setMobileNavOpen(false)}
             />
           )}
 
           <aside
             aria-label="Sidebar"
-            className={`fixed inset-y-0 left-0 z-50 h-full overflow-hidden border-r p-5 flex flex-col bg-[linear-gradient(180deg,#04191a_0%,#0B2B26_52%,#163832_100%)] border-white/10 transition-all duration-200 ease-out md:relative md:z-auto md:translate-x-0 ${
+            className={`fixed inset-y-0 left-0 z-50 h-full overflow-hidden border-r p-4 sm:p-5 flex flex-col bg-[linear-gradient(180deg,#04191a_0%,#0B2B26_52%,#163832_100%)] border-white/10 transition-transform duration-150 ease-out md:relative md:z-auto md:translate-x-0 ${
               mobileNavOpen ? "translate-x-0" : "-translate-x-full"
             } ${
               collapsed ? "md:w-[88px]" : "md:w-[290px]"
@@ -357,9 +357,9 @@ export default function ProtectedShell({
           <main
             id="main-content"
             role="main"
-            className={`flex-1 h-full overflow-y-auto transition-colors duration-300 ${pageBg}`}
+          className={`flex-1 h-full overflow-y-auto md:transition-colors md:duration-300 ${pageBg}`}
           >
-            <div className="sticky top-0 z-30 border-b border-white/10 bg-[#04191a]/90 px-4 py-3 backdrop-blur md:hidden">
+            <div className="sticky top-0 z-30 border-b border-white/10 bg-[#04191a]/95 px-4 py-3 md:hidden">
               <div className="flex items-center justify-between gap-3">
                 <button
                   type="button"

@@ -481,6 +481,11 @@
   min-height:auto;
   padding:22px 18px 20px;
   border-radius:24px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow:
+    0 12px 28px rgba(0,0,0,0.24),
+    0 0 14px rgba(0,238,255,0.05);
 }
 
 .card::before,
@@ -513,6 +518,10 @@
   font-size:clamp(20px,5vw,26px);
 }
 
+.bgGlow{
+  display:none;
+}
+
 .formBlock{
   max-width:100%;
 }
@@ -538,4 +547,20 @@
   min-height:52px;
 }
 
+.cardEnter,
+.card::after{
+  animation:none;
+}
+
+}
+
+@media (prefers-reduced-motion: reduce){
+  .cardEnter,
+  .cardExit,
+  .card::after,
+  .button,
+  .inlineRegister{
+    animation:none;
+    transition:none;
+  }
 }
