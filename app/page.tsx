@@ -75,7 +75,7 @@ export default async function Home() {
         <div className="public-container grid gap-[32px] md:grid-cols-[1.05fr_0.95fr] md:items-start">
           <div className="max-w-2xl">
             <p className="public-eyebrow">About Mount Hamiguitan</p>
-            <h2 className="public-h2 mt-[16px]">
+            <h2 className="mt-[16px] text-[clamp(1.8rem,3vw,2.8rem)] font-semibold leading-[1.08] tracking-[-0.025em] text-[var(--public-text)]">
               Mount Hamiguitan Range Wildlife Sanctuary is a protected mountain
               landscape in Davao Oriental recognized for biodiversity, unique
               ecosystems, and endemic species.
@@ -121,7 +121,7 @@ export default async function Home() {
         <div className="public-container">
           <div className="max-w-2xl">
             <p className="public-eyebrow">Key Facts</p>
-            <h2 className="public-h2 mt-[16px]">
+            <h2 className="mt-[16px] text-[clamp(1.8rem,3vw,2.8rem)] font-semibold leading-[1.08] tracking-[-0.025em] text-[var(--public-text)]">
               Core figures that define the sanctuary and its ecological value.
             </h2>
           </div>
@@ -143,7 +143,7 @@ export default async function Home() {
         <div className="public-container">
           <div className="max-w-2xl">
             <p className="public-eyebrow">What You Can Access</p>
-            <h2 className="public-h2 mt-[16px]">
+            <h2 className="mt-[16px] text-[clamp(1.8rem,3vw,2.8rem)] font-semibold leading-[1.08] tracking-[-0.025em] text-[var(--public-text)]">
               Public information areas available through the Mt. Hamiguitan
               website.
             </h2>
@@ -158,12 +158,14 @@ export default async function Home() {
               const Icon = feature.icon;
 
               return (
-                <article key={feature.title} className="public-card p-[32px]">
+                <article key={feature.title} className="public-card flex flex-col p-[32px]">
                   <div className="flex h-14 w-14 items-center justify-center rounded-[16px] border border-[var(--public-border)] bg-[#edf2ec] text-[var(--public-primary)]">
                     <Icon className="h-7 w-7" />
                   </div>
-                  <h3 className="public-h3 mt-[24px]">{feature.title}</h3>
-                  <p className="public-body mt-[16px]">{feature.description}</p>
+                  <div className="my-auto pt-[24px]">
+                    <h3 className="public-h3">{feature.title}</h3>
+                    <p className="public-body mt-[16px]">{feature.description}</p>
+                  </div>
                 </article>
               );
             })}

@@ -28,7 +28,7 @@ const AUTOPLAY_MS = 4000;
 const slides: Slide[] = [
   {
     image: "/images/carousel/carousel-01.jpg",
-    title: "Mt. Hamiguitan Range Wildlife Sanctuary",
+    title: "Range Wildlife Sanctuary",
     subtitle:
       "An official public gateway for protected area information, biodiversity awareness, and sanctuary coordination.",
     primaryCta: {
@@ -148,7 +148,7 @@ export default function HeroCarousel() {
       onTouchStart={() => setTouchPaused(true)}
       onTouchEnd={() => setTouchPaused(false)}
     >
-      <div className="relative min-h-[76vh] bg-[#0f241f] md:min-h-[82vh]">
+      <div className="relative min-h-[60vh] bg-[#0f241f] md:min-h-[74vh]">
         {slides.map((slide, index) => (
           <div
             key={slide.image}
@@ -169,19 +169,19 @@ export default function HeroCarousel() {
           </div>
         ))}
 
-        <div className="relative z-10 mx-auto flex min-h-[76vh] max-w-7xl items-end px-4 pb-[4.5rem] pt-24 sm:px-6 sm:pb-20 sm:pt-28 md:min-h-[82vh] md:px-10 md:pb-24">
-          <div className="max-w-3xl rounded-[2rem] border border-white/12 bg-[linear-gradient(180deg,rgba(16,33,29,0.34),rgba(16,33,29,0.12))] px-5 py-6 shadow-[0_28px_70px_rgba(0,0,0,0.18)] backdrop-blur-[3px] sm:px-6 sm:py-7 md:max-w-[52rem] md:rounded-[2.4rem] md:px-8 md:py-8">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.34em] text-[#dbe7df] sm:text-xs md:text-sm">
-              Mt. Hamiguitan
+        <div className="relative z-10 mx-auto flex min-h-[60vh] max-w-7xl items-end px-4 pb-14 pt-24 sm:px-6 sm:pb-16 sm:pt-26 md:min-h-[74vh] md:px-10 md:pb-20">
+          <div className="max-w-3xl rounded-[2rem] border border-white/12 bg-[linear-gradient(180deg,rgba(16,33,29,0.34),rgba(16,33,29,0.12))] px-5 py-5 shadow-[0_28px_70px_rgba(0,0,0,0.18)] backdrop-blur-[3px] sm:px-6 sm:py-6 md:max-w-[52rem] md:rounded-[2.4rem] md:px-8 md:py-8">
+            <p className="text-[10px] font-medium uppercase tracking-[0.32em] text-[#dbe7df] sm:text-xs md:text-sm">
+              MT. HAMIGUITAN
             </p>
-            <h1 className="mt-4 max-w-4xl text-[2.35rem] font-semibold leading-[1.02] tracking-[-0.03em] text-white sm:text-[3rem] md:mt-5 md:text-[4.8rem]">
+            <h1 className="mt-3 max-w-4xl text-[2.05rem] font-semibold leading-[1.02] tracking-[-0.03em] text-white sm:text-[2.7rem] md:mt-4 md:text-[4.2rem]">
               {slides[activeIndex].title}
             </h1>
-            <p className="mt-4 max-w-2xl text-[0.98rem] leading-7 text-[#e6ebe7]/90 sm:text-lg sm:leading-8 md:mt-5 md:max-w-3xl md:text-[1.18rem]">
+            <p className="mt-3 max-w-2xl text-[0.94rem] leading-7 text-[#e6ebe7]/90 sm:text-[1rem] sm:leading-8 md:mt-4 md:max-w-3xl md:text-[1.12rem]">
               {slides[activeIndex].subtitle}
             </p>
 
-            <div className="mt-7 flex flex-col gap-3 sm:mt-8 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
+            <div className="mt-6 flex flex-col gap-2.5 sm:mt-7 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
               <Link
                 href={slides[activeIndex].primaryCta.href}
                 className="app-primary-button inline-flex min-h-12 items-center justify-center rounded-full px-6 font-semibold sm:min-w-[168px]"
