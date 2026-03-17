@@ -3,7 +3,7 @@ export const runtime = "nodejs";
 import { NextResponse, type NextRequest } from "next/server";
 import { supabaseAdmin } from "@/app/lib/db";
 import { getCurrentUser } from "@/app/lib/auth";
-import { getDriveClient } from "@/app/lib/googleDrive";
+import { deleteDriveFileById, getDriveClient } from "@/app/lib/googleDrive";
 
 function isValidId(value: number) {
   return Number.isInteger(value) && value > 0;
@@ -11,7 +11,6 @@ function isValidId(value: number) {
 
 export async function DELETE(req: NextRequest) {
   let totalStarted = false;
-  let driveDeleteFailed = false;
 
   try {
     console.time("delete-total");
@@ -62,21 +61,33 @@ export async function DELETE(req: NextRequest) {
         console.time("delete-drive-file");
 
         const drive = getDriveClient();
-        await drive.files.delete({
-          fileId: doc.fileId,
-          supportsAllDrives: true,
-        });
+        await deleteDriveFileById(drive, doc.fileId);
 
         console.timeEnd("delete-drive-file");
-      } catch (error) {
-        driveDeleteFailed = true;
+      } catch (error: unknown) {
+        const status = typeof error === "object" && error !== null && "code" in error
+          ? Number((error as { code?: unknown }).code)
+          : undefined;
+
+        if (status !== 404) {
+          console.error("DRIVE DELETE FAILED:", {
+            documentId: doc.id,
+            fileId: doc.fileId,
+            requestedByUserId: me.id,
+            error,
+          });
+          return NextResponse.json(
+            { error: "Failed to delete document from Google Drive." },
+            { status: 500 }
+          );
+        }
+
         console.error("DRIVE DELETE FAILED:", {
           documentId: doc.id,
           fileId: doc.fileId,
           requestedByUserId: me.id,
           error,
         });
-        // Continue deleting DB record even if Drive delete fails
       }
     }
 
@@ -98,14 +109,6 @@ export async function DELETE(req: NextRequest) {
     }
 
     console.timeEnd("delete-total");
-
-    if (driveDeleteFailed) {
-      console.warn("DOCUMENT DELETE COMPLETED WITH DRIVE ORPHAN RISK:", {
-        documentId: doc.id,
-        fileId: doc.fileId,
-        requestedByUserId: me.id,
-      });
-    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

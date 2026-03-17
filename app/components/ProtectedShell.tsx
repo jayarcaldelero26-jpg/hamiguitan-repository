@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
@@ -8,10 +9,12 @@ import {
   DocumentTextIcon,
   ArrowUpTrayIcon,
   Bars3Icon,
+  CalendarDaysIcon,
   ArrowRightOnRectangleIcon,
+  IdentificationIcon,
   UserGroupIcon,
+  RectangleGroupIcon,
   Cog6ToothIcon,
-  ShieldCheckIcon,
 } from "@heroicons/react/24/outline";
 import { useAuth } from "@/app/components/AuthProvider";
 import { repoTheme } from "@/app/lib/repoTheme";
@@ -21,13 +24,6 @@ type PageTheme = "dark" | "light";
 function getStoredPageTheme(): PageTheme {
   if (typeof window === "undefined") return "dark";
   return localStorage.getItem("page-theme") === "light" ? "light" : "dark";
-}
-
-function initials(name: string) {
-  const parts = (name || "").trim().split(/\s+/).filter(Boolean);
-  const a = parts[0]?.[0] || "";
-  const b = parts.length > 1 ? parts[parts.length - 1]?.[0] || "" : "";
-  return (a + b).toUpperCase();
 }
 
 function normalizeRole(role?: string) {
@@ -56,13 +52,13 @@ function roleLabel(role?: string) {
 }
 
 function darkButtonStyle() {
-  return "bg-white/[0.05] text-[#DAF1DE] border-white/10 hover:bg-white/[0.08]";
+  return "bg-white/[0.04] text-[#DAF1DE] border-white/10 hover:bg-white/[0.07]";
 }
 
 function navActionBase(active: boolean) {
   return active
-    ? "bg-white/[0.09] text-white border-white/14 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
-    : "text-white border-transparent hover:bg-white/[0.05] hover:border-white/10";
+    ? "bg-[linear-gradient(180deg,rgba(255,255,255,0.11),rgba(255,255,255,0.06))] text-white border-white/14 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_10px_24px_rgba(0,0,0,0.14)]"
+    : "text-white/84 border-transparent hover:bg-white/[0.05] hover:border-white/10 hover:text-white";
 }
 
 export default function ProtectedShell({
@@ -109,6 +105,9 @@ export default function ProtectedShell({
 
     router.prefetch("/dashboard");
     router.prefetch("/research");
+    router.prefetch("/calendar");
+    router.prefetch("/porters-identification");
+    router.prefetch("/organizational-chart");
 
     if (canUpload(user.role)) router.prefetch("/upload");
     if (canAccessSettings(user.role)) router.prefetch("/settings");
@@ -153,7 +152,7 @@ export default function ProtectedShell({
           type="button"
           onClick={() => handleNavigate(href)}
           aria-current={active ? "page" : undefined}
-          className={`group relative w-full min-h-10 flex items-center gap-2.5 px-2.5 py-2.5 rounded-2xl transition-colors duration-150 border ${
+          className={`group relative w-full min-h-11 flex items-center gap-3 px-3 py-2.5 rounded-[20px] border transition-all duration-200 ease-out ${
             showLabel ? "" : "justify-center"
           } ${navActionBase(active)}`}
         >
@@ -162,10 +161,10 @@ export default function ProtectedShell({
           )}
 
           <span
-            className={`grid h-8.5 w-8.5 shrink-0 place-items-center rounded-xl border transition-colors ${
+            className={`grid h-9 w-9 shrink-0 place-items-center rounded-[14px] border transition-colors ${
               active
-                ? "border-white/12 bg-white/[0.07] text-cyan-200"
-                : "border-transparent bg-transparent text-white/90 group-hover:border-white/8 group-hover:bg-white/[0.04]"
+                ? "border-white/12 bg-white/[0.08] text-cyan-100"
+                : "border-transparent bg-transparent text-white/78 group-hover:border-white/10 group-hover:bg-white/[0.05] group-hover:text-white"
             }`}
           >
             {icon}
@@ -177,10 +176,16 @@ export default function ProtectedShell({
                 {label}
               </span>
               {active && (
-                <span className="block text-[10px] font-medium uppercase tracking-[0.12em] text-cyan-200/75">
+                <span className="block text-[10px] font-medium uppercase tracking-[0.12em] text-cyan-100/70">
                   Active
                 </span>
               )}
+            </span>
+          )}
+
+          {!showLabel && (
+            <span className="pointer-events-none absolute left-[calc(100%+12px)] top-1/2 z-20 hidden -translate-y-1/2 rounded-xl border border-white/10 bg-[#0c1f1d]/96 px-3 py-2 text-[12px] font-medium text-white shadow-[0_12px_28px_rgba(0,0,0,0.24)] opacity-0 transition-all duration-150 ease-out group-hover:translate-x-0 group-hover:opacity-100 md:block md:-translate-x-1">
+              {label}
             </span>
           )}
         </button>
@@ -190,26 +195,51 @@ export default function ProtectedShell({
   );
 
   const navItems = useMemo(() => {
-    if (!user) return [];
+    if (!user) {
+      return {
+        primary: [],
+        admin: [],
+      };
+    }
 
-    const items: Array<{
+    const primaryItems: Array<{
       href: string;
       label: string;
       icon: React.ReactNode;
-      show: boolean;
     }> = [
       {
         href: "/dashboard",
         label: "Dashboard",
         icon: <HomeIcon className="w-5 h-5" />,
-        show: true,
       },
       {
         href: "/research",
-        label: "Documents",
+        label: "Document Repository",
         icon: <DocumentTextIcon className="w-5 h-5" />,
-        show: true,
       },
+      {
+        href: "/calendar",
+        label: "Calendar",
+        icon: <CalendarDaysIcon className="w-5 h-5" />,
+      },
+      {
+        href: "/porters-identification",
+        label: "Porters Identification",
+        icon: <IdentificationIcon className="w-5 h-5" />,
+      },
+      {
+        href: "/organizational-chart",
+        label: "Organizational Chart",
+        icon: <RectangleGroupIcon className="w-5 h-5" />,
+      },
+    ];
+
+    const adminItems: Array<{
+      href: string;
+      label: string;
+      icon: React.ReactNode;
+      show: boolean;
+    }> = [
       {
         href: "/upload",
         label: "Upload",
@@ -230,7 +260,10 @@ export default function ProtectedShell({
       },
     ];
 
-    return items.filter((item) => item.show);
+    return {
+      primary: primaryItems,
+      admin: adminItems.filter((item) => item.show),
+    };
   }, [user]);
 
   const confirmLogout = confirmLogoutPath === pathname;
@@ -275,14 +308,14 @@ export default function ProtectedShell({
 
           <aside
             aria-label="Sidebar"
-            className={`fixed inset-y-0 left-0 z-50 h-full overflow-hidden border-r p-3 sm:p-4 md:p-4 flex flex-col bg-[linear-gradient(180deg,#04191a_0%,#0B2B26_52%,#163832_100%)] border-white/10 shadow-[0_12px_28px_rgba(0,0,0,0.22)] md:shadow-none transition-transform duration-150 ease-out md:relative md:z-auto md:translate-x-0 ${
+            className={`fixed inset-y-0 left-0 z-50 h-full overflow-hidden border-r p-3 sm:p-4 md:p-4 flex flex-col bg-[linear-gradient(180deg,#041618_0%,#082224_48%,#102f30_100%)] border-white/10 shadow-[0_18px_42px_rgba(0,0,0,0.28)] md:shadow-none transition-transform duration-150 ease-out md:relative md:z-auto md:translate-x-0 ${
               mobileNavOpen ? "translate-x-0" : "-translate-x-full"
             } ${
-              collapsed ? "md:w-[88px]" : "md:w-[290px]"
-            } w-[min(84vw,290px)]`}
+              collapsed ? "md:w-[96px]" : "md:w-[320px]"
+            } w-[min(88vw,320px)]`}
           >
-            <div className="absolute inset-0 pointer-events-none hidden md:block bg-[radial-gradient(circle_at_top_left,rgba(142,182,155,0.12),transparent_36%),radial-gradient(circle_at_bottom_left,rgba(35,83,71,0.22),transparent_40%)]" />
-            <div role="banner" className="flex items-center justify-between">
+            <div className="absolute inset-0 pointer-events-none hidden md:block bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.06),transparent_30%),radial-gradient(circle_at_bottom_left,rgba(35,83,71,0.16),transparent_40%)]" />
+            <div role="banner" className="flex items-center justify-between gap-3">
               <button
                 type="button"
                 onClick={() => {
@@ -292,7 +325,7 @@ export default function ProtectedShell({
                   }
                   setCollapsed((v) => !v);
                 }}
-                className="min-h-10 min-w-10 p-2 rounded-xl hover:bg-white/[0.08] transition border border-transparent hover:border-white/10"
+                className="min-h-10 min-w-10 p-2 rounded-xl hover:bg-white/[0.06] transition border border-transparent hover:border-white/10"
                 title="Toggle sidebar"
                 aria-label="Toggle sidebar"
               >
@@ -300,90 +333,87 @@ export default function ProtectedShell({
               </button>
 
               {showSidebarLabels && (
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.05] text-[#DAF1DE] font-semibold border border-white/10">
+                <span className="text-[10px] px-2.5 py-1 rounded-full bg-white/[0.04] text-white/72 font-semibold border border-white/10">
                   {roleLabel(user.role)}
                 </span>
               )}
             </div>
 
-            <div className={`mt-3 sm:mt-4 ${showSidebarLabels ? "" : "text-center"}`}>
-              <div className="flex items-center gap-2.5">
-                <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-2xl bg-white/[0.06] text-[#DAF1DE] border border-white/10 grid place-items-center text-sm font-extrabold">
-                  {initials(user.name)}
+            <div className={`mt-4 ${showSidebarLabels ? "" : "text-center"}`}>
+              <div className={`flex items-center ${showSidebarLabels ? "gap-3" : "justify-center"}`}>
+                <div className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[18px] border border-white/10 bg-white/[0.06] p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] sm:h-14 sm:w-14 sm:p-2">
+                  <Image
+                    src="/branding/mhrws-logo.png"
+                    alt="Mount Hamiguitan Range Wildlife Sanctuary logo"
+                    fill
+                    sizes="(min-width: 640px) 56px, 48px"
+                    className="object-contain p-1"
+                    priority
+                  />
                 </div>
 
                 {showSidebarLabels && (
                   <div className="min-w-0">
-                    <div className="font-extrabold text-white text-[14px] sm:text-[15px] leading-tight tracking-[0.02em]">
+                    <div className="font-bold text-white text-[15px] sm:text-base leading-tight tracking-[0.01em]">
                       Hamiguitan
                     </div>
-                    <div className="text-[11px] text-white/70 truncate">
-                      Repository System
+                    <div className="text-[11px] font-medium text-white/58 truncate">
+                      Internal Workspace
                     </div>
                   </div>
                 )}
               </div>
-
-              {showSidebarLabels && (
-                <div className="mt-2.5 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2.5">
-                  <div className="flex items-center justify-between gap-2 text-[#DAF1DE]">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <ShieldCheckIcon className="w-4 h-4 text-[#8EB69B]" />
-                      <span className="text-[11px] font-semibold">
-                        Secure Access Panel
-                      </span>
-                    </div>
-                    <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70">
-                      {roleLabel(user.role)}
-                    </span>
-                  </div>
-                  <p className="mt-1 hidden sm:block text-[10px] leading-4 text-[#DAF1DE]/65">
-                    Manage documents, uploads, settings, and staff records.
-                  </p>
-                </div>
-              )}
             </div>
 
-            <div className="mt-4 mb-2 sm:mt-5 sm:mb-2 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent" />
+            <div className="mt-5 h-px bg-gradient-to-r from-transparent via-white/12 to-transparent" />
 
-            <nav aria-label="Primary navigation" className="space-y-1.5 overflow-y-auto pr-1">
-              {navItems.map((item) => navBtn(item.href, item.label, item.icon))}
-            </nav>
+            <div className="scroll-sidebar mt-4 flex-1 overflow-y-auto pr-1.5">
+              <nav aria-label="Primary navigation" className="space-y-1.5">
+                {navItems.primary.map((item) => navBtn(item.href, item.label, item.icon))}
+              </nav>
 
-            <div className="mt-auto pt-3 sm:pt-4">
-              {showSidebarLabels && (
-                <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2.5">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#DAF1DE]/52">
-                        Signed in
-                      </div>
-                      <div className="mt-1 truncate font-semibold text-[#DAF1DE] text-[13px]">
-                        {user.email}
-                      </div>
-                    </div>
-                    <div className="grid h-7.5 w-7.5 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.04] text-[11px] text-white/70">
-                      {initials(user.name)}
-                    </div>
+              {showSidebarLabels && navItems.admin.length > 0 && (
+                <div className="px-3 pb-2 pt-6 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/42">
+                  Admin Tools
+                </div>
+              )}
+
+              <nav aria-label="Administrative navigation" className="space-y-1.5">
+                {navItems.admin.map((item) => navBtn(item.href, item.label, item.icon))}
+              </nav>
+            </div>
+
+            <div className="mt-4 border-t border-white/10 pt-4">
+              {showSidebarLabels ? (
+                <div className="px-3.5 py-1 text-left">
+                  <div className="truncate text-[13px] font-semibold text-[#DAF1DE]">
+                    {user.email}
                   </div>
+                  <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/48">
+                    {roleLabel(user.role)}
+                  </div>
+                </div>
+              ) : (
+                <div className="px-1 text-center text-[10px] font-semibold uppercase tracking-[0.14em] text-white/48">
+                  {roleLabel(user.role)}
                 </div>
               )}
 
               <button
                 type="button"
                 onClick={() => setConfirmLogoutPath(pathname)}
-                className={`mt-2.5 w-full min-h-10 flex items-center gap-2 px-2.5 py-2.5 rounded-2xl border transition ${
+                className={`mt-3 w-full min-h-11 flex items-center gap-3 px-3 py-2.5 rounded-[20px] border transition ${
                   showSidebarLabels ? "" : "justify-center"
                 } ${navActionBase(false)} ${darkButtonStyle()}`}
                 aria-label="Logout"
               >
-                <span className="grid h-8.5 w-8.5 shrink-0 place-items-center rounded-xl border border-white/8 bg-white/[0.04] text-white/90">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[14px] border border-white/10 bg-white/[0.04] text-white/88">
                   <ArrowRightOnRectangleIcon className="w-5 h-5" />
                 </span>
                 {showSidebarLabels && (
                   <span className="min-w-0 flex-1 text-left">
                     <span className="block font-semibold text-[13px]">Logout</span>
-                    <span className="block text-[10px] uppercase tracking-[0.12em] text-white/55">
+                    <span className="block text-[10px] uppercase tracking-[0.12em] text-white/50">
                       End Session
                     </span>
                   </span>
@@ -410,7 +440,7 @@ export default function ProtectedShell({
 
                 <div className="min-w-0 text-right">
                   <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/55">
-                    Repository
+                    Internal Workspace
                   </div>
                   <div className="truncate text-sm font-semibold text-white">
                     {user.name}

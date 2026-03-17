@@ -43,11 +43,53 @@ export function normalizeFolderName(input: string) {
   return (input || "").replace(/\s+/g, " ").trim();
 }
 
+export function getCategoryFolderId(category: string) {
+  if (category === "Academe") return serverEnv.driveAcademeFolderId;
+  if (category === "Stakeholders") return serverEnv.driveStakeholdersFolderId;
+  if (category === "PAMO Activity") return serverEnv.drivePamoFolderId;
+  return "";
+}
+
+const CONFIGURED_REPOSITORY_ROOT_IDS = [
+  serverEnv.driveRootFolderId,
+  serverEnv.driveAcademeFolderId,
+  serverEnv.driveStakeholdersFolderId,
+  serverEnv.drivePamoFolderId,
+].filter(Boolean);
+
 export async function findOrCreateFolder(
   drive: drive_v3.Drive,
   name: string,
   parentId?: string
 ): Promise<string> {
+  const existingId = await findFolderId(drive, name, parentId);
+  if (existingId) return existingId;
+
+  const cleanName = normalizeFolderName(name);
+
+  const created = await drive.files.create({
+    requestBody: {
+      name: cleanName,
+      mimeType: "application/vnd.google-apps.folder",
+      parents: parentId ? [parentId] : undefined,
+    },
+    fields: "id,name",
+    supportsAllDrives: true,
+  });
+
+  const createdId = created.data.id;
+  if (!createdId) {
+    throw new Error(`Failed to create folder: ${cleanName}`);
+  }
+
+  return createdId;
+}
+
+export async function findFolderId(
+  drive: drive_v3.Drive,
+  name: string,
+  parentId?: string
+): Promise<string | null> {
   const cleanName = normalizeFolderName(name);
   const safeName = cleanName.replace(/'/g, "\\'");
 
@@ -70,24 +112,7 @@ export async function findOrCreateFolder(
   });
 
   const found = existing.data.files?.[0];
-  if (found?.id) return found.id;
-
-  const created = await drive.files.create({
-    requestBody: {
-      name: cleanName,
-      mimeType: "application/vnd.google-apps.folder",
-      parents: parentId ? [parentId] : undefined,
-    },
-    fields: "id,name",
-    supportsAllDrives: true,
-  });
-
-  const createdId = created.data.id;
-  if (!createdId) {
-    throw new Error(`Failed to create folder: ${cleanName}`);
-  }
-
-  return createdId;
+  return found?.id || null;
 }
 
 export async function listChildFolders(
@@ -126,4 +151,255 @@ export async function listChildFolders(
   } while (pageToken);
 
   return Array.from(new Set(folders)).sort((a, b) => a.localeCompare(b));
+}
+
+export async function getDriveFileInfo(
+  drive: drive_v3.Drive,
+  fileId: string
+): Promise<{ id: string; name: string; parents: string[] }> {
+  const res = await drive.files.get({
+    fileId,
+    fields: "id,name,parents",
+    supportsAllDrives: true,
+  });
+
+  const id = res.data.id || "";
+  if (!id) {
+    throw new Error("Google Drive did not return file metadata.");
+  }
+
+  return {
+    id,
+    name: res.data.name || "",
+    parents: (res.data.parents || []).filter(Boolean),
+  };
+}
+
+async function folderHasConfiguredAncestor(
+  drive: drive_v3.Drive,
+  folderId: string,
+  visited = new Set<string>()
+): Promise<boolean> {
+  if (!folderId) return false;
+  if (CONFIGURED_REPOSITORY_ROOT_IDS.includes(folderId)) return true;
+  if (visited.has(folderId)) return false;
+
+  visited.add(folderId);
+
+  const res = await drive.files.get({
+    fileId: folderId,
+    fields: "id,parents",
+    supportsAllDrives: true,
+  });
+
+  const parents = (res.data.parents || []).filter(Boolean);
+  if (parents.length === 0) return false;
+
+  for (const parentId of parents) {
+    if (await folderHasConfiguredAncestor(drive, parentId, visited)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+export async function assertFileWithinConfiguredTree(
+  drive: drive_v3.Drive,
+  parentIds: string[]
+) {
+  if (!parentIds.length) {
+    throw new Error(
+      "Drive file is missing parent information; cannot safely move document."
+    );
+  }
+
+  for (const parentId of parentIds) {
+    const isAllowed = await folderHasConfiguredAncestor(drive, parentId);
+    if (!isAllowed) {
+      throw new Error(
+        "Drive file is outside the configured repository folder tree."
+      );
+    }
+  }
+}
+
+export async function resolveDocumentDriveParent(
+  drive: drive_v3.Drive,
+  category: string,
+  folder: string
+) {
+  const categoryFolderId = getCategoryFolderId(category);
+
+  if (!categoryFolderId) {
+    throw new Error("Drive folder ID is not configured for this category.");
+  }
+
+  const normalizedFolder = normalizeFolderName(folder);
+  if (!normalizedFolder) {
+    return categoryFolderId;
+  }
+
+  return findOrCreateFolder(drive, normalizedFolder, categoryFolderId);
+}
+
+export async function resolveExistingDocumentDriveParent(
+  drive: drive_v3.Drive,
+  category: string,
+  folder: string
+) {
+  const categoryFolderId = getCategoryFolderId(category);
+
+  if (!categoryFolderId) {
+    throw new Error("Drive folder ID is not configured for this category.");
+  }
+
+  const normalizedFolder = normalizeFolderName(folder);
+  if (!normalizedFolder) {
+    return categoryFolderId;
+  }
+
+  return findFolderId(drive, normalizedFolder, categoryFolderId);
+}
+
+export async function moveDriveFileToParent(
+  drive: drive_v3.Drive,
+  fileId: string,
+  currentParentIds: string[],
+  targetParentId: string
+) {
+  if (!targetParentId) {
+    throw new Error("Missing target Drive folder.");
+  }
+
+  const uniqueCurrentParents = Array.from(new Set(currentParentIds.filter(Boolean)));
+  const alreadyInTarget =
+    uniqueCurrentParents.length === 1 && uniqueCurrentParents[0] === targetParentId;
+
+  if (alreadyInTarget) {
+    return {
+      moved: false,
+      parents: uniqueCurrentParents,
+    };
+  }
+
+  if (!uniqueCurrentParents.length) {
+    throw new Error(
+      "Drive file is missing parent information; cannot safely move document."
+    );
+  }
+
+  const updated = await drive.files.update({
+    fileId,
+    addParents: targetParentId,
+    removeParents: uniqueCurrentParents.join(","),
+    fields: "id,parents",
+    supportsAllDrives: true,
+  });
+
+  const nextParents = (updated.data.parents || []).filter(Boolean);
+  if (!nextParents.includes(targetParentId)) {
+    throw new Error("Google Drive move did not place the file in the target folder.");
+  }
+
+  return {
+    moved: true,
+    parents: nextParents,
+  };
+}
+
+export async function replaceDriveFileParents(
+  drive: drive_v3.Drive,
+  fileId: string,
+  currentParentIds: string[],
+  targetParentIds: string[]
+) {
+  const uniqueCurrentParents = Array.from(new Set(currentParentIds.filter(Boolean)));
+  const uniqueTargetParents = Array.from(new Set(targetParentIds.filter(Boolean)));
+
+  if (!uniqueTargetParents.length) {
+    throw new Error("Missing target Drive parents.");
+  }
+
+  const addParents = uniqueTargetParents
+    .filter((parentId) => !uniqueCurrentParents.includes(parentId))
+    .join(",");
+
+  const removeParents = uniqueCurrentParents
+    .filter((parentId) => !uniqueTargetParents.includes(parentId))
+    .join(",");
+
+  if (!addParents && !removeParents) {
+    return {
+      moved: false,
+      parents: uniqueCurrentParents,
+    };
+  }
+
+  const updated = await drive.files.update({
+    fileId,
+    addParents: addParents || undefined,
+    removeParents: removeParents || undefined,
+    fields: "id,parents",
+    supportsAllDrives: true,
+  });
+
+  const nextParents = (updated.data.parents || []).filter(Boolean);
+  const missingTargetParent = uniqueTargetParents.some(
+    (parentId) => !nextParents.includes(parentId)
+  );
+
+  if (missingTargetParent) {
+    throw new Error("Google Drive parent replacement did not complete as expected.");
+  }
+
+  return {
+    moved: true,
+    parents: nextParents,
+  };
+}
+
+export async function ensureFileInExpectedParent(
+  drive: drive_v3.Drive,
+  fileId: string,
+  currentParentIds: string[],
+  expectedParentId: string
+) {
+  await assertFileWithinConfiguredTree(drive, currentParentIds);
+
+  if (!expectedParentId) {
+    throw new Error("Expected Drive source folder could not be resolved.");
+  }
+
+  if (!currentParentIds.includes(expectedParentId)) {
+    throw new Error(
+      "Drive file parent does not match the expected source folder."
+    );
+  }
+}
+
+export async function isDriveFolderEmpty(
+  drive: drive_v3.Drive,
+  folderId: string
+) {
+  const res = await drive.files.list({
+    q: [`'${folderId}' in parents`, "trashed=false"].join(" and "),
+    fields: "files(id)",
+    pageSize: 1,
+    spaces: "drive",
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
+  });
+
+  return (res.data.files || []).length === 0;
+}
+
+export async function deleteDriveFileById(
+  drive: drive_v3.Drive,
+  fileId: string
+) {
+  await drive.files.delete({
+    fileId,
+    supportsAllDrives: true,
+  });
 }

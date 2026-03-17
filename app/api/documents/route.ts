@@ -3,6 +3,18 @@ export const runtime = "nodejs";
 import { NextResponse, type NextRequest } from "next/server";
 import { supabaseAdmin } from "@/app/lib/db";
 import { getCurrentUser } from "@/app/lib/auth";
+import {
+  deleteDriveFileById,
+  ensureFileInExpectedParent,
+  getDriveClient,
+  getDriveFileInfo,
+  isDriveFolderEmpty,
+  moveDriveFileToParent,
+  normalizeFolderName,
+  replaceDriveFileParents,
+  resolveExistingDocumentDriveParent,
+  resolveDocumentDriveParent,
+} from "@/app/lib/googleDrive";
 
 function normalizeCategory(v: string) {
   const s = (v || "").trim().toLowerCase();
@@ -169,7 +181,7 @@ export async function PATCH(req: NextRequest) {
     const category = normalizeCategory(String(body?.category || ""));
     const title = String(body?.title || "").trim();
     const dateReceived = String(body?.dateReceived || "").trim();
-    const folder = String(body?.folder || "").trim();
+    let folder = normalizeFolderName(String(body?.folder || ""));
 
     if (!Number.isFinite(id) || id <= 0) {
       return NextResponse.json({ error: "Invalid document id." }, { status: 400 });
@@ -191,6 +203,10 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "Folder is required for this category." }, { status: 400 });
     }
 
+    if (category === "Stakeholders" && folder) {
+      folder = folder.toUpperCase();
+    }
+
     const parsedDate = /^\d{4}-\d{2}-\d{2}$/.test(dateReceived)
       ? new Date(`${dateReceived}T00:00:00.000Z`)
       : new Date(dateReceived);
@@ -200,6 +216,62 @@ export async function PATCH(req: NextRequest) {
     }
 
     const year = String(parsedDate.getUTCFullYear());
+
+    const { data: currentDocument, error: currentDocumentError } = await supabaseAdmin
+      .from("documents")
+      .select("id,fileId,name,type,category,folder,title,dateReceived,year,uploadedAt")
+      .eq("id", id)
+      .single();
+
+    if (currentDocumentError) {
+      console.error("DOCUMENT PATCH LOAD ERROR:", currentDocumentError);
+      return NextResponse.json(
+        { error: currentDocumentError.message || "Failed to load document." },
+        { status: currentDocumentError.code === "PGRST116" ? 404 : 500 }
+      );
+    }
+
+    const currentCategory = normalizeCategory(String(currentDocument?.category || ""));
+    const currentFolder = normalizeFolderName(String(currentDocument?.folder || ""));
+    const locationChanged = currentCategory !== category || currentFolder !== folder;
+
+    if (locationChanged) {
+      const fileId = String(currentDocument?.fileId || "").trim();
+
+      if (!fileId) {
+        return NextResponse.json(
+          { error: "Document is missing its Google Drive file reference." },
+          { status: 409 }
+        );
+      }
+
+      try {
+        const drive = getDriveClient();
+        const driveFile = await getDriveFileInfo(drive, fileId);
+        const expectedSourceParentId = await resolveExistingDocumentDriveParent(
+          drive,
+          currentCategory,
+          currentFolder
+        );
+
+        await ensureFileInExpectedParent(
+          drive,
+          fileId,
+          driveFile.parents,
+          expectedSourceParentId || ""
+        );
+
+        const targetParentId = await resolveDocumentDriveParent(drive, category, folder);
+
+        await moveDriveFileToParent(drive, fileId, driveFile.parents, targetParentId);
+      } catch (error: unknown) {
+        console.error("DOCUMENT PATCH DRIVE MOVE ERROR:", error);
+        return NextResponse.json(
+          { error: getErrorMessage(error, "Failed to move document in Google Drive.") },
+          { status: 500 }
+        );
+      }
+    }
 
     const { data: updated, error } = await supabaseAdmin
       .from("documents")
@@ -246,8 +318,8 @@ export async function PUT(req: NextRequest) {
     const body = await req.json();
 
     const category = normalizeCategory(String(body?.category || ""));
-    const oldFolder = String(body?.oldFolder || "").trim();
-    const newFolder = String(body?.newFolder || "").trim();
+    let oldFolder = normalizeFolderName(String(body?.oldFolder || ""));
+    let newFolder = normalizeFolderName(String(body?.newFolder || ""));
 
     if (!category) {
       return NextResponse.json({ error: "Invalid category." }, { status: 400 });
@@ -261,13 +333,18 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "New folder name is required." }, { status: 400 });
     }
 
+    if (category === "Stakeholders") {
+      oldFolder = oldFolder.toUpperCase();
+      newFolder = newFolder.toUpperCase();
+    }
+
     if (oldFolder.toLowerCase() === newFolder.toLowerCase()) {
       return NextResponse.json({ error: "New folder name must be different." }, { status: 400 });
     }
 
     const { data: existingRows, error: existingError } = await supabaseAdmin
       .from("documents")
-      .select("id", { count: "exact" })
+      .select("id,fileId")
       .eq("category", category)
       .eq("folder", oldFolder);
 
@@ -280,6 +357,83 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "Folder not found in this category." }, { status: 404 });
     }
 
+    const missingFileId = existingRows.find((row) => !String(row.fileId || "").trim());
+    if (missingFileId) {
+      return NextResponse.json(
+        { error: "One or more documents are missing their Google Drive file reference." },
+        { status: 409 }
+      );
+    }
+
+    const drive = getDriveClient();
+    const expectedSourceParentId = await resolveExistingDocumentDriveParent(
+      drive,
+      category,
+      oldFolder
+    );
+
+    if (!expectedSourceParentId) {
+      return NextResponse.json(
+        { error: "Current Drive folder could not be resolved for this category." },
+        { status: 409 }
+      );
+    }
+
+    const targetParentId = await resolveDocumentDriveParent(drive, category, newFolder);
+    const movedFiles: Array<{ fileId: string; originalParents: string[] }> = [];
+
+    try {
+      for (const row of existingRows) {
+        const fileId = String(row.fileId || "").trim();
+        const driveFile = await getDriveFileInfo(drive, fileId);
+
+        await ensureFileInExpectedParent(
+          drive,
+          fileId,
+          driveFile.parents,
+          expectedSourceParentId
+        );
+
+        const moveResult = await moveDriveFileToParent(
+          drive,
+          fileId,
+          driveFile.parents,
+          targetParentId
+        );
+
+        if (moveResult.moved) {
+          movedFiles.push({
+            fileId,
+            originalParents: driveFile.parents,
+          });
+        }
+      }
+    } catch (error: unknown) {
+      console.error("FOLDER RENAME DRIVE MOVE ERROR:", error);
+
+      for (let i = movedFiles.length - 1; i >= 0; i -= 1) {
+        const moved = movedFiles[i];
+        try {
+          const currentDriveFile = await getDriveFileInfo(drive, moved.fileId);
+          if (moved.originalParents.length > 0) {
+            await replaceDriveFileParents(
+              drive,
+              moved.fileId,
+              currentDriveFile.parents,
+              moved.originalParents
+            );
+          }
+        } catch (rollbackError) {
+          console.error("FOLDER RENAME ROLLBACK ERROR:", rollbackError);
+        }
+      }
+
+      return NextResponse.json(
+        { error: getErrorMessage(error, "Failed to move folder contents in Google Drive.") },
+        { status: 500 }
+      );
+    }
+
     const { error } = await supabaseAdmin
       .from("documents")
       .update({ folder: newFolder })
@@ -288,7 +442,34 @@ export async function PUT(req: NextRequest) {
 
     if (error) {
       console.error("FOLDER RENAME ERROR:", error);
+
+      for (let i = movedFiles.length - 1; i >= 0; i -= 1) {
+        const moved = movedFiles[i];
+        try {
+          const currentDriveFile = await getDriveFileInfo(drive, moved.fileId);
+          if (moved.originalParents.length > 0) {
+            await replaceDriveFileParents(
+              drive,
+              moved.fileId,
+              currentDriveFile.parents,
+              moved.originalParents
+            );
+          }
+        } catch (rollbackError) {
+          console.error("FOLDER RENAME DB ROLLBACK ERROR:", rollbackError);
+        }
+      }
+
       return NextResponse.json({ error: error.message || "Failed to rename folder." }, { status: 500 });
+    }
+
+    try {
+      const canDeleteOldFolder = await isDriveFolderEmpty(drive, expectedSourceParentId);
+      if (canDeleteOldFolder) {
+        await deleteDriveFileById(drive, expectedSourceParentId);
+      }
+    } catch (cleanupError) {
+      console.error("FOLDER RENAME CLEANUP ERROR:", cleanupError);
     }
 
     return NextResponse.json({

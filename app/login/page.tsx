@@ -191,6 +191,12 @@ export default function LoginPage() {
           leaving ? styles.cardExit : styles.cardEnter
         }`}
       >
+        <div className={styles.topBar}>
+          <Link href="/" className={styles.backHome}>
+            {"<-"} Back to Home
+          </Link>
+        </div>
+
         <div className={styles.logoRow}>
           <div className={styles.logoItemSmall}>
             <Image
@@ -237,20 +243,22 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <div className={styles.brandBlock}>
-          <h2 className={styles.brandSubTitle}>
-            Protected Area Management Office
-          </h2>
+        <Link href="/" className={styles.brandLink}>
+          <div className={styles.brandBlock}>
+            <h2 className={styles.brandSubTitle}>
+              Protected Area Management Office
+            </h2>
 
-          <h1 className={styles.brandMain}>
-            Mt. Hamiguitan Range Wildlife Sanctuary
-          </h1>
-        </div>
+            <h1 className={styles.brandMain}>
+              Mt. Hamiguitan Range Wildlife Sanctuary
+            </h1>
+          </div>
+        </Link>
 
         <div className={styles.formBlock}>
           <label className={styles.fieldLabel}>Email Address</label>
           <div className={styles.inputShell}>
-            <span className={styles.inputIcon}>✉</span>
+            <span className={styles.inputIcon}>@</span>
             <input
               className={styles.input}
               value={email}
@@ -263,7 +271,7 @@ export default function LoginPage() {
 
           <label className={styles.fieldLabel}>Password</label>
           <div className={styles.inputShell}>
-            <span className={styles.inputIcon}>🔒</span>
+            <span className={styles.inputIcon}>*</span>
             <input
               className={styles.input}
               value={password}
@@ -311,11 +319,11 @@ export default function LoginPage() {
             onClick={handleLogin}
           >
             <span>{loading ? "Signing In..." : "Sign In"}</span>
-            <span className={styles.buttonArrow}>→</span>
+            <span className={styles.buttonArrow}>{">"}</span>
           </button>
 
           <div className={styles.bottomText}>
-            <span>Don’t have an account?</span>
+            <span>Don&apos;t have an account?</span>
             <button
               type="button"
               className={styles.inlineRegister}
