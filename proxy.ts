@@ -31,6 +31,7 @@ export const config = {
     "/calendar/:path*",
     "/porters-identification/:path*",
     "/organizational-chart/:path*",
+    "/audit/:path*",
     "/upload/:path*",
     "/settings/:path*",
   ],

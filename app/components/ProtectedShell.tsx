@@ -15,6 +15,7 @@ import {
   UserGroupIcon,
   RectangleGroupIcon,
   Cog6ToothIcon,
+  ClipboardDocumentListIcon,
 } from "@heroicons/react/24/outline";
 import { useAuth } from "@/app/components/AuthProvider";
 import { repoTheme } from "@/app/lib/repoTheme";
@@ -40,6 +41,11 @@ function canViewRegisteredStaff(role?: string) {
 }
 
 function canUpload(role?: string) {
+  const r = normalizeRole(role);
+  return r === "admin" || r === "co_admin";
+}
+
+function canViewAudit(role?: string) {
   const r = normalizeRole(role);
   return r === "admin" || r === "co_admin";
 }
@@ -110,6 +116,7 @@ export default function ProtectedShell({
     router.prefetch("/organizational-chart");
 
     if (canUpload(user.role)) router.prefetch("/upload");
+    if (canViewAudit(user.role)) router.prefetch("/audit");
     if (canAccessSettings(user.role)) router.prefetch("/settings");
     if (canViewRegisteredStaff(user.role)) router.prefetch("/admin/users");
   }, [router, user]);
@@ -257,6 +264,12 @@ export default function ProtectedShell({
         label: "Settings",
         icon: <Cog6ToothIcon className="w-5 h-5" />,
         show: canAccessSettings(user.role),
+      },
+      {
+        href: "/audit",
+        label: "Audit Logs",
+        icon: <ClipboardDocumentListIcon className="w-5 h-5" />,
+        show: canViewAudit(user.role),
       },
     ];
 

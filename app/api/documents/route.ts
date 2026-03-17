@@ -3,6 +3,7 @@ export const runtime = "nodejs";
 import { NextResponse, type NextRequest } from "next/server";
 import { supabaseAdmin } from "@/app/lib/db";
 import { getCurrentUser } from "@/app/lib/auth";
+import { writeAuditLog } from "@/app/lib/auditLog";
 import {
   deleteDriveFileById,
   ensureFileInExpectedParent,
@@ -34,6 +35,10 @@ function normalizeRole(role?: string) {
 
 function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
+}
+
+function buildAuditPath(category: string, folder: string) {
+  return folder ? `${category} / ${folder}` : category;
 }
 
 export async function GET() {
@@ -291,6 +296,15 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: error.message || "Failed to update document." }, { status: 500 });
     }
 
+    await writeAuditLog({
+      userId: me.id,
+      userEmail: me.email,
+      action: locationChanged ? "document_move" : "document_edit",
+      fileName: String(updated?.name || currentDocument?.name || ""),
+      fromPath: buildAuditPath(currentCategory, currentFolder),
+      toPath: buildAuditPath(category, folder),
+    });
+
     return NextResponse.json({ ok: true, document: updated });
   } catch (error: unknown) {
     console.error("DOCUMENT PATCH FATAL:", error);
@@ -462,6 +476,15 @@ export async function PUT(req: NextRequest) {
 
       return NextResponse.json({ error: error.message || "Failed to rename folder." }, { status: 500 });
     }
+
+    await writeAuditLog({
+      userId: me.id,
+      userEmail: me.email,
+      action: "folder_rename",
+      fileName: oldFolder,
+      fromPath: buildAuditPath(category, oldFolder),
+      toPath: buildAuditPath(category, newFolder),
+    });
 
     try {
       const canDeleteOldFolder = await isDriveFolderEmpty(drive, expectedSourceParentId);

@@ -5,6 +5,7 @@ import { Readable } from "stream";
 import type { ReadableStream as NodeReadableStream } from "stream/web";
 import { supabaseAdmin } from "@/app/lib/db";
 import { getCurrentUser } from "@/app/lib/auth";
+import { writeAuditLog } from "@/app/lib/auditLog";
 import { serverEnv } from "@/app/lib/serverEnv";
 import {
   getDriveClient,
@@ -190,6 +191,15 @@ export async function POST(req: NextRequest) {
       id: insertedRow?.id,
       fileId,
       fileName,
+    });
+
+    await writeAuditLog({
+      userId: me.id,
+      userEmail: me.email,
+      action: "document_upload",
+      fileName,
+      fromPath: null,
+      toPath: folder ? `${category} / ${folder}` : category,
     });
 
     console.timeEnd("upload-total");

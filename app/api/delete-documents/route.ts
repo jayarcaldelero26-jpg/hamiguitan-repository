@@ -3,6 +3,7 @@ export const runtime = "nodejs";
 import { NextResponse, type NextRequest } from "next/server";
 import { supabaseAdmin } from "@/app/lib/db";
 import { getCurrentUser } from "@/app/lib/auth";
+import { writeAuditLog } from "@/app/lib/auditLog";
 import { deleteDriveFileById, getDriveClient } from "@/app/lib/googleDrive";
 
 function isValidId(value: number) {
@@ -38,7 +39,7 @@ export async function DELETE(req: NextRequest) {
 
     const { data: doc, error: findError } = await supabaseAdmin
       .from("documents")
-      .select("id, fileId")
+      .select("id, fileId, name, category, folder")
       .eq("id", id)
       .maybeSingle();
 
@@ -107,6 +108,15 @@ export async function DELETE(req: NextRequest) {
         { status: 500 }
       );
     }
+
+    await writeAuditLog({
+      userId: me.id,
+      userEmail: me.email,
+      action: "document_delete",
+      fileName: doc.name || null,
+      fromPath: doc.folder ? `${doc.category} / ${doc.folder}` : doc.category,
+      toPath: null,
+    });
 
     console.timeEnd("delete-total");
 
