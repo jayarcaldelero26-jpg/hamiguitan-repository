@@ -12,3 +12,4 @@ export const supabaseAdmin = createClient(
   publicEnv.supabaseUrl,
   serverEnv.supabaseServiceRoleKey
 );
+

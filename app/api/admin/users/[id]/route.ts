@@ -251,23 +251,47 @@ export async function DELETE(
 ) {
   try {
     const me = await getCurrentUser();
+    console.log("DELETE USER DEBUG: current user lookup", {
+      requestPath: req.nextUrl.pathname,
+      hasSession: Boolean(me),
+      currentUserId: me?.id ?? null,
+      currentUserRole: me?.role ?? null,
+    });
 
     if (!me) {
+      console.warn("DELETE USER DEBUG: denied due to missing or invalid session");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     if (me.role !== "admin") {
+      console.warn("DELETE USER DEBUG: denied due to non-admin role", {
+        currentUserId: me.id,
+        currentUserRole: me.role,
+      });
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const { id: idRaw } = await context.params;
     const id = Number(idRaw);
+    console.log("DELETE USER DEBUG: parsed target id", {
+      idRaw,
+      parsedId: id,
+    });
 
     if (!isValidUserId(id)) {
+      console.warn("DELETE USER DEBUG: denied due to invalid user id", {
+        currentUserId: me.id,
+        idRaw,
+        parsedId: id,
+      });
       return NextResponse.json({ error: "Invalid user id." }, { status: 400 });
     }
 
     if (me.id === id) {
+      console.warn("DELETE USER DEBUG: denied due to self-delete protection", {
+        currentUserId: me.id,
+        targetUserId: id,
+      });
       return NextResponse.json(
         { error: "You cannot delete your own account." },
         { status: 400 }
@@ -289,8 +313,20 @@ export async function DELETE(
     }
 
     if (!target) {
+      console.warn("DELETE USER DEBUG: denied because target user was not found", {
+        currentUserId: me.id,
+        targetUserId: id,
+      });
       return NextResponse.json({ error: "User not found." }, { status: 404 });
     }
+
+    console.log("DELETE USER DEBUG: target user lookup", {
+      currentUserId: me.id,
+      currentUserRole: me.role,
+      targetUserId: target.id,
+      targetUserRole: target.role ?? null,
+      targetUserName: target.name ?? null,
+    });
 
     if (String(target.role || "").trim().toLowerCase() === "admin") {
       const { count: adminCount, error: adminCountError } = await supabaseAdmin
@@ -307,6 +343,11 @@ export async function DELETE(
       }
 
       if ((adminCount || 0) <= 1) {
+        console.warn("DELETE USER DEBUG: denied due to last-admin protection", {
+          currentUserId: me.id,
+          targetUserId: target.id,
+          adminCount,
+        });
         return NextResponse.json(
           { error: "Cannot delete the last admin." },
           { status: 400 }
@@ -326,6 +367,11 @@ export async function DELETE(
         { status: 500 }
       );
     }
+
+    console.log("DELETE USER DEBUG: delete succeeded", {
+      currentUserId: me.id,
+      targetUserId: id,
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {

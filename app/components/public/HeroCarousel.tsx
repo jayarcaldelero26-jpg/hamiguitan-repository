@@ -2,12 +2,6 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import {
-  ArrowLeftIcon,
-  ArrowRightIcon,
-  PauseIcon,
-  PlayIcon,
-} from "@heroicons/react/24/outline";
 
 type Slide = {
   image: string;
@@ -23,7 +17,8 @@ type Slide = {
   };
 };
 
-const AUTOPLAY_MS = 4000;
+const AUTOPLAY_MS = 5000;
+const SWIPE_THRESHOLD = 48;
 
 const slides: Slide[] = [
   {
@@ -102,10 +97,11 @@ export default function HeroCarousel() {
   const [activeIndex, setActiveIndex] = useState(0);
   const [hoverPaused, setHoverPaused] = useState(false);
   const [touchPaused, setTouchPaused] = useState(false);
-  const [manualPaused, setManualPaused] = useState(false);
   const intervalRef = useRef<number | null>(null);
+  const pointerStartXRef = useRef<number | null>(null);
+  const pointerActiveRef = useRef(false);
 
-  const isPaused = hoverPaused || touchPaused || manualPaused;
+  const isPaused = hoverPaused || touchPaused;
 
   useEffect(() => {
     if (isPaused) {
@@ -140,6 +136,37 @@ export default function HeroCarousel() {
     setActiveIndex((current) => (current + 1) % slides.length);
   };
 
+  const handlePointerStart = (clientX: number) => {
+    pointerStartXRef.current = clientX;
+    pointerActiveRef.current = true;
+  };
+
+  const handlePointerEnd = (clientX: number) => {
+    if (!pointerActiveRef.current || pointerStartXRef.current === null) {
+      return;
+    }
+
+    const delta = clientX - pointerStartXRef.current;
+    pointerStartXRef.current = null;
+    pointerActiveRef.current = false;
+
+    if (Math.abs(delta) < SWIPE_THRESHOLD) {
+      return;
+    }
+
+    if (delta > 0) {
+      goToPrevious();
+      return;
+    }
+
+    goToNext();
+  };
+
+  const resetPointerTracking = () => {
+    pointerStartXRef.current = null;
+    pointerActiveRef.current = false;
+  };
+
   return (
     <section
       className="relative isolate overflow-hidden"
@@ -147,6 +174,14 @@ export default function HeroCarousel() {
       onMouseLeave={() => setHoverPaused(false)}
       onTouchStart={() => setTouchPaused(true)}
       onTouchEnd={() => setTouchPaused(false)}
+      onPointerDown={(event) => handlePointerStart(event.clientX)}
+      onPointerUp={(event) => handlePointerEnd(event.clientX)}
+      onPointerCancel={resetPointerTracking}
+      onPointerLeave={() => {
+        if (pointerActiveRef.current) {
+          resetPointerTracking();
+        }
+      }}
     >
       <div className="relative min-h-[60vh] bg-[#0f241f] md:min-h-[74vh]">
         {slides.map((slide, index) => (
@@ -171,11 +206,13 @@ export default function HeroCarousel() {
 
         <div className="relative z-10 mx-auto flex min-h-[60vh] max-w-7xl items-end px-4 pb-14 pt-24 sm:px-6 sm:pb-16 sm:pt-26 md:min-h-[74vh] md:px-10 md:pb-20">
           <div className="max-w-3xl rounded-[2rem] border border-white/12 bg-[linear-gradient(180deg,rgba(16,33,29,0.34),rgba(16,33,29,0.12))] px-5 py-5 shadow-[0_28px_70px_rgba(0,0,0,0.18)] backdrop-blur-[3px] sm:px-6 sm:py-6 md:max-w-[52rem] md:rounded-[2.4rem] md:px-8 md:py-8">
-            <p className="text-[10px] font-medium uppercase tracking-[0.32em] text-[#dbe7df] sm:text-xs md:text-sm">
-              MT. HAMIGUITAN
-            </p>
-            <h1 className="mt-3 max-w-4xl text-[2.05rem] font-semibold leading-[1.02] tracking-[-0.03em] text-white sm:text-[2.7rem] md:mt-4 md:text-[4.2rem]">
-              {slides[activeIndex].title}
+            <h1 className="mt-3 leading-[1.05] tracking-[-0.02em] text-white md:mt-4 text-[2.1rem] sm:text-[2.8rem] md:text-[4.2rem] font-semibold">
+              <span className="block">
+                MT. HAMIGUITAN
+              </span>
+              <span className="block">
+                {slides[activeIndex].title}
+              </span>
             </h1>
             <p className="mt-3 max-w-2xl text-[0.94rem] leading-7 text-[#e6ebe7]/90 sm:text-[1rem] sm:leading-8 md:mt-4 md:max-w-3xl md:text-[1.12rem]">
               {slides[activeIndex].subtitle}
@@ -198,7 +235,7 @@ export default function HeroCarousel() {
           </div>
         </div>
 
-        <div className="absolute inset-x-0 bottom-5 z-20 mx-auto flex max-w-7xl items-end justify-between gap-4 px-4 sm:bottom-6 sm:px-6 md:bottom-10 md:px-10">
+        <div className="absolute inset-x-0 bottom-5 z-20 mx-auto flex max-w-7xl items-end px-4 sm:bottom-6 sm:px-6 md:bottom-10 md:px-10">
           <div className="flex items-center gap-2 sm:gap-3">
             {slides.map((slide, index) => (
               <button
@@ -214,33 +251,6 @@ export default function HeroCarousel() {
                 }`}
               />
             ))}
-          </div>
-
-          <div className="hidden items-center gap-3 sm:flex">
-            <button
-              type="button"
-              onClick={() => setManualPaused((value) => !value)}
-              className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/16 bg-[rgba(12,22,18,0.26)] text-white transition hover:bg-[rgba(12,22,18,0.38)]"
-              aria-label={manualPaused ? "Resume autoplay" : "Pause autoplay"}
-            >
-              {manualPaused ? <PlayIcon className="h-5 w-5" /> : <PauseIcon className="h-5 w-5" />}
-            </button>
-            <button
-              type="button"
-              onClick={goToPrevious}
-              className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/16 bg-[rgba(12,22,18,0.26)] text-white transition hover:bg-[rgba(12,22,18,0.38)]"
-              aria-label="Previous slide"
-            >
-              <ArrowLeftIcon className="h-5 w-5" />
-            </button>
-            <button
-              type="button"
-              onClick={goToNext}
-              className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/16 bg-[rgba(12,22,18,0.26)] text-white transition hover:bg-[rgba(12,22,18,0.38)]"
-              aria-label="Next slide"
-            >
-              <ArrowRightIcon className="h-5 w-5" />
-            </button>
           </div>
         </div>
       </div>

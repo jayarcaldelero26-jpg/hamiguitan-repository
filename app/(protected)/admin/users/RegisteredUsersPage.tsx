@@ -446,6 +446,7 @@ export default function RegisteredUsersPage() {
   const closeUser = () => {
     setSelectedUser(null);
     setEditMode(false);
+    setDeleteTarget(null);
   };
 
   const hasChanges = selectedUser ? hasUserChanges(selectedUser, draftUser) : false;
@@ -500,6 +501,13 @@ export default function RegisteredUsersPage() {
   };
 
   const confirmDelete = async () => {
+    if (!canManage) {
+      setDeleteTarget(null);
+      setErrorMsg("Only admin can delete users.");
+      setErrorOpen(true);
+      return;
+    }
+
     if (!deleteTarget) return;
 
     setSaving(true);
@@ -1340,7 +1348,7 @@ export default function RegisteredUsersPage() {
       </AnimatePresence>
 
       <ConfirmDialog
-        open={deleteTarget !== null}
+        open={canManage && deleteTarget !== null}
         title="Delete User?"
         message={
           deleteTarget

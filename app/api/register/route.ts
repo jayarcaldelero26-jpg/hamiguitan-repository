@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcrypt";
 import { supabaseAdmin } from "@/app/lib/db";
-import { getCurrentUser } from "@/app/lib/auth";
 
 function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i.test(email);
@@ -17,16 +16,6 @@ function normalizeOptional(value: unknown) {
 
 export async function POST(req: Request) {
   try {
-    const me = await getCurrentUser();
-
-    if (!me) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    if (me.role !== "admin" && me.role !== "co_admin") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
     const body = await req.json();
 
     const userCode = normalizeOptional(body?.userCode);

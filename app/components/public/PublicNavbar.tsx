@@ -38,11 +38,11 @@ export default function PublicNavbar() {
               priority
             />
           </span>
-          <span className="min-w-0 leading-none">
-            <span className="block truncate text-[9px] font-medium uppercase tracking-[0.18em] text-[#c8d5cf] sm:text-[11px] sm:tracking-[0.22em]">
+          <span className="min-w-0 leading-tight">
+            <span className="block truncate text-[1rem] font-bold uppercase tracking-[0.12em] text-white sm:text-[1.2rem]">
               Mt. Hamiguitan
             </span>
-            <span className="mt-1 block text-[0.9rem] font-bold tracking-[0.01em] text-white sm:text-base">
+            <span className="block text-[0.72rem] font-medium tracking-[0.02em] text-[#c8d5cf] sm:text-[0.85rem]">
               Range Wildlife Sanctuary
             </span>
           </span>

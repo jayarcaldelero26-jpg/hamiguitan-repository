@@ -16,6 +16,7 @@ import {
   RectangleGroupIcon,
   Cog6ToothIcon,
   ClipboardDocumentListIcon,
+  TicketIcon,
 } from "@heroicons/react/24/outline";
 import { useAuth } from "@/app/components/AuthProvider";
 import { repoTheme } from "@/app/lib/repoTheme";
@@ -78,6 +79,9 @@ export default function ProtectedShell({
 
   const [collapsed, setCollapsed] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [bookingNavOpen, setBookingNavOpen] = useState(
+    pathname.startsWith("/booking") || pathname.startsWith("/calendar")
+  );
   const [confirmLogoutPath, setConfirmLogoutPath] = useState<string | null>(null);
   const [pageTheme, setPageTheme] = useState<PageTheme>("dark");
 
@@ -112,6 +116,7 @@ export default function ProtectedShell({
     router.prefetch("/dashboard");
     router.prefetch("/research");
     router.prefetch("/calendar");
+    router.prefetch("/booking");
     router.prefetch("/porters-identification");
     router.prefetch("/organizational-chart");
 
@@ -147,6 +152,9 @@ export default function ProtectedShell({
       : "bg-[linear-gradient(180deg,#edf6f0_0%,#f6fbf8_48%,#e6efe9_100%)]";
 
   const ui = repoTheme(pageTheme);
+  const bookingModuleActive =
+    pathname.startsWith("/booking") || pathname.startsWith("/calendar");
+  const showBookingNav = bookingNavOpen || bookingModuleActive;
 
   const navBtn = useCallback(
     (href: string, label: string, icon: React.ReactNode) => {
@@ -205,6 +213,7 @@ export default function ProtectedShell({
     if (!user) {
       return {
         primary: [],
+        booking: [],
         admin: [],
       };
     }
@@ -223,11 +232,6 @@ export default function ProtectedShell({
         href: "/research",
         label: "Document Repository",
         icon: <DocumentTextIcon className="w-5 h-5" />,
-      },
-      {
-        href: "/calendar",
-        label: "Calendar",
-        icon: <CalendarDaysIcon className="w-5 h-5" />,
       },
       {
         href: "/porters-identification",
@@ -275,6 +279,18 @@ export default function ProtectedShell({
 
     return {
       primary: primaryItems,
+      booking: [
+        {
+          href: "/booking",
+          label: "Booking",
+          icon: <TicketIcon className="w-4 h-4" />,
+        },
+        {
+          href: "/calendar",
+          label: "Calendar",
+          icon: <CalendarDaysIcon className="w-4 h-4" />,
+        },
+      ],
       admin: adminItems.filter((item) => item.show),
     };
   }, [user]);
@@ -383,6 +399,58 @@ export default function ProtectedShell({
             <div className="scroll-sidebar mt-4 flex-1 overflow-y-auto pr-1.5">
               <nav aria-label="Primary navigation" className="space-y-1.5">
                 {navItems.primary.map((item) => navBtn(item.href, item.label, item.icon))}
+
+                <div className="space-y-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!showSidebarLabels) {
+                        setCollapsed(false);
+                        setBookingNavOpen(true);
+                        return;
+                      }
+                      setBookingNavOpen((current) => !current);
+                    }}
+                    aria-expanded={showBookingNav}
+                    className={`group relative w-full min-h-11 flex items-center gap-3 px-3 py-2.5 rounded-[20px] border transition-all duration-200 ease-out ${
+                      showSidebarLabels ? "" : "justify-center"
+                    } ${navActionBase(
+                      bookingModuleActive
+                    )}`}
+                  >
+                    <span
+                      className={`grid h-9 w-9 shrink-0 place-items-center rounded-[14px] border transition-colors ${
+                        bookingModuleActive
+                          ? "border-white/12 bg-white/[0.08] text-cyan-100"
+                          : "border-transparent bg-transparent text-white/78 group-hover:border-white/10 group-hover:bg-white/[0.05] group-hover:text-white"
+                      }`}
+                    >
+                      <TicketIcon className="w-5 h-5" />
+                    </span>
+
+                    {showSidebarLabels && (
+                      <>
+                        <span className="min-w-0 flex-1 text-left">
+                          <span className="block font-semibold text-[13px] tracking-[0.01em] text-white">
+                            Booking
+                          </span>
+                          <span className="block text-[10px] font-medium uppercase tracking-[0.12em] text-white/55">
+                            Module
+                          </span>
+                        </span>
+                        <span className="text-lg font-semibold text-white/72">
+                          {showBookingNav ? "−" : "+"}
+                        </span>
+                      </>
+                    )}
+                  </button>
+
+                  {showSidebarLabels && showBookingNav && (
+                    <div className="ml-4 space-y-1 border-l border-white/10 pl-3">
+                      {navItems.booking.map((item) => navBtn(item.href, item.label, item.icon))}
+                    </div>
+                  )}
+                </div>
               </nav>
 
               {showSidebarLabels && navItems.admin.length > 0 && (
