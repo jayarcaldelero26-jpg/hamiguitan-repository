@@ -92,11 +92,10 @@ function getScheduleDurationDays(start_date: string, end_date: string) {
   return expandDateRange(start_date, end_date).length;
 }
 
-function getScheduleGroupPax(
+function getCamp3NightPax(
   bookings: BookingRow[],
   input: {
     start_date: string;
-    end_date: string;
     excludeBookingId?: number | null;
   }
 ) {
@@ -104,11 +103,7 @@ function getScheduleGroupPax(
     .filter((booking) => booking.id !== input.excludeBookingId)
     .filter((booking) => !isOffSeasonLikeType(booking.booking_type))
     .filter((booking) => bookingCountsTowardCapacity(booking))
-    .filter(
-      (booking) =>
-        booking.start_date === input.start_date &&
-        booking.end_date === input.end_date
-    )
+    .filter((booking) => booking.start_date === input.start_date)
     .reduce((total, booking) => total + booking.pax, 0);
 }
 
@@ -212,8 +207,8 @@ type ApiError = {
 
 type CapacityState =
   | { kind: "idle" }
-  | { kind: "valid"; message: string }
-  | { kind: "invalid"; message: string; conflictingDates: string[] };
+  | { kind: "valid"; title: string; message: string }
+  | { kind: "invalid"; title: string; message: string; conflictingDates: string[] };
 
 type OffSeasonWarningState =
   | { kind: "idle" }
@@ -432,24 +427,45 @@ export default function BookingPage() {
     [form.end_date, form.start_date]
   );
 
-  const exactSchedulePax = useMemo(
+  const camp3NightPax = useMemo(
     () =>
-      form.start_date && form.end_date
-        ? getScheduleGroupPax(bookings, {
+      form.start_date
+        ? getCamp3NightPax(bookings, {
             start_date: form.start_date,
-            end_date: form.end_date,
             excludeBookingId: editingId,
           })
         : 0,
-    [bookings, editingId, form.end_date, form.start_date]
+    [bookings, editingId, form.start_date]
   );
 
   const capacityState = useMemo<CapacityState>(() => {
     if (isOffSeasonLike) {
       return { kind: "idle" };
     }
-    if (!form.trail || !form.start_date || !form.end_date || !Number.isFinite(form.pax) || form.pax <= 0) {
+    if (!form.start_date || !Number.isFinite(form.pax) || form.pax <= 0) {
       return { kind: "idle" };
+    }
+
+    const remainingSlots = Math.max(30 - camp3NightPax, 0);
+
+    if (camp3NightPax + form.pax > 30) {
+      return {
+        kind: "invalid",
+        title: "Camp 3 at capacity",
+        message: "Camp 3 is at capacity for this night. Please choose a different start date.",
+        conflictingDates: [form.start_date],
+      };
+    }
+
+    if (!form.end_date || !form.trail) {
+      return {
+        kind: "valid",
+        title: "Camp 3 night available",
+        message: `${Math.max(
+          remainingSlots - form.pax,
+          0
+        )} Camp 3 slots remaining for hikers starting on ${formatDisplayDate(form.start_date)}.`,
+      };
     }
 
     if (scheduleDurationDays === 0) {
@@ -459,32 +475,22 @@ export default function BookingPage() {
     if (scheduleDurationDays < 2 || scheduleDurationDays > 3) {
       return {
         kind: "invalid",
+        title: "Invalid hike duration",
         message: "Hike duration must be between 2 and 3 days.",
         conflictingDates: [],
       };
     }
 
-    const remainingSlots = Math.max(30 - exactSchedulePax, 0);
-
-    if (exactSchedulePax + form.pax > 30) {
-      return {
-        kind: "invalid",
-        message: `The exact hiking schedule from ${formatDisplayDate(
-          form.start_date
-        )} to ${formatDisplayDate(form.end_date)} is already full across both trails.`,
-        conflictingDates: [`${form.start_date} to ${form.end_date}`],
-      };
-    }
-
     return {
       kind: "valid",
+      title: "Camp 3 night available",
       message: `${Math.max(
         remainingSlots - form.pax,
         0
-      )} slots remaining for this exact hiking schedule across both trails.`,
+      )} Camp 3 slots remaining for hikers starting on ${formatDisplayDate(form.start_date)}.`,
     };
   }, [
-    exactSchedulePax,
+    camp3NightPax,
     form.end_date,
     form.pax,
     form.start_date,
@@ -672,8 +678,8 @@ export default function BookingPage() {
               Booking
             </h1>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600 md:text-base md:leading-7">
-              Persisted booking records with server-side validation against the
-              30-pax shared capacity for each exact hiking schedule across both trails.
+              Persisted booking records with server-side validation against
+              Camp 3 first-night capacity for hikers sharing the same start date.
             </p>
           </div>
 
@@ -899,7 +905,7 @@ export default function BookingPage() {
                                 max={30}
                                 value={form.pax}
                                 onChange={(value) => setField("pax", Number(value || 0))}
-                                helper="Max 30 pax per exact hiking schedule across both trails"
+                                helper="Camp 3 first-night capacity is shared by hikers with the same start date"
                                 invalid={capacityState.kind === "invalid"}
                               />
                             </div>
@@ -917,7 +923,10 @@ export default function BookingPage() {
                           : "border-emerald-200 bg-emerald-50 text-emerald-700"
                       }`}
                     >
-                      {capacityState.message}
+                      <p className="font-semibold">
+                        {capacityState.title}
+                      </p>
+                      <p className="mt-1 leading-6">{capacityState.message}</p>
                     </div>
                   )}
                   {!isOffSeasonLike && offSeasonWarning.kind === "warning" && (
@@ -1007,7 +1016,14 @@ export default function BookingPage() {
 
                   <div className="mt-5 flex flex-wrap gap-3">
                     <button type="submit" disabled={regularSubmitDisabled} className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#235347] px-5 text-sm font-semibold text-white transition hover:bg-[#1d463b] disabled:cursor-not-allowed disabled:opacity-60">
-                      {submitting ? "Saving..." : editingId ? "Update Booking" : "Create Booking"}
+                      {submitting
+                        ? "Saving..."
+                        : capacityState.kind === "invalid" &&
+                            capacityState.title === "Camp 3 at capacity"
+                          ? "Camp 3 Full"
+                          : editingId
+                            ? "Update Booking"
+                            : "Create Booking"}
                     </button>
                     <button type="button" onClick={resetForm} className="inline-flex min-h-11 items-center justify-center rounded-full border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
                       {editingId ? "Cancel Edit" : "Reset"}
@@ -1029,12 +1045,12 @@ export default function BookingPage() {
                 </h2>
               </div>
               <p className="max-w-md text-sm leading-6 text-slate-600">
-                Overlapping date ranges are allowed unless the same exact hiking schedule across both trails reaches 30 pax.
+                Booking conflicts are based on Camp 3 first-night overlap, not full date-range matching.
               </p>
             </div>
 
-            <div className="mt-4 grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4">
-              <label className="col-span-2 rounded-[18px] border border-slate-200 bg-white p-3 sm:p-4">
+            <div className="mt-4 grid grid-cols-2 items-end gap-2.5 sm:gap-3 lg:grid-cols-[1.15fr_1fr_1fr_1fr]">
+              <label className="col-span-2 rounded-[18px] border border-slate-200 bg-white p-3 sm:p-4 lg:col-span-1">
                 <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Search</span>
                 <input
                   type="text"
@@ -1067,8 +1083,14 @@ export default function BookingPage() {
 
               <label className="col-span-2 rounded-[18px] border border-slate-200 bg-white p-3 sm:col-span-1 sm:p-4">
                 <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Month</span>
-                <input type="month" value={monthFilter} onChange={(event) => setMonthFilter(event.target.value)} className="mt-2 min-h-11 w-full rounded-2xl border border-slate-200 bg-[#f8faf8] px-3 text-sm text-slate-900 outline-none" />
+                <input
+                  type="month"
+                  value={monthFilter}
+                  onChange={(event) => setMonthFilter(event.target.value)}
+                  className="mt-2 min-h-11 w-full rounded-2xl border border-slate-200 bg-[#f8faf8] px-3 text-sm text-slate-900 outline-none"
+                />
               </label>
+
             </div>
 
             <div className="mt-5 overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-sm">

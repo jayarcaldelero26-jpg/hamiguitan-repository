@@ -11,7 +11,9 @@ import {
   type SelectedDateBooking,
 } from "@/app/lib/bookingTypes";
 import {
+  addDays,
   firstDateOfMonth,
+  formatDateOnly,
   formatDisplayDate,
   formatMonthLabel,
   shiftMonth,
@@ -45,6 +47,13 @@ function getWeekdayIndex(date: string) {
 
 function formatDayNumber(date: string) {
   return date.slice(-2).replace(/^0/, "");
+}
+
+function formatDayStateLabel(state?: CalendarDayData["sanState"] | null) {
+  if (state === "blocked") return "Closed";
+  if (state === "full") return "High Demand";
+  if (state === "limited") return "Limited";
+  return "Open";
 }
 
 function getOverallState(day: CalendarDayData) {
@@ -169,8 +178,8 @@ function DayDetailsModal({
   selectedDay,
   selectedDateBookings,
   selectedClosed,
-  selectedFullyBooked,
   canCreateBookings,
+  selectedCamp4Advised,
 }: {
   open: boolean;
   onClose: () => void;
@@ -180,8 +189,8 @@ function DayDetailsModal({
   selectedDay: CalendarDayData | null;
   selectedDateBookings: SelectedDateBooking[];
   selectedClosed: boolean;
-  selectedFullyBooked: boolean;
   canCreateBookings: boolean;
+  selectedCamp4Advised: boolean;
 }) {
   return (
     <AnimatePresence mode="wait">
@@ -216,6 +225,11 @@ function DayDetailsModal({
                 {selectedCapacityNote && (
                   <p className="mt-2 text-sm font-medium text-slate-500">{selectedCapacityNote}</p>
                 )}
+                {selectedCamp4Advised && (
+                  <span className="mt-3 inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-700">
+                    Camp 4 advised
+                  </span>
+                )}
               </div>
 
               <button
@@ -245,7 +259,7 @@ function DayDetailsModal({
                     <span className="ml-1 text-base font-medium opacity-80">/ 30</span>
                   </p>
                   <p className="mt-2 text-sm opacity-90">
-                    {selectedDay?.sanState === "full" ? "Full" : selectedDay?.sanState || "available"}
+                    {formatDayStateLabel(selectedDay?.sanState)}
                   </p>
                 </article>
 
@@ -264,7 +278,7 @@ function DayDetailsModal({
                     <span className="ml-1 text-base font-medium opacity-80">/ 30</span>
                   </p>
                   <p className="mt-2 text-sm opacity-90">
-                    {selectedDay?.govState === "full" ? "Full" : selectedDay?.govState || "available"}
+                    {formatDayStateLabel(selectedDay?.govState)}
                   </p>
                 </article>
               </div>
@@ -273,10 +287,6 @@ function DayDetailsModal({
                 {selectedClosed ? (
                   <div className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-slate-200 bg-slate-100 px-5 text-sm font-semibold text-slate-600">
                     Closed for Booking
-                  </div>
-                ) : selectedFullyBooked ? (
-                  <div className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-rose-200 bg-rose-50 px-5 text-sm font-semibold text-rose-700">
-                    Fully Booked
                   </div>
                 ) : !canCreateBookings ? (
                   <div className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-slate-200 bg-slate-100 px-5 text-sm font-semibold text-slate-600">
@@ -426,8 +436,6 @@ export default function CalendarPage() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isDayModalOpen]);
 
-  const categoryOptions = [ALL_CATEGORIES, ...PARTICIPANT_CATEGORY_OPTIONS];
-
   const selectedDay = useMemo(
     () => data?.days.find((day) => day.date === selectedDate) || null,
     [data, selectedDate]
@@ -454,7 +462,23 @@ export default function CalendarPage() {
   );
   const selectedSanFull = selectedDay?.sanState === "full";
   const selectedGovFull = selectedDay?.govState === "full";
-  const selectedFullyBooked = selectedSanFull || selectedGovFull;
+  const selectedSanLimited = selectedDay?.sanState === "limited";
+  const selectedGovLimited = selectedDay?.govState === "limited";
+  const selectedLinkedFullWarning =
+    (selectedSanFull && (selectedDay?.sanIsidro || 0) === 0) ||
+    (selectedGovFull && (selectedDay?.governorGeneroso || 0) === 0);
+  const selectedLinkedLimitedWarning =
+    (selectedSanLimited && (selectedDay?.sanIsidro || 0) === 0) ||
+    (selectedGovLimited && (selectedDay?.governorGeneroso || 0) === 0);
+  const selectedCamp4Advised = selectedDateBookings.some((booking) => {
+    const secondDay = formatDateOnly(addDays(new Date(`${booking.start_date}T00:00:00.000Z`), 1));
+    if (secondDay !== selectedDate) return false;
+    const startDay = data?.days.find((day) => day.date === booking.start_date);
+    if (!startDay) return false;
+    const startTrailState =
+      booking.trail === "San Isidro Trail" ? startDay.sanState : startDay.govState;
+    return startTrailState === "full" || startTrailState === "limited";
+  });
 
   const selectedNote = selectedClosed
     ? "This date is closed due to an Off Season or Block Schedule entry."
@@ -464,13 +488,14 @@ export default function CalendarPage() {
         ? "This date includes a special climb booking."
         : "No special schedule note is recorded for this date.";
 
-  const selectedCapacityNote = selectedSanFull && selectedGovFull
-    ? "Both trails have at least one full exact schedule on this date. Overlapping schedules with different date ranges may still be available."
-    : selectedSanFull
-      ? "San Isidro has a full exact schedule on this date. Gov. Generoso may still be available."
-      : selectedGovFull
-        ? "Gov. Generoso has a full exact schedule on this date. San Isidro may still be available."
-        : "";
+  const selectedCapacityNote =
+    selectedLinkedFullWarning
+      ? "Camp 3 reached full capacity from the linked deployment schedule."
+      : selectedLinkedLimitedWarning
+        ? "Camp 3 has limited remaining capacity from the linked deployment schedule."
+        : selectedSanFull || selectedGovFull || selectedSanLimited || selectedGovLimited
+        ? "This date has high occupancy or one or more full exact schedules. Other trail and 2-3 day schedule combinations may still be available."
+      : "";
 
   const todayMonth = getCurrentMonth();
   const todayDate = getCurrentDate();
@@ -509,8 +534,8 @@ export default function CalendarPage() {
                 </h2>
               </div>
 
-              <div className="flex flex-col gap-2.5 md:flex-row md:items-end md:justify-end">
-                <label className="w-full md:min-w-[220px]">
+              <div className="flex flex-col gap-2.5 lg:flex-row lg:items-end lg:justify-end lg:gap-3">
+                <label className="w-full lg:min-w-[220px]">
                   <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
                     Category
                   </span>
@@ -529,11 +554,11 @@ export default function CalendarPage() {
                   </select>
                 </label>
 
-                <div className="flex flex-wrap gap-2.5">
+                <div className="grid grid-cols-3 gap-2.5 lg:flex lg:flex-nowrap lg:items-center lg:justify-end">
                   <button
                     type="button"
                     onClick={() => setMonth((current) => shiftMonth(current, -1))}
-                    className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-[#d9e4dd] bg-white/95 px-4 text-sm font-semibold text-slate-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] transition hover:border-[#bfd0c5] hover:bg-[#f7faf7]"
+                    className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl border border-[#d9e4dd] bg-white/95 px-4 text-sm font-semibold text-slate-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] transition hover:border-[#bfd0c5] hover:bg-[#f7faf7] lg:w-auto"
                   >
                     Previous
                   </button>
@@ -543,14 +568,14 @@ export default function CalendarPage() {
                       setMonth(todayMonth);
                       setSelectedDate(todayDate);
                     }}
-                    className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-[#cfe0d6] bg-[linear-gradient(180deg,#eef6f0,#e7f1ea)] px-4 text-sm font-semibold text-[#235347] shadow-[0_10px_22px_rgba(35,83,71,0.08)] transition hover:bg-[#e8f0eb]"
+                    className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl border border-[#cfe0d6] bg-[linear-gradient(180deg,#eef6f0,#e7f1ea)] px-4 text-sm font-semibold text-[#235347] shadow-[0_10px_22px_rgba(35,83,71,0.08)] transition hover:bg-[#e8f0eb] lg:w-auto"
                   >
                     Today
                   </button>
                   <button
                     type="button"
                     onClick={() => setMonth((current) => shiftMonth(current, 1))}
-                    className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-[#d9e4dd] bg-white/95 px-4 text-sm font-semibold text-slate-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] transition hover:border-[#bfd0c5] hover:bg-[#f7faf7]"
+                    className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl border border-[#d9e4dd] bg-white/95 px-4 text-sm font-semibold text-slate-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] transition hover:border-[#bfd0c5] hover:bg-[#f7faf7] lg:w-auto"
                   >
                     Next
                   </button>
@@ -609,9 +634,10 @@ export default function CalendarPage() {
         selectedDay={selectedDay}
         selectedDateBookings={selectedDateBookings}
         selectedClosed={selectedClosed}
-        selectedFullyBooked={selectedFullyBooked}
         canCreateBookings={canCreateBookings}
+        selectedCamp4Advised={selectedCamp4Advised}
       />
     </section>
   );
 }
+  const categoryOptions = [ALL_CATEGORIES, ...PARTICIPANT_CATEGORY_OPTIONS];

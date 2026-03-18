@@ -46,10 +46,6 @@ function isOffSeasonLikeType(bookingType: string) {
   return bookingType === "Off Season" || bookingType === "Block Schedule";
 }
 
-function getScheduleGroupKey(start_date: string, end_date: string) {
-  return `${start_date}__${end_date}`;
-}
-
 type ValidationResult =
   | { ok: true; payload: BookingFormPayload }
   | { ok: false; error: string };
@@ -206,8 +202,7 @@ export async function validateBookingCapacity(input: {
   const { data, error } = await supabaseAdmin
     .from(BOOKINGS_TABLE)
     .select("id,start_date,end_date,pax,approval_status,booking_status,booking_type")
-    .eq("start_date", input.start_date)
-    .eq("end_date", input.end_date);
+    .eq("start_date", input.start_date);
 
   if (error) {
     throw wrapBookingsError(error, "Failed to validate booking capacity.");
@@ -222,8 +217,7 @@ export async function validateBookingCapacity(input: {
     (total, row) => total + (typeof row.pax === "number" ? row.pax : 0),
     0
   );
-  const conflicts =
-    scheduledPax + input.pax > 30 ? [`${input.start_date} to ${input.end_date}`] : [];
+  const conflicts = scheduledPax + input.pax > 30 ? [input.start_date] : [];
 
   return {
     ok: conflicts.length === 0,
@@ -326,6 +320,10 @@ export async function getCalendarData(
 
   const blockedDates = new Map<string, Set<TrailOption>>();
   const fullScheduleDates = new Map<string, Set<TrailOption>>();
+  const linkedWarningDates = new Map<
+    string,
+    Partial<Record<TrailOption, "limited" | "full">>
+  >();
   const occupancy = new Map<
     string,
     {
@@ -355,36 +353,49 @@ export async function getCalendarData(
     }
   }
 
-  const scheduleGroupPax = new Map<string, number>();
+  const camp3NightPax = new Map<string, number>();
   for (const booking of occupancyBookings) {
-    const key = getScheduleGroupKey(booking.start_date, booking.end_date);
-    scheduleGroupPax.set(key, (scheduleGroupPax.get(key) || 0) + booking.pax);
+    camp3NightPax.set(
+      booking.start_date,
+      (camp3NightPax.get(booking.start_date) || 0) + booking.pax
+    );
   }
 
   for (const booking of occupancyBookings) {
-    const key = getScheduleGroupKey(booking.start_date, booking.end_date);
-    if ((scheduleGroupPax.get(key) || 0) < 30) continue;
+    const startNightPax = camp3NightPax.get(booking.start_date) || 0;
+    const linkedState = startNightPax >= 30 ? "full" : startNightPax >= 24 ? "limited" : null;
+    if (!linkedState) continue;
 
-    for (const day of expandDateRange(booking.start_date, booking.end_date)) {
-      const set = fullScheduleDates.get(day) || new Set<TrailOption>();
-      set.add("San Isidro Trail");
-      set.add("Governor Generoso Trail");
-      fullScheduleDates.set(day, set);
-    }
-  }
-
-  for (const booking of occupancyBookings) {
     const days = expandDateRange(booking.start_date, booking.end_date);
-    for (const day of days) {
-      const entry = occupancy.get(day) || { sanIsidro: 0, governorGeneroso: 0 };
 
-      if (booking.trail === "San Isidro Trail") {
-        entry.sanIsidro += booking.pax;
-      } else if (booking.trail === "Governor Generoso Trail") {
-        entry.governorGeneroso += booking.pax;
+    if (linkedState === "full") {
+      for (const day of days) {
+        const set = fullScheduleDates.get(day) || new Set<TrailOption>();
+        set.add("San Isidro Trail");
+        set.add("Governor Generoso Trail");
+        fullScheduleDates.set(day, set);
       }
-      occupancy.set(day, entry);
     }
+
+    for (const day of days.slice(1)) {
+      const entry = linkedWarningDates.get(day) || {};
+      const currentState = entry[booking.trail];
+      entry[booking.trail] =
+        currentState === "full" || linkedState === "full" ? "full" : "limited";
+      linkedWarningDates.set(day, entry);
+    }
+  }
+
+  for (const booking of occupancyBookings) {
+    const day = booking.start_date;
+    const entry = occupancy.get(day) || { sanIsidro: 0, governorGeneroso: 0 };
+
+    if (booking.trail === "San Isidro Trail") {
+      entry.sanIsidro += booking.pax;
+    } else if (booking.trail === "Governor Generoso Trail") {
+      entry.governorGeneroso += booking.pax;
+    }
+    occupancy.set(day, entry);
   }
 
   const days: CalendarDayData[] = [];
@@ -395,16 +406,27 @@ export async function getCalendarData(
 
   for (let current = monthStartDate; current <= monthEndDate; current = addDays(current, 1)) {
     const date = formatDateOnly(current);
-    const entry = occupancy.get(date) || { sanIsidro: 0, governorGeneroso: 0 };
+    const rawEntry = occupancy.get(date) || { sanIsidro: 0, governorGeneroso: 0 };
+    const entry = {
+      sanIsidro: Math.min(rawEntry.sanIsidro, 30),
+      governorGeneroso: Math.min(rawEntry.governorGeneroso, 30),
+    };
     const blockedSet = blockedDates.get(date) || new Set<TrailOption>();
     const fullSet = fullScheduleDates.get(date) || new Set<TrailOption>();
+    const linkedWarnings = linkedWarningDates.get(date) || {};
 
-    const sanState = inferDayState({
+    const sanState =
+      entry.sanIsidro === 0 && linkedWarnings["San Isidro Trail"]
+        ? linkedWarnings["San Isidro Trail"]!
+        : inferDayState({
       occupancy: entry.sanIsidro,
       blocked: blockedSet.has("San Isidro Trail"),
       fullSchedule: fullSet.has("San Isidro Trail"),
     });
-    const govState = inferDayState({
+    const govState =
+      entry.governorGeneroso === 0 && linkedWarnings["Governor Generoso Trail"]
+        ? linkedWarnings["Governor Generoso Trail"]!
+        : inferDayState({
       occupancy: entry.governorGeneroso,
       blocked: blockedSet.has("Governor Generoso Trail"),
       fullSchedule: fullSet.has("Governor Generoso Trail"),
@@ -498,11 +520,11 @@ export async function updateBooking(id: number, payload: BookingWritePayload) {
 
 export function getConflictMessage(_trail: TrailOption, conflictingDates: string[]) {
   if (conflictingDates.length === 0) {
-    return "The selected hiking schedule stays within the 30-pax shared limit across both trails.";
+    return "Camp 3 stays within capacity for hikers starting on the selected date.";
   }
 
   const preview = conflictingDates.join(", ");
-  return `The selected hiking schedule is already full across both trails: ${preview}.`;
+  return `Camp 3 is at capacity for this night. Please choose a different start date. Affected start date: ${preview}.`;
 }
 
 export function getOffSeasonConflictMessage(overlaps: OffSeasonConflict[]) {
