@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/app/lib/auth";
 import { writeAuditLog } from "@/app/lib/auditLog";
 import {
   canCreateBookings,
+  canDeleteBookings,
   canEditBookings,
   canViewBookings,
   createBooking,
@@ -13,6 +14,7 @@ import {
   getConflictMessage,
   getOffSeasonConflictMessage,
   listBookings,
+  softDeleteBooking,
   updateBooking,
   validateBookingCapacity,
   validateBookingPayload,
@@ -206,6 +208,58 @@ export async function PATCH(req: NextRequest) {
     console.error("BOOKING UPDATE ERROR:", error);
     return NextResponse.json(
       { error: getErrorMessage(error, "Failed to update booking.") },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  const me = await getCurrentUser();
+
+  if (!me) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!canDeleteBookings(me.role)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  try {
+    const url = new URL(req.url);
+    const id = Number(url.searchParams.get("id"));
+
+    if (!Number.isFinite(id) || id <= 0) {
+      return NextResponse.json({ error: "Invalid booking id." }, { status: 400 });
+    }
+
+    const existing = await getBookingById(id);
+    if (!existing) {
+      return NextResponse.json({ error: "Booking not found." }, { status: 404 });
+    }
+
+    const deleted = await softDeleteBooking(id, me.id);
+    if (!deleted) {
+      return NextResponse.json({ error: "Booking not found." }, { status: 404 });
+    }
+
+    await writeAuditLog({
+      userId: me.id,
+      userEmail: me.email,
+      action: "booking_soft_delete",
+      fileName: deleted.booking_code,
+      fromPath: `${deleted.trail} | ${deleted.start_date} -> ${deleted.end_date}`,
+      toPath: "soft_deleted",
+    });
+
+    return NextResponse.json({
+      ok: true,
+      id: deleted.id,
+      booking_code: deleted.booking_code,
+    });
+  } catch (error) {
+    console.error("BOOKING DELETE ERROR:", error);
+    return NextResponse.json(
+      { error: getErrorMessage(error, "Failed to delete booking.") },
       { status: 500 }
     );
   }

@@ -168,6 +168,7 @@ export async function listBookings() {
   const { data, error } = await supabaseAdmin
     .from(BOOKINGS_TABLE)
     .select("*")
+    .is("deleted_at", null)
     .order("start_date", { ascending: false })
     .order("created_at", { ascending: false });
 
@@ -183,6 +184,7 @@ export async function getBookingById(id: number) {
     .from(BOOKINGS_TABLE)
     .select("*")
     .eq("id", id)
+    .is("deleted_at", null)
     .maybeSingle();
 
   if (error) {
@@ -202,7 +204,8 @@ export async function validateBookingCapacity(input: {
   const { data, error } = await supabaseAdmin
     .from(BOOKINGS_TABLE)
     .select("id,start_date,end_date,pax,approval_status,booking_status,booking_type")
-    .eq("start_date", input.start_date);
+    .eq("start_date", input.start_date)
+    .is("deleted_at", null);
 
   if (error) {
     throw wrapBookingsError(error, "Failed to validate booking capacity.");
@@ -234,6 +237,7 @@ export async function findOffSeasonOverlaps(input: {
     .from(BOOKINGS_TABLE)
     .select("id,booking_code,start_date,end_date,contact_name")
     .eq("booking_type", "Off Season")
+    .is("deleted_at", null)
     .lte("start_date", input.end_date)
     .gte("end_date", input.start_date)
     .order("start_date", { ascending: true });
@@ -300,6 +304,7 @@ export async function getCalendarData(
   const { data, error } = await supabaseAdmin
     .from(BOOKINGS_TABLE)
     .select("*")
+    .is("deleted_at", null)
     .lte("start_date", monthEnd)
     .gte("end_date", monthStart)
     .order("start_date", { ascending: true });
@@ -508,6 +513,7 @@ export async function updateBooking(id: number, payload: BookingWritePayload) {
     .from(BOOKINGS_TABLE)
     .update({ ...payload, updated_at: new Date().toISOString() })
     .eq("id", id)
+    .is("deleted_at", null)
     .select("*")
     .single();
 
@@ -516,6 +522,26 @@ export async function updateBooking(id: number, payload: BookingWritePayload) {
   }
 
   return data as BookingRow;
+}
+
+export async function softDeleteBooking(id: number, deletedBy: number) {
+  const { data, error } = await supabaseAdmin
+    .from(BOOKINGS_TABLE)
+    .update({
+      deleted_at: new Date().toISOString(),
+      deleted_by: deletedBy,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .is("deleted_at", null)
+    .select("*")
+    .maybeSingle();
+
+  if (error) {
+    throw wrapBookingsError(error, "Failed to delete booking.");
+  }
+
+  return (data as BookingRow | null) || null;
 }
 
 export function getConflictMessage(_trail: TrailOption, conflictingDates: string[]) {
@@ -560,4 +586,8 @@ export function canViewBookings(role?: string) {
 
 export function canManageBookings(role?: string) {
   return canCreateBookings(role);
+}
+
+export function canDeleteBookings(role?: string) {
+  return canEditBookings(role);
 }

@@ -7,7 +7,7 @@ import {
   useDocuments,
   type DocumentRow,
 } from "@/app/components/DocumentsProvider";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   TrashIcon,
@@ -22,7 +22,8 @@ import {
   FolderIcon,
   ChartBarIcon,
 } from "@heroicons/react/24/outline";
-import { repoTheme, type PageTheme } from "@/app/lib/repoTheme";
+import { repoTheme } from "@/app/lib/repoTheme";
+import { useProtectedTheme } from "@/app/components/ProtectedThemeProvider";
 
 function initials(name: string) {
   const parts = (name || "").trim().split(/\s+/).filter(Boolean);
@@ -157,10 +158,10 @@ function RecentUploadsSkeleton({ dark }: { dark: boolean }) {
         {[1, 2, 3].map((i) => (
           <div
             key={i}
-            className={`rounded-[24px] border px-4 py-4 ${
+            className={`rounded-[24px] px-4 py-4 ${
               dark
-                ? "bg-white/[0.035] border-white/8"
-                : "bg-white/45 border-white/50"
+                ? "bg-white/[0.035]"
+                : "bg-white/45"
             }`}
           >
             <SkeletonBlock dark={dark} className="h-4 w-2/3" />
@@ -302,7 +303,7 @@ function DashboardStatCard({
           </div>
 
           <div
-            className={`mt-1 flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] border shadow-[0_12px_24px_rgba(0,0,0,0.08)] ${iconCapsule}`}
+            className={`mt-1 flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] ${iconCapsule}`}
           >
             <span className={iconTone}>{icon}</span>
           </div>
@@ -328,7 +329,7 @@ export default function Dashboard() {
     refreshDocuments,
   } = useDocuments();
 
-  const [pageTheme, setPageTheme] = useState<PageTheme>("dark");
+  const { theme: pageTheme } = useProtectedTheme();
   const [query, setQuery] = useState("");
   const [activeTab, setActiveTab] = useState<
     "all" | "academe" | "stakeholder" | "pamo"
@@ -348,20 +349,6 @@ export default function Dashboard() {
   const [editSelectedFolder, setEditSelectedFolder] = useState("");
   const [editNewFolder, setEditNewFolder] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
-
-  useEffect(() => {
-    const syncTheme = () => {
-      const saved =
-        typeof window !== "undefined"
-          ? (localStorage.getItem("page-theme") as PageTheme | null)
-          : null;
-      setPageTheme(saved === "light" ? "light" : "dark");
-    };
-
-    syncTheme();
-    window.addEventListener("page-theme-changed", syncTheme);
-    return () => window.removeEventListener("page-theme-changed", syncTheme);
-  }, []);
 
   const stats = useMemo(() => {
     const total = docs.length;
@@ -571,17 +558,29 @@ export default function Dashboard() {
   };
 
   const btnSm =
-    "px-2.5 py-1.5 rounded-[16px] text-[11px] font-medium transition inline-flex items-center gap-1.5 shrink-0 whitespace-nowrap border";
+    "app-glass-button app-protected-action-button inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-[11px] font-semibold transition";
 
   const dark = pageTheme === "dark";
   const ui = repoTheme(pageTheme);
+  const rowActionNeutralClassName = dark
+    ? "border-white/10 bg-[rgba(255,255,255,0.08)] text-[#E6EDF3] [&_svg]:text-inherit"
+    : "border-slate-200/80 bg-[#F3F4F6] text-[#1F2937] [&_svg]:text-inherit";
+  const rowActionDownloadClassName = dark
+    ? "border-[#5E7D9C]/28 bg-[rgba(57,92,122,0.28)] text-[#E6EDF3] [&_svg]:text-inherit"
+    : "border-[#395C7A]/18 bg-[rgba(57,92,122,0.12)] text-[#1E3A5F] [&_svg]:text-inherit";
+  const rowActionDeleteClassName = dark
+    ? "border-[rgba(220,38,38,0.26)] bg-[rgba(220,38,38,0.22)] text-[#FEE2E2] [&_svg]:text-inherit"
+    : "border-[rgba(220,38,38,0.18)] bg-[rgba(220,38,38,0.12)] text-[#991B1B] [&_svg]:text-inherit";
 
   const cardCls = ui.card;
   const textMain = ui.textMain;
   const textMuted = ui.textMuted;
   const textSoft = ui.textSoft;
   const subBg = dark ? "bg-white/[0.03]" : "bg-white/45";
-  const subBorder = dark ? "border-white/8" : "border-white/50";
+  const subBorder = dark ? "border-transparent" : "border-slate-200/60";
+  const modalOverlayClassName = dark
+    ? "fixed inset-0 bg-black/28 backdrop-blur-[2px] flex items-center justify-center p-4"
+    : "fixed inset-0 bg-slate-900/10 backdrop-blur-[2px] flex items-center justify-center p-4";
   const inputCls = `${ui.input} text-sm`;
 
   if (loadingUser || !user) {
@@ -729,7 +728,7 @@ export default function Dashboard() {
 
           <motion.div
             {...fadeUpDelayed(0.08)}
-            className={`${ui.shell} mb-5 overflow-hidden p-4 sm:p-5 shadow-[0_18px_40px_rgba(35,83,71,0.10)]`}
+            className={`${ui.shell} mb-5 overflow-hidden p-4 sm:p-5 shadow-none`}
           >
             <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
               <div>
@@ -946,25 +945,25 @@ export default function Dashboard() {
 
                 <div className="mt-5 space-y-3">
                   {recentUploads.length === 0 ? (
-                    <div className={`rounded-[22px] border px-4 py-6 text-sm ${subBg} ${subBorder} ${textMuted}`}>
+                    <div className={`rounded-[22px] px-4 py-6 text-sm ${subBg} ${textMuted}`}>
                       No uploads yet.
                     </div>
                   ) : (
                     recentUploads.map((d, index) => (
                       <div
                         key={d.id}
-                        className={`rounded-[24px] border p-4 transition ${subBg} ${subBorder} ${
+                        className={`rounded-[24px] p-4 transition ${subBg} ${
                           dark
-                            ? "shadow-[0_14px_32px_rgba(0,0,0,0.18)] hover:bg-white/[0.05]"
-                            : "shadow-[0_14px_30px_rgba(35,83,71,0.08)] hover:bg-white/68"
+                            ? "hover:bg-white/[0.05]"
+                            : "hover:bg-white/68"
                         }`}
                       >
                         <div className="flex items-start gap-3">
                           <div
-                            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px] border shadow-[0_10px_24px_rgba(0,0,0,0.08)] ${
+                            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px] ${
                               dark
-                                ? "border-[#9fb5ff]/18 bg-[#9fb5ff]/10 text-[#c7cbff]"
-                                : "border-[#cfd5ff] bg-[#eef0ff] text-[#5d64b8]"
+                                ? "bg-[#9fb5ff]/10 text-[#c7cbff]"
+                                : "bg-[#eef0ff] text-[#5d64b8]"
                             }`}
                           >
                             <DocumentTextIcon className="w-5 h-5" />
@@ -1015,7 +1014,7 @@ export default function Dashboard() {
 
           <motion.div
             {...fadeUpDelayed(0.08)}
-            className={`${ui.shell} mb-5 overflow-hidden p-4 sm:p-5 shadow-[0_12px_24px_rgba(35,83,71,0.08)] md:shadow-[0_18px_40px_rgba(35,83,71,0.10)]`}
+            className={`${ui.shell} mb-5 overflow-hidden p-4 sm:p-5 shadow-none`}
           >
             <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
               <div>
@@ -1106,10 +1105,10 @@ export default function Dashboard() {
             {filteredDocs.length === 0 ? (
               <div className="text-center py-14">
                 <div
-                  className={`mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-[20px] border shadow-[0_10px_24px_rgba(0,0,0,0.08)] ${
+                  className={`mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-[20px] ${
                     dark
-                      ? "border-[#97bbe4]/18 bg-[#97bbe4]/10 text-[#c8d8f0]"
-                      : "border-[#d7e4f0] bg-[#edf4fb] text-[#4d6f99]"
+                      ? "bg-[#97bbe4]/10 text-[#c8d8f0]"
+                      : "bg-[#edf4fb] text-[#4d6f99]"
                   }`}
                 >
                   <DocumentTextIcon className="w-7 h-7" />
@@ -1203,7 +1202,7 @@ export default function Dashboard() {
                               <button
                                 type="button"
                                 onClick={() => openEditDialog(doc)}
-                                className={`${btnSm} ${ui.buttonSecondary}`}
+                                className={`${btnSm} ${rowActionNeutralClassName}`}
                               >
                                 <PencilSquareIcon className="w-3.5 h-3.5" />
                                 Edit
@@ -1213,7 +1212,7 @@ export default function Dashboard() {
                             <button
                               type="button"
                               onClick={() => setPreviewDoc(doc)}
-                              className={`${btnSm} ${ui.buttonSecondary}`}
+                              className={`${btnSm} ${rowActionNeutralClassName}`}
                             >
                               <EyeIcon className="w-3.5 h-3.5" />
                               View
@@ -1221,7 +1220,7 @@ export default function Dashboard() {
 
                             <a
                               href={downloadUrl(doc.fileId)}
-                              className={`${btnSm} ${ui.buttonPrimary} font-semibold`}
+                              className={`${btnSm} ${rowActionDownloadClassName} font-semibold`}
                             >
                               <CloudArrowDownIcon className="w-3.5 h-3.5" />
                               Download
@@ -1231,7 +1230,7 @@ export default function Dashboard() {
                               <button
                                 type="button"
                                 onClick={() => setConfirmDeleteId(doc.id)}
-                                className={`${btnSm} ${ui.buttonDanger}`}
+                                className={`${btnSm} ${rowActionDeleteClassName}`}
                               >
                                 <TrashIcon className="w-3.5 h-3.5" />
                                 Delete
@@ -1260,7 +1259,7 @@ export default function Dashboard() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.16 }}
-            className="fixed inset-0 z-[65] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
+            className={`z-[65] ${modalOverlayClassName}`}
           >
             <motion.div
               initial={{ opacity: 0, y: 16, scale: 0.98 }}
@@ -1278,7 +1277,7 @@ export default function Dashboard() {
                   <button
                     type="button"
                     onClick={() => !savingEdit && setEditDoc(null)}
-                    className={`min-h-11 min-w-11 p-2.5 rounded-[16px] transition border shadow-sm ${ui.buttonSecondary}`}
+                    className={`app-glass-skip min-h-11 min-w-11 p-2.5 rounded-full transition border shadow-sm ${ui.buttonSecondary}`}
                   >
                     <XMarkIcon className={`w-5 h-5 ${dark ? "text-[#DAF1DE]" : "text-[#163832]"}`} />
                   </button>
@@ -1298,9 +1297,9 @@ export default function Dashboard() {
                     className={`${ui.input.replace("pl-11", "pl-4")} mt-2 text-sm`}
                     disabled={savingEdit}
                   >
-                    <option className="text-slate-900" value="Academe">Academe</option>
-                    <option className="text-slate-900" value="Stakeholders">Stakeholders</option>
-                    <option className="text-slate-900" value="PAMO Activity">PAMO Activity</option>
+                    <option value="Academe">Academe</option>
+                    <option value="Stakeholders">Stakeholders</option>
+                    <option value="PAMO Activity">PAMO Activity</option>
                   </select>
                 </div>
 
@@ -1337,9 +1336,9 @@ export default function Dashboard() {
                       className={`${ui.input.replace("pl-11", "pl-4")} mt-2 text-sm`}
                       disabled={savingEdit}
                     >
-                      <option className="text-slate-900" value="">Select existing folder</option>
+                      <option value="">Select existing folder</option>
                       {editFolderOptions.map((folder) => (
-                        <option className="text-slate-900" key={folder} value={folder}>
+                        <option key={folder} value={folder}>
                           {folder}
                         </option>
                       ))}
@@ -1393,7 +1392,7 @@ export default function Dashboard() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.16 }}
-            className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
+            className={`z-[60] ${modalOverlayClassName}`}
           >
             <motion.div
               initial={{ opacity: 0, y: 16, scale: 0.98 }}
@@ -1429,7 +1428,7 @@ export default function Dashboard() {
                   <button
                     type="button"
                     onClick={() => setPreviewDoc(null)}
-                    className={`min-h-11 min-w-11 p-2.5 rounded-[16px] transition border shadow-sm ${ui.buttonSecondary}`}
+                    className={`app-glass-skip min-h-11 min-w-11 p-2.5 rounded-full transition border shadow-sm ${ui.buttonSecondary}`}
                   >
                     <XMarkIcon
                       className={`w-5 h-5 ${dark ? "text-[#DAF1DE]" : "text-[#163832]"}`}

@@ -8,71 +8,94 @@ export function repoTheme(pageTheme: PageTheme) {
     dark,
 
     page: dark
-      ? "min-h-full bg-[linear-gradient(180deg,#051F20_0%,#0B2B26_38%,#163832_100%)] text-[#DAF1DE]"
-      : "min-h-full bg-[linear-gradient(135deg,#DAF1DE_0%,#d7e8dd_35%,#cfe1d7_65%,#e5efea_100%)] text-[#163832]",
+      ? "min-h-full [background:var(--ui-page-bg)] text-[var(--ui-text-main)]"
+      : "min-h-full [background:var(--ui-page-bg)] text-[var(--ui-text-main)]",
 
     shell: dark
-      ? "bg-white/[0.03] border border-white/8 shadow-[0_12px_28px_rgba(0,0,0,0.18)] md:shadow-[0_18px_50px_rgba(0,0,0,0.28)] backdrop-blur-sm md:backdrop-blur-xl rounded-[28px]"
-      : "bg-white/42 border border-white/45 shadow-[0_10px_24px_rgba(22,56,50,0.08)] md:shadow-[0_18px_45px_rgba(22,56,50,0.10)] backdrop-blur-sm md:backdrop-blur-xl rounded-[28px]",
+      ? "[background:var(--ui-shell-bg)] border border-[color:var(--ui-shell-border)] shadow-[var(--ui-shell-shadow)] backdrop-blur-sm md:backdrop-blur-xl rounded-[28px]"
+      : "[background:var(--ui-shell-bg)] border border-[color:var(--ui-shell-border)] shadow-[var(--ui-shell-shadow)] backdrop-blur-sm md:backdrop-blur-xl rounded-[28px]",
+
+    sectionShell: dark
+      ? "rounded-[28px] border border-[color:var(--ui-shell-border)] [background:var(--ui-section-shell-bg)] shadow-[var(--ui-section-shell-shadow)]"
+      : "rounded-[28px] border border-[color:var(--ui-shell-border)] [background:var(--ui-section-shell-bg)] shadow-[var(--ui-section-shell-shadow)]",
+
+    panel: dark
+      ? "rounded-[20px] border border-[color:var(--ui-panel-border)] [background:var(--ui-panel-bg)] shadow-[var(--ui-panel-shadow)]"
+      : "rounded-[20px] border border-[color:var(--ui-panel-border)] [background:var(--ui-panel-bg)] shadow-[var(--ui-panel-shadow)]",
+
+    panelSoft: dark
+      ? "rounded-[18px] border border-[color:var(--ui-panel-border)] [background:var(--ui-panel-soft-bg)]"
+      : "rounded-[18px] border border-[color:var(--ui-panel-border)] [background:var(--ui-panel-soft-bg)]",
+
+    sidebar: dark
+      ? "border-[color:var(--ui-shell-border)] [background:var(--ui-sidebar-bg)] shadow-[var(--ui-sidebar-shadow)]"
+      : "border-[color:var(--ui-shell-border)] [background:var(--ui-sidebar-bg)] shadow-[var(--ui-sidebar-shadow)]",
+
+    mobileBar: dark
+      ? "border-[color:var(--ui-shell-border)] bg-[color:var(--ui-mobile-bar-bg)]"
+      : "border-[color:var(--ui-shell-border)] bg-[color:var(--ui-mobile-bar-bg)]",
 
     card: dark
-      ? "bg-[linear-gradient(180deg,rgba(35,83,71,0.58),rgba(11,43,38,0.82))] border border-white/8 shadow-[0_10px_24px_rgba(0,0,0,0.16)] md:shadow-[0_16px_40px_rgba(0,0,0,0.22)] backdrop-blur-sm md:backdrop-blur-xl rounded-[26px]"
-      : "bg-white/55 border border-white/50 shadow-[0_8px_20px_rgba(22,56,50,0.08)] md:shadow-[0_14px_34px_rgba(22,56,50,0.10)] backdrop-blur-sm md:backdrop-blur-xl rounded-[26px]",
+      ? "bg-[linear-gradient(180deg,rgba(31,42,51,0.92),rgba(24,31,39,0.96))] border border-[var(--ui-border)] shadow-[0_14px_34px_rgba(0,0,0,0.22)] md:shadow-[0_18px_44px_rgba(0,0,0,0.3)] backdrop-blur-sm md:backdrop-blur-xl rounded-[26px]"
+      : "bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(245,247,250,0.98))] border border-[var(--ui-border-strong)] shadow-[0_14px_32px_rgba(15,23,42,0.07)] md:shadow-[0_18px_42px_rgba(15,23,42,0.11)] backdrop-blur-sm md:backdrop-blur-xl rounded-[26px]",
 
     cardSoft: dark
-      ? "bg-white/[0.04] border border-white/8 rounded-[22px]"
-      : "bg-white/50 border border-white/45 rounded-[22px]",
+      ? "bg-white/[0.04] border border-[var(--ui-border)] rounded-[22px]"
+      : "bg-[#F8FAFC] border border-[var(--ui-border-strong)] rounded-[22px]",
 
     tableWrap: dark
-      ? "border border-white/8 bg-[#0B2B26]/70 rounded-[24px] overflow-hidden"
-      : "border border-white/50 bg-white/45 rounded-[24px] overflow-hidden",
+      ? "[background:var(--ui-table-surface-bg)] rounded-[24px] overflow-hidden shadow-none"
+      : "[background:var(--ui-table-surface-bg)] rounded-[24px] overflow-hidden shadow-none",
 
     tableHead: dark
-      ? "bg-[#051F20]/70 border-b border-white/8 text-[#8EB69B]"
-      : "bg-white/45 border-b border-white/50 text-[#235347]",
+      ? "bg-white/[0.035] text-[var(--ui-accent-soft)]"
+      : "bg-slate-50/88 text-[var(--ui-text-soft)]",
 
-    rowHover: dark ? "hover:bg-white/[0.035]" : "hover:bg-white/40",
+    rowHover: dark ? "hover:bg-white/[0.035]" : "hover:bg-slate-50/90",
 
-    textMain: dark ? "text-[#DAF1DE]" : "text-[#163832]",
-    textMuted: dark ? "text-[#DAF1DE]/68" : "text-[#235347]/82",
-    textSoft: dark ? "text-[#8EB69B]/78" : "text-[#235347]/62",
+    textMain: "text-[var(--ui-text-main)]",
+    textMuted: dark ? "text-[color:rgba(230,237,243,0.72)]" : "text-[color:rgba(75,85,99,0.82)]",
+    textSoft: dark ? "text-[color:rgba(151,166,168,0.88)]" : "text-[color:rgba(75,85,99,0.68)]",
 
     pill: dark
-      ? "bg-[#235347]/70 text-[#DAF1DE] border border-white/8"
-      : "bg-white/55 text-[#235347] border border-white/50",
+      ? "bg-[#2C3A45]/78 text-[var(--ui-text-main)] border border-[var(--ui-border)]"
+      : "bg-white text-[var(--ui-text-main)] border border-[var(--ui-border-strong)]",
 
     pillGreen: dark
-      ? "bg-[#163832] text-[#DAF1DE] border border-[#8EB69B]/18"
-      : "bg-[#e5f1ea] text-[#235347] border border-[#8EB69B]/45",
+      ? "bg-[#2D3B31] text-[var(--ui-text-main)] border border-[#868C65]/26"
+      : "bg-[#F4F4EE] text-[#4B4F41] border border-[#A5A58D]/42",
 
     pillBlue: dark
-      ? "bg-[#0B2B26] text-[#DAF1DE] border border-white/8"
-      : "bg-[#eef5f1] text-[#235347] border border-white/50",
+      ? "bg-[#243648] text-[var(--ui-text-main)] border border-[var(--ui-border)]"
+      : "bg-[#EEF3F8] text-[#395C7A] border border-[#395C7A]/18",
 
     pillAmber: dark
-      ? "bg-[#235347] text-[#DAF1DE] border border-white/8"
-      : "bg-[#edf5ef] text-[#235347] border border-white/50",
+      ? "bg-[#3A3D2F] text-[var(--ui-text-main)] border border-[#868C65]/24"
+      : "bg-[#F5F4ED] text-[#6B705C] border border-[#A5A58D]/34",
 
     input: dark
-      ? "w-full pl-11 pr-4 py-3.5 rounded-[20px] border border-white/10 bg-white/[0.04] text-[#DAF1DE] placeholder:text-[#8EB69B]/65 outline-none focus:ring-4 focus:ring-[#8EB69B]/10 focus:border-[#8EB69B]/25"
-      : "w-full pl-11 pr-4 py-3.5 rounded-[20px] border border-white/55 bg-white/55 text-[#163832] placeholder:text-[#235347]/55 outline-none focus:ring-4 focus:ring-[#8EB69B]/18 focus:border-[#8EB69B]/55",
+      ? "w-full pl-11 pr-4 py-3.5 rounded-[20px] border border-[var(--ui-border)] bg-white/[0.04] text-[var(--ui-text-main)] placeholder:text-[color:rgba(151,166,168,0.75)] outline-none focus:ring-4 focus:ring-[#395C7A]/18 focus:border-[#395C7A]/45"
+      : "w-full pl-11 pr-4 py-3.5 rounded-[20px] border border-[var(--ui-border-strong)] bg-white text-[var(--ui-text-main)] placeholder:text-[color:rgba(75,85,99,0.58)] outline-none focus:ring-4 focus:ring-[#395C7A]/12 focus:border-[#395C7A]/45",
 
     buttonPrimary: dark
-      ? "border border-[#8EB69B]/80 bg-[linear-gradient(135deg,#8EB69B_0%,#DAF1DE_100%)] text-[#051F20] shadow-[0_10px_24px_rgba(142,182,155,0.22),inset_0_1px_0_rgba(255,255,255,0.24)] hover:brightness-[1.02]"
-      : "border border-[#235347]/90 bg-[linear-gradient(135deg,#235347_0%,#3f7a68_100%)] text-white shadow-[0_10px_24px_rgba(35,83,71,0.16),inset_0_1px_0_rgba(255,255,255,0.16)] hover:brightness-[1.02]",
+      ? "app-glass-button app-protected-action-button border border-[var(--ui-border-strong)] bg-[linear-gradient(135deg,rgba(57,92,122,0.96)_0%,rgba(47,78,102,0.92)_100%)] text-[var(--ui-text-main)] shadow-[0_12px_26px_rgba(0,0,0,0.22),inset_0_1px_0_rgba(255,255,255,0.12)]"
+      : "app-glass-button app-protected-action-button border border-[rgba(57,92,122,0.24)] bg-[linear-gradient(135deg,rgba(57,92,122,0.98)_0%,rgba(47,78,102,0.94)_100%)] text-[var(--ui-text-main)] shadow-[0_14px_28px_rgba(57,92,122,0.18),inset_0_1px_0_rgba(255,255,255,0.2)]",
 
     buttonSecondary: dark
-      ? "bg-white/[0.04] text-[#DAF1DE] hover:bg-white/[0.07] border border-white/10"
-      : "bg-white/55 text-[#163832] hover:bg-white/75 border border-white/55",
+      ? "app-glass-button app-protected-action-button bg-white/[0.05] text-[var(--ui-text-main)] hover:bg-white/[0.08] border border-[var(--ui-border)] shadow-[0_10px_22px_rgba(0,0,0,0.16),inset_0_1px_0_rgba(255,255,255,0.06)]"
+      : "app-glass-button app-protected-action-button border border-[rgba(148,163,184,0.24)] bg-[linear-gradient(180deg,rgba(255,255,255,0.94),rgba(248,250,252,0.98))] text-[var(--ui-text-main)] hover:bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(241,245,249,0.98))] shadow-[0_12px_24px_rgba(15,23,42,0.08),inset_0_1px_0_rgba(255,255,255,0.9)]",
 
-    buttonDanger: "bg-slate-800 text-white hover:bg-slate-700 border border-slate-700",
+    buttonDanger:
+      dark
+        ? "app-glass-button app-protected-action-button border border-[rgba(181,110,110,0.35)] bg-[linear-gradient(135deg,rgba(74,49,49,0.9)_0%,rgba(54,38,38,0.88)_100%)] text-[var(--ui-text-main)] shadow-[0_12px_26px_rgba(0,0,0,0.22),inset_0_1px_0_rgba(255,255,255,0.08)] hover:border-[rgba(199,130,130,0.46)]"
+        : "app-glass-button app-protected-action-button border border-[rgba(220,38,38,0.18)] bg-[linear-gradient(180deg,rgba(255,245,245,0.96),rgba(254,242,242,0.98))] text-[#991B1B] shadow-[0_12px_24px_rgba(127,29,29,0.08),inset_0_1px_0_rgba(255,255,255,0.96)] hover:border-[rgba(220,38,38,0.24)]",
 
     iconBox: dark
-      ? "h-12 w-12 rounded-[18px] grid place-items-center bg-[#235347]/75 border border-white/8 text-[#DAF1DE]"
-      : "h-12 w-12 rounded-[18px] grid place-items-center bg-white/60 border border-white/55 text-[#235347]",
+      ? "h-12 w-12 rounded-[18px] grid place-items-center bg-[#2C3A45]/80 border border-[var(--ui-border)] text-[var(--ui-text-main)]"
+      : "h-12 w-12 rounded-[18px] grid place-items-center bg-white border border-[var(--ui-border-strong)] text-[var(--ui-text-main)]",
 
     modal: dark
-      ? "bg-[#0B2B26] border border-white/10"
-      : "bg-[#f7fbf8] border border-white/60",
+      ? "bg-[#1F2A33] border border-[var(--ui-border)]"
+      : "bg-white border border-[var(--ui-border-strong)]",
   };
 }

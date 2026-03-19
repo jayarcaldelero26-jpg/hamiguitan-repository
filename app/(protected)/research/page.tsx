@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
@@ -18,7 +18,8 @@ import {
   PencilSquareIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
-import { repoTheme, type PageTheme } from "@/app/lib/repoTheme";
+import { repoTheme } from "@/app/lib/repoTheme";
+import { useProtectedTheme } from "@/app/components/ProtectedThemeProvider";
 
 type CategoryFilter = "All" | "Academe" | "Stakeholders" | "PAMO Activity";
 
@@ -174,7 +175,18 @@ function GroupCard({
       : dark
       ? "text-[#f0cf97]"
       : "text-[#9d6c26]";
-  const actionBtnCls = ui.buttonPrimary;
+  const compactActionBtnCls =
+    "app-glass-button app-protected-action-button inline-flex min-h-9 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[11px] font-semibold leading-none transition shadow-[0_6px_16px_rgba(15,23,42,0.06)] [&_svg]:text-inherit";
+  const rowActionDownloadClassName = dark
+    ? "border-[#5E7D9C]/28 bg-[rgba(57,92,122,0.28)] text-[#E6EDF3]"
+    : "border-[#395C7A]/18 bg-[rgba(57,92,122,0.12)] text-[#1E3A5F]";
+  const rowActionDeleteClassName = dark
+    ? "border-[rgba(220,38,38,0.26)] bg-[rgba(220,38,38,0.22)] text-[#FEE2E2]"
+    : "border-[rgba(220,38,38,0.18)] bg-[rgba(220,38,38,0.12)] text-[#991B1B]";
+  const compactUtilityBtnCls =
+    "app-glass-button app-protected-action-button inline-flex min-h-9 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[11px] font-semibold leading-none transition";
+  const compactHeaderIconBtnCls =
+    "app-glass-button app-protected-action-button flex h-8.5 w-8.5 shrink-0 items-center justify-center rounded-full border transition";
   const textMain = ui.textMain;
   const textMuted = ui.textMuted;
   const textSoft = ui.textSoft;
@@ -312,14 +324,14 @@ function GroupCard({
                     </div>
                   </button>
 
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-1.5 shrink-0">
                     {canRenameFolders && folder !== "Unsorted" && (
                       <button
                         type="button"
                         onClick={() => onRenameFolder(folder)}
-                        className={`inline-flex min-h-10 items-center gap-1.5 px-3 py-2 rounded-[14px] text-[11px] font-medium transition ${ui.buttonSecondary}`}
+                        className={`${compactUtilityBtnCls} ${ui.buttonSecondary}`}
                       >
-                        <PencilSquareIcon className="w-4 h-4" />
+                        <PencilSquareIcon className="w-3.5 h-3.5" />
                         Rename
                       </button>
                     )}
@@ -329,7 +341,7 @@ function GroupCard({
                       onClick={() => toggleFolder(folder)}
                       aria-expanded={open}
                       aria-label={open ? `Collapse ${folder}` : `Expand ${folder}`}
-                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition ${
+                      className={`${compactHeaderIconBtnCls} ${
                         open
                           ? dark
                             ? "border-white/10 bg-white/[0.06]"
@@ -338,7 +350,7 @@ function GroupCard({
                       }`}
                     >
                       <ChevronRightIcon
-                        className={`h-5 w-5 transition-transform duration-200 ${
+                        className={`h-4.5 w-4.5 transition-transform duration-200 ${
                           open ? `rotate-90 ${textMain}` : textMuted
                         }`}
                       />
@@ -375,14 +387,14 @@ function GroupCard({
                             </div>
                           </div>
 
-                          <div className="mt-3 sm:mt-0 flex flex-wrap items-center gap-2 shrink-0">
+                          <div className="mt-2.5 sm:mt-0 flex flex-wrap items-center gap-1.5 shrink-0">
                             <a
                               href={docUrl(d)}
                               target="_blank"
                               rel="noopener noreferrer"
-                            className={`inline-flex min-h-11 items-center gap-1.5 px-3 py-2 rounded-[14px] text-[11px] font-medium shadow-sm transition ${actionBtnCls}`}
+                              className={`${compactActionBtnCls} ${rowActionDownloadClassName}`}
                             >
-                              <CloudArrowDownIcon className="w-4 h-4" />
+                              <CloudArrowDownIcon className="w-3.5 h-3.5" />
                               <span>Download</span>
                             </a>
 
@@ -390,9 +402,9 @@ function GroupCard({
                               <button
                                 type="button"
                                 onClick={() => onAskDelete(d.id)}
-                                className={`inline-flex min-h-11 items-center gap-1.5 px-3 py-2 rounded-[14px] text-[11px] font-medium transition shadow-sm ${ui.buttonDanger}`}
+                                className={`${compactActionBtnCls} ${rowActionDeleteClassName}`}
                               >
-                                <TrashIcon className="w-4 h-4" />
+                                <TrashIcon className="w-3.5 h-3.5" />
                                 <span>Delete</span>
                               </button>
                             )}
@@ -447,21 +459,7 @@ export default function ResearchPage() {
   const [renameFolderCurrent, setRenameFolderCurrent] = useState("");
   const [renameFolderNext, setRenameFolderNext] = useState("");
   const [renamingFolder, setRenamingFolder] = useState(false);
-  const [pageTheme, setPageTheme] = useState<PageTheme>("dark");
-
-  useEffect(() => {
-    const syncTheme = () => {
-      const saved =
-        typeof window !== "undefined"
-          ? (localStorage.getItem("page-theme") as PageTheme | null)
-          : null;
-      setPageTheme(saved === "light" ? "light" : "dark");
-    };
-
-    syncTheme();
-    window.addEventListener("page-theme-changed", syncTheme);
-    return () => window.removeEventListener("page-theme-changed", syncTheme);
-  }, []);
+  const { theme: pageTheme } = useProtectedTheme();
 
   const filteredDocs = useMemo(() => {
     const query = q.trim().toLowerCase();
@@ -712,7 +710,7 @@ export default function ResearchPage() {
                   <button
                     type="button"
                     onClick={() => !renamingFolder && setRenameFolderCategory(null)}
-                    className={`min-h-11 min-w-11 p-2.5 rounded-[16px] transition border shadow-sm ${ui.buttonSecondary}`}
+                    className={`app-glass-skip min-h-11 min-w-11 p-2.5 rounded-full transition border shadow-sm ${ui.buttonSecondary}`}
                   >
                     <XMarkIcon className={`w-5 h-5 ${dark ? "text-[#DAF1DE]" : "text-[#163832]"}`} />
                   </button>
@@ -742,12 +740,12 @@ export default function ResearchPage() {
                   </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
+                <div className="flex flex-col sm:flex-row gap-2.5 sm:justify-end">
                   <button
                     type="button"
                     onClick={() => setRenameFolderCategory(null)}
                     disabled={renamingFolder}
-                    className={`min-h-11 px-5 py-3 rounded-[20px] font-medium text-sm ${ui.buttonSecondary}`}
+                    className={`min-h-10 px-4 py-2.5 rounded-[18px] font-medium text-sm ${ui.buttonSecondary}`}
                   >
                     Cancel
                   </button>
@@ -755,7 +753,7 @@ export default function ResearchPage() {
                     type="button"
                     onClick={submitFolderRename}
                     disabled={renamingFolder}
-                    className={`min-h-11 px-5 py-3 rounded-[20px] font-semibold text-sm ${ui.buttonPrimary}`}
+                    className={`min-h-10 px-4 py-2.5 rounded-[18px] font-semibold text-sm ${ui.buttonPrimary}`}
                   >
                     {renamingFolder ? "Renaming..." : "Rename Folder"}
                   </button>
@@ -792,7 +790,7 @@ export default function ResearchPage() {
               <button
                 type="button"
                 onClick={() => router.push("/upload")}
-                className={`min-h-11 px-4 py-2.5 rounded-[18px] transition font-medium text-sm ${ui.buttonPrimary}`}
+                className={`min-h-10 px-4 py-2 rounded-[17px] transition font-medium text-sm ${ui.buttonPrimary}`}
               >
                 Upload Document
               </button>
@@ -831,16 +829,16 @@ export default function ResearchPage() {
                     : "border-white/55 bg-white/55 text-[#163832] focus:ring-4 focus:ring-[#8EB69B]/18"
                 }`}
               >
-                <option className="text-slate-900" value="All">
+                <option value="All">
                   All
                 </option>
-                <option className="text-slate-900" value="Academe">
+                <option value="Academe">
                   Academe
                 </option>
-                <option className="text-slate-900" value="Stakeholders">
+                <option value="Stakeholders">
                   Stakeholders
                 </option>
-                <option className="text-slate-900" value="PAMO Activity">
+                <option value="PAMO Activity">
                   PAMO Activity
                 </option>
               </select>
@@ -851,7 +849,7 @@ export default function ResearchPage() {
                   setQ("");
                   setCat("All");
                 }}
-                className={`min-h-11 px-4 py-3 rounded-[20px] transition font-medium shadow-sm text-sm ${ui.buttonSecondary}`}
+                className={`min-h-10 px-4 py-2.5 rounded-[18px] transition font-medium text-sm ${ui.buttonSecondary}`}
               >
                 Clear
               </button>

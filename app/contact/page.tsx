@@ -48,7 +48,7 @@ export default function ContactPage() {
                     <p className="public-eyebrow tracking-[0.2em]">
                       {item.label}
                     </p>
-                    <p className="mt-[8px] text-base leading-7 text-[#27423a]">
+                    <p className="mt-[8px] text-base leading-7 text-[var(--ui-text-main)]">
                       {item.value}
                     </p>
                   </div>

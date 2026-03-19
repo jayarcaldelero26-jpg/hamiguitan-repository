@@ -19,8 +19,7 @@ import {
   LockClosedIcon,
 } from "@heroicons/react/24/outline";
 import { repoTheme } from "@/app/lib/repoTheme";
-
-type PageTheme = "dark" | "light";
+import { useProtectedTheme } from "@/app/components/ProtectedThemeProvider";
 type SettingsTab = "security" | "appearance" | "account";
 
 function Skeleton({
@@ -169,12 +168,8 @@ function TabButton({
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-2xl border px-4 py-3 text-sm transition ${
-        active
-          ? ui.buttonPrimary
-          : dark
-          ? "border-white/10 bg-white/[0.04] text-[#DAF1DE]/75 hover:bg-white/[0.07]"
-          : "border-white/55 bg-white/55 text-[#235347] hover:bg-white/75"
+      className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full border px-4 py-3 text-sm transition ${
+        active ? ui.buttonPrimary : ui.buttonSecondary
       }`}
     >
       <span className="shrink-0">{icon}</span>
@@ -186,6 +181,7 @@ function TabButton({
 export default function SettingsPage() {
   const router = useRouter();
   const { user, loading: loadingUser } = useAuth();
+  const { theme: pageTheme, dark, setTheme } = useProtectedTheme();
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -198,7 +194,6 @@ export default function SettingsPage() {
   const [showAdminNew, setShowAdminNew] = useState(false);
   const [resetting, setResetting] = useState(false);
 
-  const [pageTheme, setPageTheme] = useState<PageTheme>("dark");
   const [activeTab, setActiveTab] = useState<SettingsTab>("security");
 
   const [showLogoutAfterChange, setShowLogoutAfterChange] = useState(false);
@@ -229,27 +224,6 @@ export default function SettingsPage() {
       router.replace("/dashboard");
     }
   }, [loadingUser, user, canAccessSettings, router]);
-
-  useEffect(() => {
-    const saved =
-      typeof window !== "undefined"
-        ? (localStorage.getItem("page-theme") as PageTheme | null)
-        : null;
-
-    if (saved === "dark" || saved === "light") {
-      setPageTheme(saved);
-      document.documentElement.dataset.pageTheme = saved;
-    }
-  }, []);
-
-  const setTheme = (theme: PageTheme) => {
-    setPageTheme(theme);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("page-theme", theme);
-      document.documentElement.dataset.pageTheme = theme;
-      window.dispatchEvent(new Event("page-theme-changed"));
-    }
-  };
 
   const passwordStrength = useMemo(() => {
     let score = 0;
@@ -388,7 +362,6 @@ export default function SettingsPage() {
     }
   };
 
-  const dark = pageTheme === "dark";
   const ui = repoTheme(pageTheme);
 
   const pageWrap = ui.page;
@@ -401,9 +374,7 @@ export default function SettingsPage() {
 
   const previewCardCls = `${ui.cardSoft} p-5`;
 
-  const themeLabel = useMemo(() => {
-    return pageTheme === "dark" ? "Dark Neon" : "Clean Light";
-  }, [pageTheme]);
+  const themeLabel = pageTheme === "dark" ? "Dark Mode" : "Light Mode";
 
   const adminToolsLabel = canAdminReset ? "Enabled" : "Not Available";
 
@@ -518,7 +489,7 @@ export default function SettingsPage() {
           <SecurityStatCard
             title="Theme Mode"
             value={themeLabel}
-            subtitle="Applies only to the main page content area."
+            subtitle="Applies across the protected workspace."
             tone="violet"
             dark={dark}
           />
@@ -954,7 +925,7 @@ export default function SettingsPage() {
                     Page Theme
                   </h2>
                   <p className={`mt-1 text-sm ${muted}`}>
-                    Change how the page area looks. Sidebar stays fixed neon style.
+                    Choose the protected workspace theme and save it for future visits.
                   </p>
                 </div>
               </div>
@@ -992,14 +963,14 @@ export default function SettingsPage() {
                       dark ? "text-white" : "text-slate-900"
                     }`}
                   >
-                    Dark Neon
+                    Dark Mode
                   </div>
                   <div
                     className={`mt-1 text-sm ${
                       dark ? "text-cyan-100/65" : "text-slate-600"
                     }`}
                   >
-                    Premium dark glass look with neon page cards.
+                    Deep slate surfaces with a premium internal dashboard feel.
                   </div>
                 </button>
 
@@ -1035,14 +1006,14 @@ export default function SettingsPage() {
                       dark ? "text-white" : "text-slate-900"
                     }`}
                   >
-                    Clean Light
+                    Light Mode
                   </div>
                   <div
                     className={`mt-1 text-sm ${
                       dark ? "text-cyan-100/65" : "text-slate-600"
                     }`}
                   >
-                    Bright page background with strong readable contrast.
+                    A clean light workspace with strong contrast and softer surfaces.
                   </div>
                 </button>
               </div>
@@ -1271,8 +1242,7 @@ export default function SettingsPage() {
         )}
 
         <div className={`mt-8 text-xs ${muted}`}>
-          Tip: The page theme is saved on this browser and applied to the main
-          content area only.
+          Tip: The protected theme is saved on this browser and applied across the internal workspace.
         </div>
       </div>
     </div>

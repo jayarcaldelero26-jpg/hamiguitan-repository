@@ -65,13 +65,15 @@ export type BookingRow = {
   internal_notes: string | null;
   rescheduled_from: string | null;
   cancel_reason: string | null;
+  deleted_at: string | null;
+  deleted_by: number | null;
   created_at: string | null;
   updated_at: string | null;
 };
 
 export type BookingWritePayload = Omit<
   BookingRow,
-  "id" | "created_at" | "updated_at"
+  "id" | "deleted_at" | "deleted_by" | "created_at" | "updated_at"
 >;
 
 export type BookingFormPayload = Omit<BookingWritePayload, "booking_code">;

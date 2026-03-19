@@ -2,9 +2,14 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useSearchParams } from "next/navigation";
+import { PencilSquareIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { useAuth } from "@/app/components/AuthProvider";
+import ConfirmDialog from "@/app/components/ConfirmDialog";
+import { useProtectedTheme } from "@/app/components/ProtectedThemeProvider";
 import type { BookingFormPayload, BookingRow } from "@/app/lib/bookingTypes";
+import { repoTheme } from "@/app/lib/repoTheme";
 import {
   APPROVAL_STATUS_OPTIONS,
   BOOKING_STATUS_OPTIONS,
@@ -108,10 +113,13 @@ function getCamp3NightPax(
 }
 
 const baseFieldClassName =
-  "min-h-12 w-full rounded-2xl border border-slate-200 bg-[#f8faf8] px-3.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#235347] focus:bg-white focus:ring-4 focus:ring-[#235347]/10";
+  "min-h-12 w-full rounded-2xl border border-[var(--ui-border)] bg-white/[0.05] px-3.5 text-sm text-[var(--ui-text-main)] outline-none transition placeholder:text-[color:rgba(151,166,168,0.82)] focus:border-[#395C7A] focus:bg-white/[0.08] focus:ring-4 focus:ring-[#395C7A]/18";
 
 const invalidFieldClassName =
-  "border-rose-300 bg-rose-50 focus:border-rose-500 focus:ring-rose-500/10";
+  "border-rose-400/50 bg-rose-500/10 focus:border-rose-400 focus:ring-rose-500/16";
+
+const compactTableActionBaseClassName =
+  "app-glass-button app-protected-action-button inline-flex min-h-9 items-center gap-1.5 rounded-full px-3.5 py-2 text-[11px] font-semibold leading-none transition shadow-sm [&_svg]:h-3.5 [&_svg]:w-3.5 [&_svg]:shrink-0 [&_svg]:stroke-[1.9]";
 
 const statusTone: Record<string, string> = {
   Paid: "border-emerald-200 bg-emerald-50 text-emerald-700",
@@ -168,6 +176,114 @@ function LabeledInput({
   );
 }
 
+function FloatingInput({
+  label,
+  value,
+  onChange,
+  type = "text",
+  min,
+  max,
+  helper,
+  invalid = false,
+  className = "",
+  inputClassName = "",
+  required = false,
+  disabled = false,
+}: {
+  label: string;
+  value: string | number;
+  onChange: (value: string) => void;
+  type?: "text" | "email" | "number";
+  min?: number | string;
+  max?: number | string;
+  helper?: string;
+  invalid?: boolean;
+  className?: string;
+  inputClassName?: string;
+  required?: boolean;
+  disabled?: boolean;
+}) {
+  const labelTone = invalid
+    ? "bg-rose-50 text-rose-600"
+    : "bg-white/[0.05] text-[var(--ui-text-soft)] peer-focus:bg-white/[0.08] peer-focus:text-[var(--ui-text-main)]";
+
+  return (
+    <label className={`block ${className}`}>
+      <div className="relative">
+        <input
+          type={type}
+          value={value}
+          min={min}
+          max={max}
+          placeholder=" "
+          required={required}
+          disabled={disabled}
+          onChange={(event) => onChange(event.target.value)}
+          className={`peer ${baseFieldClassName} px-3.5 pb-2 pt-5 ${invalid ? invalidFieldClassName : ""} ${inputClassName}`}
+        />
+        <span
+          className={`pointer-events-none absolute left-3 top-1/2 z-[1] -translate-y-1/2 px-1 text-sm transition-all duration-200 peer-placeholder-shown:text-sm peer-focus:top-0 peer-focus:translate-y-[-50%] peer-focus:text-[11px] peer-[:not(:placeholder-shown)]:top-0 peer-[:not(:placeholder-shown)]:translate-y-[-50%] peer-[:not(:placeholder-shown)]:text-[11px] ${labelTone}`}
+        >
+          {label}
+          {required ? " *" : ""}
+        </span>
+      </div>
+      {helper && <span className="mt-1 block text-xs leading-5 text-slate-500">{helper}</span>}
+    </label>
+  );
+}
+
+function FloatingTextarea({
+  label,
+  value,
+  onChange,
+  rows = 3,
+  helper,
+  invalid = false,
+  className = "",
+  textareaClassName = "",
+  required = false,
+  disabled = false,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  rows?: number;
+  helper?: string;
+  invalid?: boolean;
+  className?: string;
+  textareaClassName?: string;
+  required?: boolean;
+  disabled?: boolean;
+}) {
+  const labelTone = invalid
+    ? "bg-rose-50 text-rose-600"
+    : "bg-white/[0.05] text-[var(--ui-text-soft)] peer-focus:bg-white/[0.08] peer-focus:text-[var(--ui-text-main)]";
+
+  return (
+    <label className={`block ${className}`}>
+      <div className="relative">
+        <textarea
+          value={value}
+          rows={rows}
+          placeholder=" "
+          required={required}
+          disabled={disabled}
+          onChange={(event) => onChange(event.target.value)}
+          className={`peer w-full rounded-2xl border border-[var(--ui-border)] bg-white/[0.05] px-3.5 pb-3 pt-6 text-sm text-[var(--ui-text-main)] outline-none transition placeholder:text-[color:rgba(151,166,168,0.82)] focus:border-[#395C7A] focus:bg-white/[0.08] focus:ring-4 focus:ring-[#395C7A]/18 ${invalid ? invalidFieldClassName : ""} ${textareaClassName}`}
+        />
+        <span
+          className={`pointer-events-none absolute left-3 top-6 z-[1] -translate-y-1/2 px-1 text-sm transition-all duration-200 peer-placeholder-shown:text-sm peer-focus:top-0 peer-focus:translate-y-[-50%] peer-focus:text-[11px] peer-[:not(:placeholder-shown)]:top-0 peer-[:not(:placeholder-shown)]:translate-y-[-50%] peer-[:not(:placeholder-shown)]:text-[11px] ${labelTone}`}
+        >
+          {label}
+          {required ? " *" : ""}
+        </span>
+      </div>
+      {helper && <span className="mt-1 block text-xs leading-5 text-slate-500">{helper}</span>}
+    </label>
+  );
+}
+
 function LabeledSelect({
   label,
   value,
@@ -181,6 +297,12 @@ function LabeledSelect({
   options: readonly string[];
   invalid?: boolean;
 }) {
+  const { theme } = useProtectedTheme();
+  const dark = theme === "dark";
+  const optionStyle = dark
+    ? { backgroundColor: "#F8FAFC", color: "#0F172A" }
+    : undefined;
+
   return (
     <label className="block">
       <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
@@ -192,7 +314,9 @@ function LabeledSelect({
         className={`${baseFieldClassName} ${invalid ? invalidFieldClassName : ""}`}
       >
         {options.map((option) => (
-          <option key={option}>{option}</option>
+          <option key={option} style={optionStyle}>
+            {option}
+          </option>
         ))}
       </select>
     </label>
@@ -219,6 +343,31 @@ type OffSeasonWarningState =
     };
 
 export default function BookingPage() {
+  const { theme } = useProtectedTheme();
+  const ui = repoTheme(theme);
+  const dark = theme === "dark";
+  const sectionShellClassName = ui.sectionShell;
+  const panelSoftClassName = ui.panelSoft;
+  const cleanSectionShellClassName = `${ui.shell} p-4 sm:p-5 md:p-6 shadow-none`;
+  const cleanPanelClassName = dark
+    ? "rounded-[20px] bg-white/[0.03]"
+    : "rounded-[20px] bg-white/72";
+  const cleanPanelSoftClassName = dark
+    ? "rounded-[18px] bg-white/[0.03]"
+    : "rounded-[18px] bg-white/78";
+  const dialogOverlayClassName = dark
+    ? "bg-black/28 backdrop-blur-[2px]"
+    : "bg-slate-900/10 backdrop-blur-[2px]";
+  const recordsDividerClassName = dark ? "divide-y divide-white/8" : "divide-y divide-slate-200/70";
+  const recordsRowTextClassName = dark
+    ? "text-[color:rgba(230,237,243,0.82)]"
+    : "text-slate-700";
+  const recordsMetaTextClassName = dark
+    ? "text-[color:rgba(230,237,243,0.68)]"
+    : "text-slate-500";
+  const recordsMutedTextClassName = dark
+    ? "text-[color:rgba(151,166,168,0.9)]"
+    : "text-slate-400";
   const { user, loading: loadingUser } = useAuth();
   const searchParams = useSearchParams();
   const startDateParam = searchParams.get("startDate") || "";
@@ -229,7 +378,10 @@ export default function BookingPage() {
   const [submitError, setSubmitError] = useState("");
   const [submitSuccess, setSubmitSuccess] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [portalReady, setPortalReady] = useState(false);
   const [trailFilter, setTrailFilter] = useState("All Trails");
   const [bookingTypeFilter, setBookingTypeFilter] = useState("All");
   const [approvalFilter] = useState("All");
@@ -248,6 +400,7 @@ export default function BookingPage() {
   const canViewBookings = normalizedRole === "admin" || normalizedRole === "co_admin" || normalizedRole === "registered_staff" || normalizedRole === "staff";
   const canCreateBookings = normalizedRole === "admin" || normalizedRole === "co_admin";
   const canEditBookings = normalizedRole === "admin";
+  const canDeleteBookings = normalizedRole === "admin";
 
   const visibleBookingTypeOptions = useMemo(
     () =>
@@ -340,6 +493,10 @@ export default function BookingPage() {
     setSubmitError("");
     setSubmitSuccess("");
   }, [startDateParam]);
+
+  useEffect(() => {
+    setPortalReady(true);
+  }, []);
 
   useEffect(() => {
     if (!isEditDialogOpen) return;
@@ -596,6 +753,40 @@ export default function BookingPage() {
     setSubmitSuccess("");
   }
 
+  async function handleDeleteBooking() {
+    if (!deleteTargetId || !canDeleteBookings) return;
+
+    try {
+      setDeleting(true);
+      setSubmitError("");
+      setSubmitSuccess("");
+
+      const res = await fetch(`/api/bookings?id=${deleteTargetId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+
+      const data = (await res.json().catch(() => null)) as ApiError | { booking_code?: string } | null;
+      if (!res.ok) {
+        setSubmitError((data as ApiError | null)?.error || "Failed to delete booking.");
+        return;
+      }
+
+      await refreshBookings();
+      if (editingId === deleteTargetId) {
+        resetForm();
+      }
+      setDeleteTargetId(null);
+      setSubmitSuccess(
+        `Booking ${(data as { booking_code?: string } | null)?.booking_code || ""} deleted successfully.`.trim()
+      );
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "Failed to delete booking.");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -665,19 +856,331 @@ export default function BookingPage() {
 
   const regularSubmitDisabled =
     ((editingId ? !canEditBookings : !canCreateBookings) || submitting || capacityState.kind === "invalid");
+  const bookingFormContent = (
+    <>
+      <div className="flex flex-col gap-2 border-b border-[var(--ui-border)] pb-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className={`text-[11px] font-semibold uppercase tracking-[0.16em] ${ui.textSoft}`}>
+            {isEditDialogOpen ? "Edit Booking" : "Booking Form"}
+          </p>
+          <h2 className={`mt-1.5 text-lg font-semibold sm:mt-2 sm:text-2xl ${ui.textMain}`}>
+            {editingId ? "Edit booking record" : "Add booking record"}
+          </h2>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:gap-3">
+          <p className={`max-w-md text-sm leading-6 ${ui.textMuted}`}>
+            Use this form to create or update persisted booking records before filtering and reviewing the booking table below.
+          </p>
+          {isEditDialogOpen && (
+            <button
+              type="button"
+              onClick={resetForm}
+              className={`inline-flex min-h-11 items-center justify-center rounded-full px-4 text-sm font-semibold transition ${ui.buttonSecondary}`}
+            >
+              Close
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className={`mt-4 px-4 py-3 text-sm ${panelSoftClassName} ${ui.textMuted}`}>
+        <span className={`font-semibold ${ui.textMain}`}>Booking Code:</span>{" "}
+        {editingId
+          ? bookings.find((booking) => booking.id === editingId)?.booking_code || "Unavailable"
+          : "Auto-generated on save using the MHRWS-YYYY-XXXX format."}
+      </div>
+
+      {submitError && (
+        <div className="mt-4 rounded-[18px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          {submitError}
+        </div>
+      )}
+
+      {submitSuccess && (
+        <div className="mt-4 rounded-[18px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          {submitSuccess}
+        </div>
+      )}
+
+      <div className={`mt-4 grid gap-3 ${isOffSeasonLike ? "xl:grid-cols-[1.15fr_0.85fr]" : "lg:grid-cols-[1.25fr_0.75fr]"}`}>
+        <div className={`${cleanPanelClassName} p-3.5 sm:p-4`}>
+          <p className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${ui.textSoft}`}>
+            Booking Details
+          </p>
+          <div className="mt-4 grid max-h-[34rem] gap-2.5 overflow-y-auto pr-1 [scrollbar-color:#c8d8cf_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#c8d8cf] [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar]:w-2">
+            {isOffSeasonLike ? (
+              <div
+                className="grid gap-4 md:grid-cols-2"
+              >
+                <LabeledSelect
+                  label="Booking Type"
+                  value={form.booking_type}
+                  onChange={(value) => setBookingType(value as BookingFormPayload["booking_type"])}
+                  options={visibleBookingTypeOptions}
+                />
+                <LabeledInput
+                  label="Start Date"
+                  type="date"
+                  value={form.start_date}
+                  onChange={(value) => setField("start_date", value)}
+                  helper="First covered day"
+                  invalid={capacityState.kind === "invalid"}
+                />
+                <LabeledInput
+                  label="End Date"
+                  type="date"
+                  value={form.end_date}
+                  onChange={(value) => setField("end_date", value)}
+                  helper="Last covered day"
+                  invalid={capacityState.kind === "invalid"}
+                />
+              </div>
+            ) : (
+              <>
+                <div className="grid items-start gap-3 md:grid-cols-2 lg:grid-cols-12">
+                  <div className="lg:col-span-4 lg:pt-[1.625rem]">
+                    <FloatingInput
+                      label="Guest Name"
+                      value={form.contact_name}
+                      onChange={(value) => setField("contact_name", value)}
+                    />
+                  </div>
+                  <div className="lg:col-span-3">
+                    <LabeledSelect
+                      label="Booking Type"
+                      value={form.booking_type}
+                      onChange={(value) =>
+                        setBookingType(value as BookingFormPayload["booking_type"])
+                      }
+                      options={visibleBookingTypeOptions}
+                    />
+                  </div>
+                  {showParticipantCategory && (
+                    <div className="lg:col-span-2">
+                      <LabeledSelect
+                        label="Category"
+                        value={form.participant_category}
+                        onChange={(value) =>
+                          setField(
+                            "participant_category",
+                            value as BookingFormPayload["participant_category"]
+                          )
+                        }
+                        options={PARTICIPANT_CATEGORY_OPTIONS}
+                      />
+                    </div>
+                  )}
+                  {showTrail && (
+                    <div className="lg:col-span-3">
+                      <LabeledSelect
+                        label="Trail"
+                        value={form.trail}
+                        onChange={(value) => setField("trail", value as BookingFormPayload["trail"])}
+                        options={TRAIL_OPTIONS}
+                        invalid={capacityState.kind === "invalid"}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className={`${cleanPanelSoftClassName} p-3 lg:p-4`}>
+                  <div className={`grid items-start gap-2.5 md:grid-cols-2 ${showPax ? "xl:grid-cols-12" : "xl:grid-cols-8"}`}>
+                    <div className="xl:col-span-4">
+                      <LabeledInput
+                        label="Start Date"
+                        type="date"
+                        value={form.start_date}
+                        onChange={(value) => setField("start_date", value)}
+                        helper="First hiking day (2-3 day schedule)"
+                        invalid={capacityState.kind === "invalid"}
+                      />
+                    </div>
+                    <div className="xl:col-span-4">
+                      <LabeledInput
+                        label="End Date"
+                        type="date"
+                        value={form.end_date}
+                        onChange={(value) => setField("end_date", value)}
+                        helper="Last hiking day"
+                        invalid={capacityState.kind === "invalid"}
+                      />
+                    </div>
+                    {showPax && (
+                      <div className="xl:col-span-4 xl:pt-[1.625rem]">
+                        <FloatingInput
+                          label="Number of Participants"
+                          type="number"
+                          min={1}
+                          max={30}
+                          value={form.pax}
+                          onChange={(value) => setField("pax", Number(value || 0))}
+                          helper="Camp 3 first-night capacity is shared by hikers with the same start date"
+                          invalid={capacityState.kind === "invalid"}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {!isOffSeasonLike && capacityState.kind !== "idle" && (
+              <div
+                className={`rounded-2xl border px-4 py-3 text-sm ${
+                  capacityState.kind === "invalid"
+                    ? "border-rose-200 bg-rose-50 text-rose-700"
+                    : "border-emerald-200 bg-emerald-50 text-emerald-700"
+                }`}
+              >
+                <p className="font-semibold">
+                  {capacityState.title}
+                </p>
+                <p className="mt-1 leading-6">{capacityState.message}</p>
+              </div>
+            )}
+            {!isOffSeasonLike && offSeasonWarning.kind === "warning" && (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                <p className="font-semibold text-amber-900">Off Season overlap</p>
+                <p className="mt-1 leading-6">{offSeasonWarning.message}</p>
+                <p className="mt-1 text-xs leading-5 text-amber-700">
+                  {offSeasonWarning.closures
+                    .map((closure) =>
+                      `${closure.booking_code || closure.contact_name}: ${closure.start_date} to ${closure.end_date}`
+                    )
+                    .join(" | ")}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {isOffSeasonLike ? (
+          <div className={`${cleanPanelClassName} p-3.5 sm:p-4`}>
+            <p className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${ui.textSoft}`}>
+              {form.booking_type}
+            </p>
+            <div className={`mt-3 p-5 ${cleanPanelSoftClassName}`}>
+              <p className={`text-base font-semibold ${ui.textMain}`}>
+                Selected dates will be marked unavailable.
+              </p>
+              <p className={`mt-3 text-sm leading-7 ${ui.textMuted}`}>
+                {form.booking_type} uses the closure-style form. Participant category, trail, pax, and status fields stay hidden while the selected date range is recorded for schedule management.
+              </p>
+            </div>
+
+            <div className="mt-4">
+              <FloatingTextarea
+                label="Remarks"
+                value={form.remarks}
+                onChange={(value) => setField("remarks", value)}
+                rows={4}
+              />
+            </div>
+
+            <div className="mt-5 flex flex-wrap gap-3">
+              <button type="submit" disabled={(editingId ? !canEditBookings : !canCreateBookings) || submitting} className="app-primary-button inline-flex min-h-11 items-center justify-center rounded-full px-5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60">
+                {submitting ? "Saving..." : editingId ? `Update ${form.booking_type}` : `Create ${form.booking_type}`}
+              </button>
+              <button type="button" onClick={resetForm} className={`app-glass-button inline-flex min-h-11 items-center justify-center rounded-full px-5 text-sm font-semibold transition ${ui.buttonSecondary}`}>
+                {editingId ? "Cancel Edit" : "Reset"}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className={`${cleanPanelClassName} p-3.5 sm:p-4`}>
+            <p className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${ui.textSoft}`}>
+              Status and Notes
+            </p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              {showStatusControls && (
+                <>
+                  <LabeledSelect
+                    label="Payment Status"
+                    value={form.payment_status}
+                    onChange={(value) =>
+                      setField("payment_status", value as BookingFormPayload["payment_status"])
+                    }
+                    options={PAYMENT_STATUS_OPTIONS}
+                  />
+                  <LabeledSelect
+                    label="Approval Status"
+                    value={form.approval_status}
+                    onChange={(value) =>
+                      setField("approval_status", value as BookingFormPayload["approval_status"])
+                    }
+                    options={APPROVAL_STATUS_OPTIONS}
+                  />
+                  <div className="sm:col-span-2">
+                    <LabeledSelect
+                      label="Booking Status"
+                      value={form.booking_status}
+                      onChange={(value) =>
+                        setField("booking_status", value as BookingFormPayload["booking_status"])
+                      }
+                      options={BOOKING_STATUS_OPTIONS}
+                    />
+                  </div>
+                </>
+              )}
+              <FloatingTextarea
+                label="Remarks"
+                value={form.remarks}
+                onChange={(value) => setField("remarks", value)}
+                rows={3}
+                className="sm:col-span-2"
+              />
+            </div>
+
+            <div className="mt-5 flex flex-wrap gap-3">
+              <button type="submit" disabled={regularSubmitDisabled} className="app-primary-button inline-flex min-h-11 items-center justify-center rounded-full px-5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60">
+                {submitting
+                  ? "Saving..."
+                  : capacityState.kind === "invalid" &&
+                      capacityState.title === "Camp 3 at capacity"
+                    ? "Camp 3 Full"
+                    : editingId
+                      ? "Update Booking"
+                      : "Create Booking"}
+              </button>
+              <button type="button" onClick={resetForm} className={`app-glass-button inline-flex min-h-11 items-center justify-center rounded-full px-5 text-sm font-semibold transition ${ui.buttonSecondary}`}>
+                {editingId ? "Cancel Edit" : "Reset"}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
+  );
+
+  const tableEditButtonClassName = dark
+    ? `${compactTableActionBaseClassName} border-white/10 bg-[rgba(255,255,255,0.08)] text-[#E6EDF3] [&_svg]:text-inherit`
+    : `${compactTableActionBaseClassName} border-slate-200/80 bg-[#F3F4F6] text-[#1F2937] [&_svg]:text-inherit`;
+  const tableDeleteButtonClassName = dark
+    ? `${compactTableActionBaseClassName} border-[rgba(220,38,38,0.26)] bg-[rgba(220,38,38,0.22)] text-[#FEE2E2] [&_svg]:text-inherit`
+    : `${compactTableActionBaseClassName} border-[rgba(220,38,38,0.18)] bg-[rgba(220,38,38,0.12)] text-[#991B1B] [&_svg]:text-inherit`;
+
+  const mobileEditButtonClassName = dark
+    ? "app-glass-button app-protected-action-button inline-flex min-h-9 items-center justify-center rounded-full border border-white/10 bg-[rgba(255,255,255,0.08)] px-3.5 text-xs font-semibold text-[#E6EDF3] transition"
+    : "app-glass-button app-protected-action-button inline-flex min-h-9 items-center justify-center rounded-full border border-slate-200/80 bg-[#F3F4F6] px-3.5 text-xs font-semibold text-[#1F2937] transition";
+  const mobileDeleteButtonClassName = dark
+    ? "app-glass-button app-protected-action-button inline-flex min-h-9 items-center justify-center rounded-full border border-[rgba(220,38,38,0.26)] bg-[rgba(220,38,38,0.22)] px-3.5 text-xs font-semibold text-[#FEE2E2] transition"
+    : "app-glass-button app-protected-action-button inline-flex min-h-9 items-center justify-center rounded-full border border-[rgba(220,38,38,0.18)] bg-[rgba(220,38,38,0.12)] px-3.5 text-xs font-semibold text-[#991B1B] transition";
+  const bookingNativeOptionStyle = dark
+    ? { backgroundColor: "#F8FAFC", color: "#0F172A" }
+    : undefined;
 
   return (
-    <section className="min-h-full bg-[#f4f7f5] px-3 py-4 sm:px-6 sm:py-6 lg:px-8">
+    <section className={`min-h-full px-4 py-5 sm:px-6 sm:py-6 lg:px-8 ${ui.page}`}>
       <div className="mx-auto max-w-7xl">
-        <div className="rounded-[30px] border border-slate-200 bg-white p-4 shadow-[0_16px_40px_rgba(15,23,42,0.08)] sm:p-5 md:p-8">
+        <div className={`${ui.card} rounded-[34px] p-5 md:p-7`}>
           <div className="max-w-4xl">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#5c7b67]">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[var(--ui-accent-soft)]">
               Booking Transactions
             </p>
-            <h1 className="mt-3 text-[1.7rem] font-semibold tracking-tight text-slate-900 sm:text-3xl md:text-5xl">
+            <h1 className={`mt-3 text-[1.7rem] font-semibold tracking-tight sm:text-3xl md:text-5xl ${ui.textMain}`}>
               Booking
             </h1>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600 md:text-base md:leading-7">
+            <p className={`mt-3 max-w-3xl text-sm leading-6 md:text-base md:leading-7 ${ui.textMuted}`}>
               Persisted booking records with server-side validation against
               Camp 3 first-night capacity for hikers sharing the same start date.
             </p>
@@ -704,397 +1207,128 @@ export default function BookingPage() {
             ].map((card) => (
               <article
                 key={card.label}
-                className="rounded-[24px] border border-slate-200 bg-[#f8fbf8] p-4 shadow-sm sm:p-5"
+                className={`${ui.cardSoft} p-4 sm:p-5`}
               >
                 <div className={`h-1.5 w-16 rounded-full ${card.accent}`} />
-                <p className="mt-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 sm:mt-4 sm:text-[11px]">
+                <p className={`mt-3 text-[10px] font-semibold uppercase tracking-[0.14em] sm:mt-4 sm:text-[11px] ${ui.textSoft}`}>
                   {card.label}
                 </p>
-                <p className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-900 sm:mt-3 sm:text-3xl">
+                <p className={`mt-2 text-2xl font-semibold tracking-[-0.03em] sm:mt-3 sm:text-3xl ${ui.textMain}`}>
                   {card.value}
                 </p>
-                <p className="mt-1.5 text-sm leading-6 text-slate-600 sm:mt-2">{card.note}</p>
+                <p className={`mt-1.5 text-sm leading-6 sm:mt-2 ${ui.textMuted}`}>{card.note}</p>
               </article>
             ))}
           </div>
 
-          <AnimatePresence>
-            {isEditDialogOpen && (
-              <motion.button
-                type="button"
-                aria-label="Close edit dialog"
-                onClick={resetForm}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.18, ease: "easeOut" }}
-                className="fixed inset-0 z-[79] bg-[#16362d]/26 backdrop-blur-[3px]"
-              />
-            )}
-          </AnimatePresence>
-
-          <motion.form
-            onSubmit={handleSubmit}
-            initial={isEditDialogOpen ? { opacity: 0, scale: 0.985, y: 10 } : false}
-            animate={
-              isEditDialogOpen
-                ? { opacity: 1, scale: 1, y: 0 }
-                : { opacity: 1, scale: 1, y: 0 }
-            }
-            transition={{ duration: 0.22, ease: "easeOut" }}
-            className={
-              isEditDialogOpen
-                ? "fixed inset-x-2 top-3 z-[80] mx-auto max-h-[calc(100vh-1.5rem)] w-full max-w-6xl overflow-y-auto rounded-[28px] border border-slate-200 bg-[#fbfcfb] p-4 shadow-[0_28px_90px_rgba(15,23,42,0.26)] sm:inset-x-4 sm:top-6 sm:max-h-[calc(100vh-3rem)] sm:p-5 md:p-6"
-                : "mt-5 rounded-[28px] border border-slate-200 bg-[#fbfcfb] p-4 shadow-sm sm:p-5 md:p-6"
-            }
-          >
-            <div className="flex flex-col gap-2 border-b border-slate-200 pb-4 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                  {isEditDialogOpen ? "Edit Booking" : "Booking Form"}
-                </p>
-                <h2 className="mt-1.5 text-lg font-semibold text-slate-900 sm:mt-2 sm:text-2xl">
-                  {editingId ? "Edit booking record" : "Add booking record"}
-                </h2>
-              </div>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:gap-3">
-                <p className="max-w-md text-sm leading-6 text-slate-600">
-                  Use this form to create or update persisted booking records before filtering and reviewing the booking table below.
-                </p>
-                {isEditDialogOpen && (
-                  <button
-                    type="button"
-                    onClick={resetForm}
-                    className="inline-flex min-h-11 items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+          {isEditDialogOpen && portalReady
+            ? createPortal(
+                <AnimatePresence>
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.18, ease: "easeOut" }}
+                    data-protected-theme={theme}
+                    className="fixed inset-0 z-[79] flex items-center justify-center p-3 sm:p-4 md:p-6"
                   >
-                    Close
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <div className="mt-4 rounded-[18px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
-              <span className="font-semibold text-slate-900">Booking Code:</span>{" "}
-              {editingId
-                ? bookings.find((booking) => booking.id === editingId)?.booking_code || "Unavailable"
-                : "Auto-generated on save using the MHRWS-YYYY-XXXX format."}
-            </div>
-
-            {submitError && (
-              <div className="mt-4 rounded-[18px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                {submitError}
-              </div>
+                    <motion.button
+                      type="button"
+                      aria-label="Close edit dialog"
+                      onClick={resetForm}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.18, ease: "easeOut" }}
+                      className={`absolute inset-0 ${dialogOverlayClassName}`}
+                    />
+                    <motion.form
+                      onSubmit={handleSubmit}
+                      initial={{ opacity: 0, scale: 0.985, y: 10 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.985, y: 10 }}
+                      transition={{ duration: 0.22, ease: "easeOut" }}
+                      className={`relative z-[80] max-h-[calc(100vh-1.5rem)] w-full max-w-6xl overflow-y-auto p-4 shadow-[0_28px_90px_rgba(0,0,0,0.34)] sm:max-h-[calc(100vh-2rem)] sm:p-5 md:max-h-[calc(100vh-3rem)] md:p-6 ${sectionShellClassName}`}
+                    >
+                      {bookingFormContent}
+                    </motion.form>
+                  </motion.div>
+                </AnimatePresence>,
+                document.body
+              )
+            : (
+              <motion.form
+                onSubmit={handleSubmit}
+                initial={false}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                transition={{ duration: 0.22, ease: "easeOut" }}
+                className={`mt-5 ${cleanSectionShellClassName}`}
+              >
+                {bookingFormContent}
+              </motion.form>
             )}
 
-            {submitSuccess && (
-              <div className="mt-4 rounded-[18px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-                {submitSuccess}
-              </div>
-            )}
-
-            <div className={`mt-4 grid gap-3 ${isOffSeasonLike ? "xl:grid-cols-[1.15fr_0.85fr]" : "lg:grid-cols-[1.25fr_0.75fr]"}`}>
-              <div className="rounded-[20px] border border-slate-200 bg-white p-3.5 sm:p-4">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                  Booking Details
-                </p>
-                <div className="mt-2.5 grid max-h-[34rem] gap-2.5 overflow-y-auto pr-1 [scrollbar-color:#c8d8cf_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#c8d8cf] [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar]:w-2">
-                  {isOffSeasonLike ? (
-                    <div
-                      className="grid gap-4 md:grid-cols-2"
-                    >
-                      <LabeledSelect
-                        label="Booking Type"
-                        value={form.booking_type}
-                        onChange={(value) => setBookingType(value as BookingFormPayload["booking_type"])}
-                        options={visibleBookingTypeOptions}
-                      />
-                      <LabeledInput
-                        label="Start Date"
-                        type="date"
-                        value={form.start_date}
-                        onChange={(value) => setField("start_date", value)}
-                        helper="First covered day"
-                        invalid={capacityState.kind === "invalid"}
-                      />
-                      <LabeledInput
-                        label="End Date"
-                        type="date"
-                        value={form.end_date}
-                        onChange={(value) => setField("end_date", value)}
-                        helper="Last covered day"
-                        invalid={capacityState.kind === "invalid"}
-                      />
-                    </div>
-                  ) : (
-                    <>
-                      <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-12">
-                        <div className="xl:col-span-4">
-                          <LabeledInput
-                            label="Guest Name"
-                            value={form.contact_name}
-                            onChange={(value) => setField("contact_name", value)}
-                            placeholder="Enter guest name"
-                          />
-                        </div>
-                        <div className="xl:col-span-3">
-                          <LabeledSelect
-                            label="Booking Type"
-                            value={form.booking_type}
-                            onChange={(value) =>
-                              setBookingType(value as BookingFormPayload["booking_type"])
-                            }
-                            options={visibleBookingTypeOptions}
-                          />
-                        </div>
-                        {showParticipantCategory && (
-                          <div className="xl:col-span-2">
-                            <LabeledSelect
-                              label="Participant Category"
-                              value={form.participant_category}
-                              onChange={(value) =>
-                                setField(
-                                  "participant_category",
-                                  value as BookingFormPayload["participant_category"]
-                                )
-                              }
-                              options={PARTICIPANT_CATEGORY_OPTIONS}
-                            />
-                          </div>
-                        )}
-                        {showTrail && (
-                          <div className="xl:col-span-3">
-                            <LabeledSelect
-                              label="Trail"
-                              value={form.trail}
-                              onChange={(value) => setField("trail", value as BookingFormPayload["trail"])}
-                              options={TRAIL_OPTIONS}
-                              invalid={capacityState.kind === "invalid"}
-                            />
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="rounded-[18px] border border-slate-200 bg-[#fbfcfb] p-3 lg:p-4">
-                        <div className={`grid gap-2.5 md:grid-cols-2 ${showPax ? "xl:grid-cols-12" : "xl:grid-cols-8"}`}>
-                          <div className="xl:col-span-4">
-                            <LabeledInput
-                              label="Start Date"
-                              type="date"
-                              value={form.start_date}
-                              onChange={(value) => setField("start_date", value)}
-                              helper="First hiking day (2-3 day schedule)"
-                              invalid={capacityState.kind === "invalid"}
-                            />
-                          </div>
-                          <div className="xl:col-span-4">
-                            <LabeledInput
-                              label="End Date"
-                              type="date"
-                              value={form.end_date}
-                              onChange={(value) => setField("end_date", value)}
-                              helper="Last hiking day"
-                              invalid={capacityState.kind === "invalid"}
-                            />
-                          </div>
-                          {showPax && (
-                            <div className="xl:col-span-4">
-                              <LabeledInput
-                                label="Number of Participants"
-                                type="number"
-                                min={1}
-                                max={30}
-                                value={form.pax}
-                                onChange={(value) => setField("pax", Number(value || 0))}
-                                helper="Camp 3 first-night capacity is shared by hikers with the same start date"
-                                invalid={capacityState.kind === "invalid"}
-                              />
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  {!isOffSeasonLike && capacityState.kind !== "idle" && (
-                    <div
-                      className={`rounded-2xl border px-4 py-3 text-sm ${
-                        capacityState.kind === "invalid"
-                          ? "border-rose-200 bg-rose-50 text-rose-700"
-                          : "border-emerald-200 bg-emerald-50 text-emerald-700"
-                      }`}
-                    >
-                      <p className="font-semibold">
-                        {capacityState.title}
-                      </p>
-                      <p className="mt-1 leading-6">{capacityState.message}</p>
-                    </div>
-                  )}
-                  {!isOffSeasonLike && offSeasonWarning.kind === "warning" && (
-                    <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                      <p className="font-semibold text-amber-900">Off Season overlap</p>
-                      <p className="mt-1 leading-6">{offSeasonWarning.message}</p>
-                      <p className="mt-1 text-xs leading-5 text-amber-700">
-                        {offSeasonWarning.closures
-                          .map((closure) =>
-                            `${closure.booking_code || closure.contact_name}: ${closure.start_date} to ${closure.end_date}`
-                          )
-                          .join(" | ")}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {isOffSeasonLike ? (
-                <div className="rounded-[20px] border border-slate-200 bg-white p-3.5 sm:p-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                    {form.booking_type}
-                  </p>
-                  <div className="mt-3 rounded-[18px] border border-[#d9e4dd] bg-[#f6faf7] p-5">
-                    <p className="text-base font-semibold text-slate-900">
-                      Selected dates will be marked unavailable.
-                    </p>
-                    <p className="mt-3 text-sm leading-7 text-slate-600">
-                      {form.booking_type} uses the closure-style form. Participant category, trail, pax, and status fields stay hidden while the selected date range is recorded for schedule management.
-                    </p>
-                  </div>
-
-                  <div className="mt-4">
-                    <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                      Remarks
-                    </span>
-                    <textarea value={form.remarks} onChange={(e) => setField("remarks", e.target.value)} placeholder="Remarks (optional)" rows={4} className="w-full rounded-2xl border border-slate-200 bg-[#f8faf8] px-3 py-3 text-sm text-slate-900 outline-none transition focus:border-[#235347] focus:bg-white focus:ring-4 focus:ring-[#235347]/10" />
-                  </div>
-
-                  <div className="mt-5 flex flex-wrap gap-3">
-                    <button type="submit" disabled={(editingId ? !canEditBookings : !canCreateBookings) || submitting} className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#235347] px-5 text-sm font-semibold text-white transition hover:bg-[#1d463b] disabled:cursor-not-allowed disabled:opacity-60">
-                      {submitting ? "Saving..." : editingId ? `Update ${form.booking_type}` : `Create ${form.booking_type}`}
-                    </button>
-                    <button type="button" onClick={resetForm} className="inline-flex min-h-11 items-center justify-center rounded-full border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
-                      {editingId ? "Cancel Edit" : "Reset"}
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="rounded-[20px] border border-slate-200 bg-white p-3.5 sm:p-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                    Status and Notes
-                  </p>
-                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                    {showStatusControls && (
-                      <>
-                        <LabeledSelect
-                          label="Payment Status"
-                          value={form.payment_status}
-                          onChange={(value) =>
-                            setField("payment_status", value as BookingFormPayload["payment_status"])
-                          }
-                          options={PAYMENT_STATUS_OPTIONS}
-                        />
-                        <LabeledSelect
-                          label="Approval Status"
-                          value={form.approval_status}
-                          onChange={(value) =>
-                            setField("approval_status", value as BookingFormPayload["approval_status"])
-                          }
-                          options={APPROVAL_STATUS_OPTIONS}
-                        />
-                        <div className="sm:col-span-2">
-                          <LabeledSelect
-                            label="Booking Status"
-                            value={form.booking_status}
-                            onChange={(value) =>
-                              setField("booking_status", value as BookingFormPayload["booking_status"])
-                            }
-                            options={BOOKING_STATUS_OPTIONS}
-                          />
-                        </div>
-                      </>
-                    )}
-                    <textarea value={form.remarks} onChange={(e) => setField("remarks", e.target.value)} placeholder="Remarks (optional)" rows={3} className="rounded-2xl border border-slate-200 bg-[#f8faf8] px-3 py-3 text-sm text-slate-900 outline-none transition focus:border-[#235347] focus:bg-white focus:ring-4 focus:ring-[#235347]/10 sm:col-span-2" />
-                  </div>
-
-                  <div className="mt-5 flex flex-wrap gap-3">
-                    <button type="submit" disabled={regularSubmitDisabled} className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#235347] px-5 text-sm font-semibold text-white transition hover:bg-[#1d463b] disabled:cursor-not-allowed disabled:opacity-60">
-                      {submitting
-                        ? "Saving..."
-                        : capacityState.kind === "invalid" &&
-                            capacityState.title === "Camp 3 at capacity"
-                          ? "Camp 3 Full"
-                          : editingId
-                            ? "Update Booking"
-                            : "Create Booking"}
-                    </button>
-                    <button type="button" onClick={resetForm} className="inline-flex min-h-11 items-center justify-center rounded-full border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
-                      {editingId ? "Cancel Edit" : "Reset"}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </motion.form>
-
-          <div className="mt-5 rounded-[28px] border border-slate-200 bg-[#fbfcfb] p-4 shadow-sm sm:p-5 md:p-6">
-            <div className="flex flex-col gap-2 border-b border-slate-200 pb-3 sm:flex-row sm:items-end sm:justify-between sm:pb-4">
+          <div className={`mt-5 ${cleanSectionShellClassName}`}>
+            <div className="flex flex-col gap-2 border-b border-[var(--ui-border)] pb-3 sm:flex-row sm:items-end sm:justify-between sm:pb-4">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                <p className={`text-[11px] font-semibold uppercase tracking-[0.16em] ${ui.textSoft}`}>
                   Booking Records
                 </p>
-                <h2 className="mt-1.5 text-lg font-semibold text-slate-900 sm:mt-2 sm:text-2xl">
+                <h2 className={`mt-1.5 text-lg font-semibold sm:mt-2 sm:text-2xl ${ui.textMain}`}>
                   Filters and records
                 </h2>
               </div>
-              <p className="max-w-md text-sm leading-6 text-slate-600">
+              <p className={`max-w-md text-sm leading-6 ${ui.textMuted}`}>
                 Booking conflicts are based on Camp 3 first-night overlap, not full date-range matching.
               </p>
             </div>
 
             <div className="mt-4 grid grid-cols-2 items-end gap-2.5 sm:gap-3 lg:grid-cols-[1.15fr_1fr_1fr_1fr]">
-              <label className="col-span-2 rounded-[18px] border border-slate-200 bg-white p-3 sm:p-4 lg:col-span-1">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Search</span>
+              <label className={`col-span-2 p-3 sm:p-4 lg:col-span-1 ${cleanPanelSoftClassName}`}>
+                <span className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${ui.textSoft}`}>Search</span>
                 <input
                   type="text"
                   value={searchFilter}
                   onChange={(event) => setSearchFilter(event.target.value)}
                   placeholder="Booking code, guest name, type, trail..."
-                  className="mt-2 min-h-11 w-full rounded-2xl border border-slate-200 bg-[#f8faf8] px-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#235347] focus:bg-white focus:ring-4 focus:ring-[#235347]/10"
+                  className="mt-2 min-h-11 w-full rounded-2xl border border-[var(--ui-border)] bg-white/[0.05] px-3 text-sm text-[var(--ui-text-main)] outline-none transition placeholder:text-[color:rgba(151,166,168,0.82)] focus:border-[#395C7A] focus:bg-white/[0.08] focus:ring-4 focus:ring-[#395C7A]/18"
                 />
               </label>
 
-              <label className="rounded-[18px] border border-slate-200 bg-white p-3 sm:p-4">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Trail</span>
-                <select value={trailFilter} onChange={(event) => setTrailFilter(event.target.value)} className="mt-2 min-h-11 w-full rounded-2xl border border-slate-200 bg-[#f8faf8] px-3 text-sm text-slate-900 outline-none">
-                  <option>All Trails</option>
+              <label className={`p-3 sm:p-4 ${cleanPanelSoftClassName}`}>
+                <span className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${ui.textSoft}`}>Trail</span>
+                <select value={trailFilter} onChange={(event) => setTrailFilter(event.target.value)} className="mt-2 min-h-11 w-full rounded-2xl border border-[var(--ui-border)] bg-white/[0.05] px-3 text-sm text-[var(--ui-text-main)] outline-none">
+                  <option style={bookingNativeOptionStyle}>All Trails</option>
                   {TRAIL_OPTIONS.map((option) => (
-                    <option key={option} value={option}>{option}</option>
+                    <option key={option} value={option} style={bookingNativeOptionStyle}>{option}</option>
                   ))}
                 </select>
               </label>
 
-              <label className="rounded-[18px] border border-slate-200 bg-white p-3 sm:p-4">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Booking Type</span>
-                <select value={bookingTypeFilter} onChange={(event) => setBookingTypeFilter(event.target.value)} className="mt-2 min-h-11 w-full rounded-2xl border border-slate-200 bg-[#f8faf8] px-3 text-sm text-slate-900 outline-none">
-                  <option>All</option>
+              <label className={`p-3 sm:p-4 ${cleanPanelSoftClassName}`}>
+                <span className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${ui.textSoft}`}>Booking Type</span>
+                <select value={bookingTypeFilter} onChange={(event) => setBookingTypeFilter(event.target.value)} className="mt-2 min-h-11 w-full rounded-2xl border border-[var(--ui-border)] bg-white/[0.05] px-3 text-sm text-[var(--ui-text-main)] outline-none">
+                  <option style={bookingNativeOptionStyle}>All</option>
                   {visibleBookingTypeOptions.map((option) => (
-                    <option key={option} value={option}>{option}</option>
+                    <option key={option} value={option} style={bookingNativeOptionStyle}>{option}</option>
                   ))}
                 </select>
               </label>
 
-              <label className="col-span-2 rounded-[18px] border border-slate-200 bg-white p-3 sm:col-span-1 sm:p-4">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Month</span>
+              <label className={`col-span-2 p-3 sm:col-span-1 sm:p-4 ${cleanPanelSoftClassName}`}>
+                <span className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${ui.textSoft}`}>Month</span>
                 <input
                   type="month"
                   value={monthFilter}
                   onChange={(event) => setMonthFilter(event.target.value)}
-                  className="mt-2 min-h-11 w-full rounded-2xl border border-slate-200 bg-[#f8faf8] px-3 text-sm text-slate-900 outline-none"
+                  className="mt-2 min-h-11 w-full rounded-2xl border border-[var(--ui-border)] bg-white/[0.05] px-3 text-sm text-[var(--ui-text-main)] outline-none"
                 />
               </label>
 
             </div>
 
-            <div className="mt-5 overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-sm">
-              <div className="hidden grid-cols-[1.15fr_1.1fr_1fr_1fr_1fr_1fr_1.1fr_0.6fr_0.85fr_0.95fr_0.85fr_0.75fr] gap-3 border-b border-slate-200 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500 lg:grid">
+            <div className={`mt-5 overflow-hidden rounded-[22px] ${ui.tableWrap}`}>
+              <div className={`hidden grid-cols-[1.15fr_1.1fr_1fr_1fr_1fr_1fr_1.1fr_0.6fr_0.85fr_0.95fr_0.85fr_0.75fr] gap-3 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.14em] lg:grid ${ui.tableHead}`}>
                 <span>Booking Code</span>
                 <span>Guest Name</span>
                 <span>Type</span>
@@ -1110,18 +1344,18 @@ export default function BookingPage() {
               </div>
 
               {loading ? (
-                <div className="px-5 py-8 text-sm text-slate-600">Loading booking records...</div>
+                <div className={`px-5 py-8 text-sm ${ui.textMuted}`}>Loading booking records...</div>
               ) : filteredBookings.length === 0 ? (
-                <div className="px-5 py-8 text-sm text-slate-600">No booking records match the current filters.</div>
+                <div className={`px-5 py-8 text-sm ${ui.textMuted}`}>No booking records match the current filters.</div>
               ) : (
-                <div className="divide-y divide-slate-200">
+                <div className={recordsDividerClassName}>
                   {filteredBookings.map((row) => (
                     <article key={row.id}>
                       <div className="grid gap-3 px-4 py-4 lg:hidden">
                         <div className="flex flex-wrap items-start justify-between gap-2.5">
                           <div>
-                            <p className="text-sm font-semibold text-slate-900">{row.booking_code}</p>
-                            <p className="mt-1 text-xs leading-5 text-slate-500">{row.contact_name}</p>
+                            <p className={`text-sm font-semibold ${ui.textMain}`}>{row.booking_code}</p>
+                            <p className={`mt-1 text-xs leading-5 ${ui.textMuted}`}>{row.contact_name}</p>
                           </div>
                           <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] ${statusTone[row.booking_status]}`}>
                             {row.booking_status}
@@ -1129,20 +1363,20 @@ export default function BookingPage() {
                         </div>
 
                         <div className="grid gap-2.5 sm:grid-cols-2">
-                          <div className="rounded-[18px] border border-slate-200 bg-[#f8faf8] p-3">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Schedule</p>
-                            <p className="mt-1.5 text-sm text-slate-900">{row.start_date} to {row.end_date}</p>
-                            <p className="mt-1 text-xs text-slate-500">
+                          <div className={`${cleanPanelSoftClassName} p-3`}>
+                            <p className={`text-[11px] font-semibold uppercase tracking-[0.12em] ${ui.textSoft}`}>Schedule</p>
+                            <p className={`mt-1.5 text-sm ${ui.textMain}`}>{row.start_date} to {row.end_date}</p>
+                            <p className={`mt-1 text-xs ${ui.textMuted}`}>
                               {isOffSeasonLikeType(row.booking_type) ? "All trails closed" : row.trail}
                             </p>
                           </div>
-                          <div className="rounded-[18px] border border-slate-200 bg-[#f8faf8] p-3">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Type and Pax</p>
-                            <p className="mt-1.5 text-sm text-slate-900">
+                          <div className={`${cleanPanelSoftClassName} p-3`}>
+                            <p className={`text-[11px] font-semibold uppercase tracking-[0.12em] ${ui.textSoft}`}>Type and Pax</p>
+                            <p className={`mt-1.5 text-sm ${ui.textMain}`}>
                               {row.booking_type}
                               {isOffSeasonLikeType(row.booking_type) ? "" : ` | ${row.pax} pax`}
                             </p>
-                            <p className="mt-1 text-xs text-slate-500">
+                            <p className={`mt-1 text-xs ${ui.textMuted}`}>
                               {isOffSeasonLikeType(row.booking_type) ? "Closure record" : row.participant_category}
                             </p>
                           </div>
@@ -1157,21 +1391,32 @@ export default function BookingPage() {
                           </span>
                         </div>
 
-                        {canEditBookings && (
+                        {(canEditBookings || canDeleteBookings) && (
                           <div className="flex gap-2">
-                            <button type="button" onClick={() => startEdit(row)} className="inline-flex min-h-9 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 px-3 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100">
-                              Edit
-                            </button>
+                            {canEditBookings && (
+                              <button type="button" onClick={() => startEdit(row)} className={mobileEditButtonClassName}>
+                                Edit
+                              </button>
+                            )}
+                            {canDeleteBookings && (
+                              <button
+                                type="button"
+                                onClick={() => setDeleteTargetId(row.id)}
+                                className={mobileDeleteButtonClassName}
+                              >
+                                Delete
+                              </button>
+                            )}
                           </div>
                         )}
                       </div>
 
-                      <div className="hidden grid-cols-[1.15fr_1.1fr_1fr_1fr_1fr_1fr_1.1fr_0.6fr_0.85fr_0.95fr_0.85fr_0.75fr] items-center gap-3 px-5 py-5 text-sm text-slate-700 lg:grid">
-                        <div className="font-semibold text-slate-900">{row.booking_code}</div>
+                      <div className={`hidden grid-cols-[1.15fr_1.1fr_1fr_1fr_1fr_1fr_1.1fr_0.6fr_0.85fr_0.95fr_0.85fr_0.75fr] items-center gap-3 px-5 py-5 text-sm lg:grid ${recordsRowTextClassName}`}>
+                        <div className={`font-semibold ${ui.textMain}`}>{row.booking_code}</div>
                         <div>
-                          <p className="font-medium text-slate-900">{row.contact_name}</p>
+                          <p className={`font-medium ${ui.textMain}`}>{row.contact_name}</p>
                           {!isOffSeasonLikeType(row.booking_type) && (
-                            <p className="mt-1 text-xs text-slate-500">{row.participant_category}</p>
+                            <p className={`mt-1 text-xs ${recordsMetaTextClassName}`}>{row.participant_category}</p>
                           )}
                         </div>
                         <span>{row.booking_type}</span>
@@ -1179,7 +1424,7 @@ export default function BookingPage() {
                         <span>{row.start_date}</span>
                         <span>{row.end_date}</span>
                         {isOffSeasonLikeType(row.booking_type) ? (
-                          <span className="text-slate-500">All trails</span>
+                          <span className={recordsMetaTextClassName}>All trails</span>
                         ) : (
                           <span className={`inline-flex w-fit items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${trailPillTone(row.trail)}`}>
                             {row.trail === "San Isidro Trail" ? "San Isidro" : "Governor Generoso"}
@@ -1193,13 +1438,32 @@ export default function BookingPage() {
                           {isOffSeasonLikeType(row.booking_type) ? "Closure" : row.approval_status}
                         </span>
                         <span className={`inline-flex w-fit items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${statusTone[row.booking_status]}`}>{row.booking_status}</span>
-                        <div>
-                          {canEditBookings ? (
-                            <button type="button" onClick={() => startEdit(row)} className="inline-flex min-h-9 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 px-3 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100">
-                              Edit
-                            </button>
+                        <div className="flex justify-center">
+                          {canEditBookings || canDeleteBookings ? (
+                            <div className="flex flex-wrap items-center justify-center gap-1.5">
+                              {canEditBookings && (
+                                <button
+                                  type="button"
+                                  onClick={() => startEdit(row)}
+                                  className={tableEditButtonClassName}
+                                >
+                                  <PencilSquareIcon className="h-3.5 w-3.5" />
+                                  Edit
+                                </button>
+                              )}
+                              {canDeleteBookings && (
+                                <button
+                                  type="button"
+                                  onClick={() => setDeleteTargetId(row.id)}
+                                  className={tableDeleteButtonClassName}
+                                >
+                                  <TrashIcon />
+                                  Delete
+                                </button>
+                              )}
+                            </div>
                           ) : (
-                            <span className="text-xs text-slate-400">Read only</span>
+                            <span className={`text-xs ${recordsMutedTextClassName}`}>Read only</span>
                           )}
                         </div>
                       </div>
@@ -1211,6 +1475,20 @@ export default function BookingPage() {
           </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={deleteTargetId !== null}
+        title="Delete booking?"
+        message="This will soft delete the booking record. It will be removed from the booking table, calendar, capacity checks, and reporting views."
+        confirmText={deleting ? "Deleting..." : "Delete Booking"}
+        cancelText="Cancel"
+        danger
+        loading={deleting}
+        onCancel={() => {
+          if (!deleting) setDeleteTargetId(null);
+        }}
+        onConfirm={handleDeleteBooking}
+      />
     </section>
   );
 }

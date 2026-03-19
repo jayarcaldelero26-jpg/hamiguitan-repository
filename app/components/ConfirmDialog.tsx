@@ -8,6 +8,7 @@ import {
   TrashIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
+import { useOptionalProtectedTheme } from "@/app/components/ProtectedThemeProvider";
 
 type DialogVariant = "success" | "info" | "warning" | "danger";
 
@@ -69,34 +70,49 @@ export default function ConfirmDialog({
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  const protectedTheme = useOptionalProtectedTheme();
+  const protectedLight = protectedTheme?.theme === "light";
   const finalVariant = getVariant(variant, danger);
+  const isDanger = finalVariant === "danger";
 
   const iconWrapClass =
     finalVariant === "success"
-      ? "bg-cyan-500 text-white shadow-[0_10px_24px_rgba(6,182,212,0.28)]"
+      ? "bg-[linear-gradient(180deg,rgba(57,92,122,0.92),rgba(47,78,102,0.96))] text-[var(--ui-text-main)] shadow-[0_16px_36px_rgba(24,31,39,0.3)]"
       : finalVariant === "warning"
-      ? "bg-amber-500 text-white shadow-[0_10px_24px_rgba(245,158,11,0.28)]"
+      ? "bg-[linear-gradient(180deg,rgba(86,94,64,0.94),rgba(63,69,46,0.98))] text-[var(--ui-text-main)] shadow-[0_16px_36px_rgba(24,31,39,0.3)]"
       : finalVariant === "danger"
-      ? "bg-slate-900 text-white shadow-[0_10px_24px_rgba(15,23,42,0.28)]"
-      : "bg-sky-500 text-white shadow-[0_10px_24px_rgba(14,165,233,0.28)]";
+      ? "bg-[linear-gradient(180deg,rgba(122,46,55,0.96),rgba(88,34,42,0.98))] text-white shadow-[0_18px_42px_rgba(73,24,31,0.34)]"
+      : "bg-[linear-gradient(180deg,rgba(47,78,102,0.94),rgba(35,58,77,0.98))] text-[var(--ui-text-main)] shadow-[0_16px_36px_rgba(24,31,39,0.3)]";
+
+  const iconOuterRingClass = isDanger
+    ? protectedLight
+      ? "border border-[rgba(127,29,29,0.12)] bg-[radial-gradient(circle,rgba(220,38,38,0.18),rgba(220,38,38,0.05)_60%,transparent_76%)]"
+      : "border border-[rgba(248,113,113,0.12)] bg-[radial-gradient(circle,rgba(220,38,38,0.22),rgba(127,29,29,0.08)_62%,transparent_78%)]"
+    : protectedLight
+    ? "border border-[rgba(57,92,122,0.1)] bg-[radial-gradient(circle,rgba(148,163,184,0.14),rgba(148,163,184,0.04)_60%,transparent_76%)]"
+    : "border border-white/8 bg-[radial-gradient(circle,rgba(255,255,255,0.08),rgba(255,255,255,0.02)_62%,transparent_78%)]";
 
   const confirmBtnClass =
     finalVariant === "success"
-      ? "bg-cyan-600 hover:bg-cyan-500 text-white shadow-[0_10px_24px_rgba(6,182,212,0.24)]"
+      ? "app-glass-button app-protected-action-button border border-[rgba(86,134,173,0.22)] bg-[linear-gradient(180deg,rgba(57,92,122,0.96),rgba(47,78,102,0.98))] text-[var(--ui-text-main)] shadow-[0_16px_34px_rgba(24,31,39,0.3)]"
       : finalVariant === "warning"
-      ? "bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-[0_10px_24px_rgba(245,158,11,0.24)]"
+      ? "app-glass-button app-protected-action-button border border-[rgba(166,174,120,0.18)] bg-[linear-gradient(180deg,rgba(86,94,64,0.96),rgba(63,69,46,0.98))] text-[var(--ui-text-main)] shadow-[0_16px_34px_rgba(24,31,39,0.3)]"
       : finalVariant === "danger"
-      ? "bg-cyan-600 hover:bg-cyan-500 text-white shadow-[0_10px_24px_rgba(6,182,212,0.24)]"
-      : "bg-sky-600 hover:bg-sky-500 text-white shadow-[0_10px_24px_rgba(14,165,233,0.24)]";
+      ? "app-glass-button app-protected-action-button border border-[rgba(248,113,113,0.18)] bg-[linear-gradient(180deg,rgba(112,36,44,0.98),rgba(81,26,34,1))] text-[#FFF1F2] shadow-[0_18px_38px_rgba(63,16,23,0.36)]"
+      : "app-glass-button app-protected-action-button border border-[rgba(110,140,168,0.18)] bg-[linear-gradient(180deg,rgba(47,78,102,0.96),rgba(35,58,77,0.98))] text-[var(--ui-text-main)] shadow-[0_16px_34px_rgba(24,31,39,0.3)]";
+
+  const cancelBtnClass = protectedLight
+    ? "app-glass-button app-protected-action-button border border-[rgba(15,23,42,0.1)] bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(248,250,252,0.96))] text-[#1F2937] shadow-[0_12px_28px_rgba(15,23,42,0.1)]"
+    : "app-glass-button app-protected-action-button border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.04))] text-[var(--ui-text-main)] shadow-[0_14px_30px_rgba(0,0,0,0.24)]";
 
   const accentTextClass =
     finalVariant === "success"
-      ? "text-cyan-600"
+      ? "text-[#9AB6D1]"
       : finalVariant === "warning"
-      ? "text-amber-600"
+      ? "text-[#B8BE92]"
       : finalVariant === "danger"
-      ? "text-slate-800"
-      : "text-sky-600";
+      ? "text-[#D3B5B5]"
+      : "text-[#A9BDD1]";
 
   return (
     <AnimatePresence>
@@ -106,59 +122,87 @@ export default function ConfirmDialog({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            className={`absolute inset-0 backdrop-blur-md ${
+              protectedLight ? "bg-slate-900/16" : "bg-black/42"
+            }`}
             onClick={() => {
               if (!loading) onCancel?.();
             }}
           />
 
           <motion.div
-            initial={{ opacity: 0, scale: 0.94, y: 18 }}
+            initial={{ opacity: 0, scale: 0.965, y: 14 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: 10 }}
-            transition={{ duration: 0.18, ease: "easeOut" }}
-            className="relative w-full max-w-[540px] max-h-[min(88dvh,760px)] overflow-y-auto rounded-[28px] bg-white border border-slate-200 shadow-[0_28px_80px_rgba(15,23,42,0.20)] px-4 py-6 sm:px-6 sm:py-7 sm:rounded-[30px]"
+            exit={{ opacity: 0, scale: 0.975, y: 8 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className={`relative w-full max-w-[540px] max-h-[min(88dvh,760px)] overflow-y-auto rounded-[28px] border px-5 py-7 sm:px-7 sm:py-8 sm:rounded-[30px] ${
+              protectedLight
+                ? "border-[rgba(15,23,42,0.1)] bg-[linear-gradient(180deg,rgba(255,255,255,0.94),rgba(245,247,250,0.98))] text-[var(--ui-text-main)] shadow-[0_28px_72px_rgba(15,23,42,0.18)]"
+                : "border-white/10 bg-[linear-gradient(180deg,rgba(31,42,51,0.88),rgba(24,31,39,0.94))] text-[var(--ui-text-main)] shadow-[0_34px_90px_rgba(0,0,0,0.42)]"
+            }`}
           >
+            <div
+              className={`pointer-events-none absolute inset-x-0 top-0 h-28 rounded-t-[inherit] ${
+                isDanger
+                  ? protectedLight
+                    ? "bg-[radial-gradient(circle_at_top,rgba(220,38,38,0.14),transparent_68%)]"
+                    : "bg-[radial-gradient(circle_at_top,rgba(239,68,68,0.18),transparent_68%)]"
+                  : protectedLight
+                  ? "bg-[radial-gradient(circle_at_top,rgba(148,163,184,0.1),transparent_70%)]"
+                  : "bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_72%)]"
+              }`}
+            />
+            <div
+              className={`pointer-events-none absolute inset-0 rounded-[inherit] ${
+                protectedLight
+                  ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]"
+                  : "shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
+              }`}
+            />
+
             {!oneButton && onCancel && (
               <button
                 type="button"
                 onClick={() => !loading && onCancel()}
                 disabled={loading}
-                className="absolute right-3 top-3 h-11 w-11 rounded-xl border border-slate-200 bg-white text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition disabled:opacity-60 grid place-items-center sm:right-4 sm:top-4 sm:h-10 sm:w-10"
+                className={`app-glass-skip absolute right-3 top-3 grid h-11 w-11 place-items-center rounded-2xl border transition disabled:opacity-60 sm:right-4 sm:top-4 sm:h-10 sm:w-10 ${
+                  protectedLight
+                    ? "border-[rgba(15,23,42,0.08)] bg-white/78 text-[var(--ui-text-soft)] hover:bg-white hover:text-[var(--ui-text-main)]"
+                    : "border-white/10 bg-white/[0.06] text-[var(--ui-text-soft)] hover:bg-white/[0.1] hover:text-[var(--ui-text-main)]"
+                }`}
                 aria-label="Close dialog"
               >
                 <XMarkIcon className="w-5 h-5" />
               </button>
             )}
 
-            <div className="flex flex-col items-center text-center">
-              <div className="relative mb-5">
-                <div className={`h-16 w-16 rounded-full grid place-items-center ${iconWrapClass}`}>
+            <div className="relative flex flex-col items-center text-center">
+              <div className={`mb-6 inline-flex h-24 w-24 items-center justify-center rounded-full ${iconOuterRingClass}`}>
+                <div className={`grid h-16 w-16 place-items-center rounded-full border border-white/10 ${iconWrapClass}`}>
                   <VariantIcon variant={finalVariant} />
                 </div>
-
-                <span className="absolute -left-4 top-2 h-2.5 w-2.5 rounded-full bg-cyan-200" />
-                <span className="absolute -right-3 top-0 h-2 w-2 rounded-full bg-sky-300" />
-                <span className="absolute right-0 -bottom-1 h-2.5 w-2.5 rounded-full bg-emerald-200" />
-                <span className="absolute -left-1 -bottom-3 h-2 w-2 rounded-full bg-cyan-100" />
               </div>
 
-              <h2 className="text-[24px] sm:text-[30px] leading-tight font-extrabold text-slate-900">
+              <h2 className="max-w-[420px] text-[24px] leading-tight font-extrabold tracking-[-0.03em] text-[var(--ui-text-main)] sm:text-[30px]">
                 {title}
               </h2>
 
-              <p className="mt-3 max-w-[420px] text-[14px] sm:text-[15px] leading-6 sm:leading-7 text-slate-500 whitespace-pre-line">
+              <p className="mt-3 max-w-[420px] whitespace-pre-line text-[14px] leading-6 text-[var(--ui-text-soft)] sm:text-[15px] sm:leading-7">
                 {message}
               </p>
 
               {details.length > 0 && (
-                <div className="mt-6 grid w-full grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="mt-7 grid w-full grid-cols-1 gap-3 sm:grid-cols-3">
                   {details.map((item, i) => (
                     <div
                       key={`${item.label}-${i}`}
-                      className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left"
+                      className={`rounded-2xl border px-4 py-3 text-left ${
+                        protectedLight
+                          ? "border-[rgba(15,23,42,0.08)] bg-white/68"
+                          : "border-white/8 bg-white/[0.04]"
+                      }`}
                     >
-                      <div className="text-[12px] text-slate-500">{item.label}</div>
+                      <div className="text-[12px] text-[var(--ui-text-soft)]">{item.label}</div>
                       <div className={`mt-1 text-[15px] font-extrabold ${accentTextClass}`}>
                         {item.value}
                       </div>
@@ -168,8 +212,8 @@ export default function ConfirmDialog({
               )}
 
               <div
-                className={`mt-7 flex w-full flex-col sm:flex-row gap-3 ${
-                  oneButton ? "justify-center" : "justify-center sm:justify-between"
+                className={`mt-8 flex w-full flex-col gap-3 sm:flex-row ${
+                  oneButton ? "justify-center" : "justify-center sm:justify-center"
                 } ${oneButton ? "max-w-[320px]" : ""}`}
               >
                 {!oneButton && (
@@ -177,7 +221,7 @@ export default function ConfirmDialog({
                     type="button"
                     onClick={() => onCancel?.()}
                     disabled={loading}
-                    className="flex-1 sm:flex-none sm:min-w-[140px] min-h-11 px-5 py-3 rounded-2xl border border-slate-300 bg-white text-slate-700 font-bold hover:bg-slate-50 transition disabled:opacity-70 disabled:cursor-not-allowed"
+                    className={`min-h-11 flex-1 rounded-full px-5 py-3 font-semibold transition disabled:cursor-not-allowed disabled:opacity-70 sm:min-w-[148px] sm:flex-none ${cancelBtnClass}`}
                   >
                     {cancelText}
                   </button>
@@ -187,7 +231,7 @@ export default function ConfirmDialog({
                   type="button"
                   onClick={onConfirm}
                   disabled={loading}
-                  className={`flex-1 sm:flex-none sm:min-w-[180px] min-h-11 px-6 py-3 rounded-2xl font-extrabold transition disabled:opacity-70 disabled:cursor-not-allowed ${confirmBtnClass}`}
+                  className={`min-h-11 flex-1 rounded-full px-6 py-3 font-extrabold transition disabled:cursor-not-allowed disabled:opacity-70 sm:min-w-[180px] sm:flex-none ${confirmBtnClass}`}
                 >
                   {loading ? "Please wait..." : confirmText}
                 </button>

@@ -12,8 +12,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { repoTheme } from "@/app/lib/repoTheme";
-
-type PageTheme = "dark" | "light";
+import { useProtectedTheme } from "@/app/components/ProtectedThemeProvider";
 
 function initials(name: string) {
   const parts = (name || "").trim().split(/\s+/).filter(Boolean);
@@ -199,7 +198,7 @@ function IconButton({
       onClick={onClick}
       title={title}
       aria-label={title}
-      className={`h-10 w-10 rounded-xl transition shadow-sm grid place-items-center ${ui.buttonSecondary}`}
+      className={`app-glass-skip h-10 w-10 rounded-full transition shadow-sm grid place-items-center ${ui.buttonSecondary}`}
     >
       {children}
     </button>
@@ -301,7 +300,7 @@ export default function RegisteredUsersPage() {
   const { user: me, loading: loadingMe } = useAuth();
   const { users, loading: loadingUsers, refreshing, refreshUsers } = useUsers();
 
-  const [pageTheme, setPageTheme] = useState<PageTheme>("dark");
+  const { theme: pageTheme } = useProtectedTheme();
 
   const [q, setQ] = useState("");
   const [empFilter, setEmpFilter] = useState<
@@ -324,21 +323,6 @@ export default function RegisteredUsersPage() {
 
   const [infoOpen, setInfoOpen] = useState(false);
   const [infoMsg, setInfoMsg] = useState("Done.");
-
-  useEffect(() => {
-    const syncTheme = () => {
-      const saved =
-        typeof window !== "undefined"
-          ? (localStorage.getItem("page-theme") as PageTheme | null)
-          : null;
-
-      setPageTheme(saved === "light" ? "light" : "dark");
-    };
-
-    syncTheme();
-    window.addEventListener("page-theme-changed", syncTheme);
-    return () => window.removeEventListener("page-theme-changed", syncTheme);
-  }, []);
 
   useEffect(() => {
     if (loadingMe) return;
@@ -542,6 +526,8 @@ export default function RegisteredUsersPage() {
   const dark = pageTheme === "dark";
   const ui = repoTheme(pageTheme);
   const inputCls = `${ui.input.replace("pl-11", "pl-4")} h-12`;
+  const modalSecondaryActionClassName = `h-11 px-5 rounded-full font-semibold transition ${ui.buttonSecondary}`;
+  const modalDangerActionClassName = `h-11 px-5 rounded-full font-semibold transition ${ui.buttonDanger}`;
   const modalInputCls = dark
     ? "mt-1 w-full h-11 rounded-xl border border-white/10 bg-white/[0.04] px-3 text-sm text-[#DAF1DE] outline-none focus:ring-4 focus:ring-[#8EB69B]/10 focus:border-[#8EB69B]/25 disabled:bg-white/[0.03] disabled:text-[#DAF1DE]/60"
     : "mt-1 w-full h-11 rounded-xl border border-white/55 bg-white/60 px-3 text-sm text-[#163832] outline-none focus:ring-4 focus:ring-[#8EB69B]/18 focus:border-[#8EB69B]/55 disabled:bg-white/40 disabled:text-[#235347]/55";
@@ -698,16 +684,16 @@ export default function RegisteredUsersPage() {
                   onChange={(e) => setRoleFilter(e.target.value as "all" | "admin" | "co_admin" | "staff")}
                   className={`${inputCls} sm:min-w-[150px]`}
                 >
-                  <option className="text-slate-900" value="all">
+                  <option value="all">
                     All roles
                   </option>
-                  <option className="text-slate-900" value="staff">
+                  <option value="staff">
                     Staff
                   </option>
-                  <option className="text-slate-900" value="co_admin">
+                  <option value="co_admin">
                     Co-Admin
                   </option>
-                  <option className="text-slate-900" value="admin">
+                  <option value="admin">
                     Admin
                   </option>
                 </select>
@@ -721,19 +707,19 @@ export default function RegisteredUsersPage() {
                   }
                   className={`${inputCls} sm:min-w-[190px]`}
                 >
-                  <option className="text-slate-900" value="all">
+                  <option value="all">
                     All employment types
                   </option>
-                  <option className="text-slate-900" value="Job Order">
+                  <option value="Job Order">
                     Job Order
                   </option>
-                  <option className="text-slate-900" value="Contract of Service">
+                  <option value="Contract of Service">
                     Contract of Service
                   </option>
-                  <option className="text-slate-900" value="Casual">
+                  <option value="Casual">
                     Casual
                   </option>
-                  <option className="text-slate-900" value="Permanent">
+                  <option value="Permanent">
                     Permanent
                   </option>
                 </select>
@@ -1136,13 +1122,13 @@ export default function RegisteredUsersPage() {
                       onChange={(e) => setDraftUser((p) => ({ ...p, role: e.target.value as UserRole }))}
                       className={modalInputCls}
                     >
-                      <option className="text-slate-900" value="staff">
+                      <option value="staff">
                         Staff
                       </option>
-                      <option className="text-slate-900" value="co_admin">
+                      <option value="co_admin">
                         Co-Admin
                       </option>
-                      <option className="text-slate-900" value="admin">
+                      <option value="admin">
                         Admin
                       </option>
                     </select>
@@ -1163,19 +1149,19 @@ export default function RegisteredUsersPage() {
                       }
                       className={modalInputCls}
                     >
-                      <option className="text-slate-900" value="">
+                      <option value="">
                         —
                       </option>
-                      <option className="text-slate-900" value="Job Order">
+                      <option value="Job Order">
                         Job Order
                       </option>
-                      <option className="text-slate-900" value="Contract of Service">
+                      <option value="Contract of Service">
                         Contract of Service
                       </option>
-                      <option className="text-slate-900" value="Casual">
+                      <option value="Casual">
                         Casual
                       </option>
-                      <option className="text-slate-900" value="Permanent">
+                      <option value="Permanent">
                         Permanent
                       </option>
                     </select>
@@ -1263,11 +1249,7 @@ export default function RegisteredUsersPage() {
                     <button
                       type="button"
                       onClick={() => setDeleteTarget(selectedUser)}
-                      className={
-                        dark
-                          ? "h-11 px-5 rounded-2xl border border-cyan-300/12 bg-white/[0.05] text-white hover:bg-white/[0.08] transition font-medium"
-                          : "h-11 px-5 rounded-2xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition font-medium"
-                      }
+                      className={modalDangerActionClassName}
                     >
                       Delete User
                     </button>
@@ -1283,11 +1265,7 @@ export default function RegisteredUsersPage() {
                         <button
                           type="button"
                           onClick={() => setEditMode(true)}
-                          className={
-                            dark
-                              ? "h-11 px-5 rounded-2xl border border-cyan-300/12 bg-white/[0.05] text-white hover:bg-white/[0.08] transition font-medium"
-                              : "h-11 px-5 rounded-2xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition font-medium"
-                          }
+                          className={modalSecondaryActionClassName}
                         >
                           Edit
                         </button>
@@ -1307,11 +1285,7 @@ export default function RegisteredUsersPage() {
                               });
                               setEditMode(false);
                             }}
-                            className={
-                              dark
-                                ? "h-11 px-5 rounded-2xl border border-cyan-300/12 bg-white/[0.05] text-white hover:bg-white/[0.08] transition font-medium"
-                                : "h-11 px-5 rounded-2xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition font-medium"
-                            }
+                            className={modalSecondaryActionClassName}
                           >
                             Cancel
                           </button>
@@ -1330,11 +1304,7 @@ export default function RegisteredUsersPage() {
                       <button
                         type="button"
                         onClick={closeUser}
-                        className={
-                          dark
-                            ? "h-11 px-5 rounded-2xl border border-cyan-300/12 bg-white/[0.05] text-white hover:bg-white/[0.08] transition font-medium"
-                            : "h-11 px-5 rounded-2xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition font-medium"
-                        }
+                        className={modalSecondaryActionClassName}
                       >
                         Close
                       </button>

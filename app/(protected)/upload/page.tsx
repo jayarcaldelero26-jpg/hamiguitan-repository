@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/app/components/AuthProvider";
 import { useDocuments } from "@/app/components/DocumentsProvider";
+import { useProtectedTheme } from "@/app/components/ProtectedThemeProvider";
 import { supabaseBrowser } from "@/app/lib/supabaseClient";
 import { motion } from "framer-motion";
 import { repoTheme } from "@/app/lib/repoTheme";
@@ -21,7 +22,6 @@ import {
 
 type Category = "Academe" | "Stakeholder" | "PAMO Activity";
 type FoldersState = { academe: string[]; stakeholders: string[]; pamo: string[] };
-type PageTheme = "dark" | "light";
 
 const TEMP_BUCKET = "temp-uploads";
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
@@ -89,7 +89,7 @@ export default function UploadPage() {
   const { user: me, loading: loadingMe } = useAuth();
   const { refreshDocuments } = useDocuments();
 
-  const [pageTheme, setPageTheme] = useState<PageTheme>("dark");
+  const { theme: pageTheme } = useProtectedTheme();
 
   const [category, setCategory] = useState<Category>("Academe");
   const [title, setTitle] = useState("");
@@ -118,21 +118,6 @@ export default function UploadPage() {
   const [errorMsg, setErrorMsg] = useState("Something went wrong.");
 
   const inputRef = useRef<HTMLInputElement | null>(null);
-
-  useEffect(() => {
-    const syncTheme = () => {
-      const saved =
-        typeof window !== "undefined"
-          ? (localStorage.getItem("page-theme") as PageTheme | null)
-          : null;
-
-      setPageTheme(saved === "light" ? "light" : "dark");
-    };
-
-    syncTheme();
-    window.addEventListener("page-theme-changed", syncTheme);
-    return () => window.removeEventListener("page-theme-changed", syncTheme);
-  }, []);
 
   useEffect(() => {
     if (loadingMe) return;
@@ -768,13 +753,13 @@ export default function UploadPage() {
                     onChange={(e) => setCategory(e.target.value as Category)}
                     className={inputBase}
                   >
-                    <option className="text-slate-900" value="Academe">
+                    <option value="Academe">
                       Academe
                     </option>
-                    <option className="text-slate-900" value="Stakeholder">
+                    <option value="Stakeholder">
                       Stakeholder
                     </option>
-                    <option className="text-slate-900" value="PAMO Activity">
+                    <option value="PAMO Activity">
                       PAMO Activity
                     </option>
                   </select>
@@ -852,11 +837,11 @@ export default function UploadPage() {
                   className={inputBase}
                   disabled={loadingFolders}
                 >
-                  <option className="text-slate-900" value="">
+                  <option value="">
                     {loadingFolders ? "Loading folders..." : "Select existing folder (optional)"}
                   </option>
                   {folderOptions.map((f) => (
-                    <option className="text-slate-900" key={f} value={f}>
+                    <option key={f} value={f}>
                       {f}
                     </option>
                   ))}
