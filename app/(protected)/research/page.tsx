@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
 import { useAuth } from "@/app/components/AuthProvider";
 import {
+  DocumentsProvider,
   useDocuments,
   type DocumentRow,
 } from "@/app/components/DocumentsProvider";
@@ -442,7 +443,7 @@ const fadeUpDelayed = (delay = 0) => ({
   transition: { duration: 0.18, delay },
 });
 
-export default function ResearchPage() {
+function ResearchPageContent() {
   const router = useRouter();
   const { user: me, loading: loadingMe } = useAuth();
   const { documents: docs = [], loading: loadingDocs, refreshDocuments } = useDocuments();
@@ -932,5 +933,13 @@ export default function ResearchPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ResearchPage() {
+  return (
+    <DocumentsProvider>
+      <ResearchPageContent />
+    </DocumentsProvider>
   );
 }

@@ -4,7 +4,10 @@ import ConfirmDialog from "@/app/components/ConfirmDialog";
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/app/components/AuthProvider";
-import { useDocuments } from "@/app/components/DocumentsProvider";
+import {
+  DocumentsProvider,
+  useDocuments,
+} from "@/app/components/DocumentsProvider";
 import { useProtectedTheme } from "@/app/components/ProtectedThemeProvider";
 import { supabaseBrowser } from "@/app/lib/supabaseClient";
 import { motion } from "framer-motion";
@@ -84,7 +87,7 @@ function Skeleton({
   );
 }
 
-export default function UploadPage() {
+function UploadPageContent() {
   const router = useRouter();
   const { user: me, loading: loadingMe } = useAuth();
   const { refreshDocuments } = useDocuments();
@@ -1218,5 +1221,13 @@ export default function UploadPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function UploadPage() {
+  return (
+    <DocumentsProvider>
+      <UploadPageContent />
+    </DocumentsProvider>
   );
 }

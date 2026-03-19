@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
 import { useAuth } from "@/app/components/AuthProvider";
@@ -30,19 +31,63 @@ type ContextType = {
 
 const DocumentsContext = createContext<ContextType | null>(null);
 
+const DOCUMENTS_CACHE_TTL_MS = 15_000;
+
+let cachedDocumentsUserId: number | null = null;
+let cachedDocuments: DocumentRow[] | null = null;
+let cachedDocumentsAt = 0;
+let documentsRequest: Promise<DocumentRow[]> | null = null;
+
+function readDocumentsCache(userId: number) {
+  if (
+    cachedDocumentsUserId === userId &&
+    cachedDocuments &&
+    Date.now() - cachedDocumentsAt < DOCUMENTS_CACHE_TTL_MS
+  ) {
+    return cachedDocuments;
+  }
+
+  return null;
+}
+
+function writeDocumentsCache(userId: number, documents: DocumentRow[]) {
+  cachedDocumentsUserId = userId;
+  cachedDocuments = documents;
+  cachedDocumentsAt = Date.now();
+}
+
+function clearDocumentsCache() {
+  cachedDocumentsUserId = null;
+  cachedDocuments = null;
+  cachedDocumentsAt = 0;
+  documentsRequest = null;
+}
+
 export function DocumentsProvider({
   children,
 }: {
   children: React.ReactNode;
 }) {
   const { user, loading: authLoading } = useAuth();
+  const mountedRef = useRef(true);
 
   const [documents, setDocuments] = useState<DocumentRow[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const loadDocuments = useCallback(async () => {
+  const loadDocuments = useCallback(async (options?: { force?: boolean }) => {
     if (!user) {
+      clearDocumentsCache();
       setDocuments([]);
+      setLoading(false);
+      return;
+    }
+
+    const force = options?.force ?? false;
+    const userId = user.id;
+    const cached = force ? null : readDocumentsCache(userId);
+
+    if (cached) {
+      setDocuments(cached);
       setLoading(false);
       return;
     }
@@ -50,52 +95,79 @@ export function DocumentsProvider({
     try {
       setLoading(true);
 
-      const res = await fetch("/api/documents", {
-        credentials: "include",
-        cache: "no-store",
-      });
+      if (!documentsRequest) {
+        documentsRequest = (async () => {
+          const res = await fetch("/api/documents", {
+            credentials: "include",
+            cache: "no-store",
+          });
 
-      if (res.status === 401) {
-        setDocuments([]);
-        return;
+          if (res.status === 401) {
+            return [];
+          }
+
+          if (!res.ok) {
+            console.error("DOCUMENTS GET FAILED:", res.status);
+            return [];
+          }
+
+          const data = await res.json();
+
+          if (Array.isArray(data)) {
+            return data;
+          }
+
+          if (Array.isArray(data?.documents)) {
+            return data.documents;
+          }
+
+          return [];
+        })().finally(() => {
+          documentsRequest = null;
+        });
       }
 
-      if (!res.ok) {
-        console.error("DOCUMENTS GET FAILED:", res.status);
-        setDocuments([]);
-        return;
-      }
+      const nextDocuments = await documentsRequest;
 
-      const data = await res.json();
+      if (!mountedRef.current) return;
 
-      if (Array.isArray(data)) {
-        setDocuments(data);
-      } else if (Array.isArray(data?.documents)) {
-        setDocuments(data.documents);
-      } else {
-        setDocuments([]);
-      }
+      writeDocumentsCache(userId, nextDocuments);
+      setDocuments(nextDocuments);
     } catch (e) {
       console.error("DOCUMENT LOAD FAILED", e);
+      if (!mountedRef.current) return;
       setDocuments([]);
     } finally {
-      setLoading(false);
+      if (mountedRef.current) {
+        setLoading(false);
+      }
     }
   }, [user]);
 
   useEffect(() => {
+    mountedRef.current = true;
+
     if (authLoading) {
       setLoading(true);
-      return;
+      return () => {
+        mountedRef.current = false;
+      };
     }
 
     if (!user) {
+      clearDocumentsCache();
       setDocuments([]);
       setLoading(false);
-      return;
+      return () => {
+        mountedRef.current = false;
+      };
     }
 
     loadDocuments();
+
+    return () => {
+      mountedRef.current = false;
+    };
   }, [authLoading, user, loadDocuments]);
 
   return (
@@ -103,7 +175,7 @@ export function DocumentsProvider({
       value={{
         documents,
         loading,
-        refreshDocuments: loadDocuments,
+        refreshDocuments: () => loadDocuments({ force: true }),
       }}
     >
       {children}

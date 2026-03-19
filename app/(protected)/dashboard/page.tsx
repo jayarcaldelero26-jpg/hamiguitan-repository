@@ -4,6 +4,7 @@ import ConfirmDialog from "@/app/components/ConfirmDialog";
 import { useAuth } from "@/app/components/AuthProvider";
 
 import {
+  DocumentsProvider,
   useDocuments,
   type DocumentRow,
 } from "@/app/components/DocumentsProvider";
@@ -321,7 +322,7 @@ const fadeUpDelayed = (delay = 0) => ({
   transition: { duration: 0.18, delay },
 });
 
-export default function Dashboard() {
+function DashboardContent() {
   const { user, loading: loadingUser } = useAuth();
   const {
     documents: docs = [],
@@ -1486,5 +1487,13 @@ export default function Dashboard() {
       />
       </div>
     </div>
+  );
+}
+
+export default function Dashboard() {
+  return (
+    <DocumentsProvider>
+      <DashboardContent />
+    </DocumentsProvider>
   );
 }

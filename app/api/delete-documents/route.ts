@@ -10,6 +10,10 @@ function isValidId(value: number) {
   return Number.isInteger(value) && value > 0;
 }
 
+function normalizeRole(role?: string) {
+  return (role || "").trim().toLowerCase();
+}
+
 export async function DELETE(req: NextRequest) {
   let totalStarted = false;
 
@@ -23,7 +27,7 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (me.role !== "admin") {
+    if (normalizeRole(me.role) !== "admin") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

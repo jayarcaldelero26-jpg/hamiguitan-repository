@@ -3,19 +3,6 @@ export const runtime = "nodejs";
 import { NextResponse, type NextRequest } from "next/server";
 import { supabaseAdmin } from "@/app/lib/db";
 import { getCurrentUser } from "@/app/lib/auth";
-import { writeAuditLog } from "@/app/lib/auditLog";
-import {
-  deleteDriveFileById,
-  ensureFileInExpectedParent,
-  getDriveClient,
-  getDriveFileInfo,
-  isDriveFolderEmpty,
-  moveDriveFileToParent,
-  normalizeFolderName,
-  replaceDriveFileParents,
-  resolveExistingDocumentDriveParent,
-  resolveDocumentDriveParent,
-} from "@/app/lib/googleDrive";
 
 function normalizeCategory(v: string) {
   const s = (v || "").trim().toLowerCase();
@@ -35,6 +22,14 @@ function normalizeRole(role?: string) {
 
 function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
+}
+
+async function loadAuditLogModule() {
+  return import("@/app/lib/auditLog");
+}
+
+async function loadGoogleDriveModule() {
+  return import("@/app/lib/googleDrive");
 }
 
 function buildAuditPath(category: string, folder: string) {
@@ -60,14 +55,7 @@ export async function GET() {
       return NextResponse.json({ error: "Failed to load documents." }, { status: 500 });
     }
 
-    const documents = (rows || []).map((d) => ({
-      ...d,
-      url: d.fileId ? `/api/documents/preview?id=${encodeURIComponent(d.fileId)}` : "",
-      previewUrl: d.fileId ? `/api/documents/preview?id=${encodeURIComponent(d.fileId)}` : "",
-      downloadUrl: d.fileId ? `/api/documents/download?id=${encodeURIComponent(d.fileId)}` : "",
-    }));
-
-    return NextResponse.json(documents);
+    return NextResponse.json(rows || []);
   } catch (error) {
     console.error("DOCUMENTS GET FATAL:", error);
     return NextResponse.json({ error: "Failed to load documents." }, { status: 500 });
@@ -186,6 +174,7 @@ export async function PATCH(req: NextRequest) {
     const category = normalizeCategory(String(body?.category || ""));
     const title = String(body?.title || "").trim();
     const dateReceived = String(body?.dateReceived || "").trim();
+    const { normalizeFolderName } = await loadGoogleDriveModule();
     let folder = normalizeFolderName(String(body?.folder || ""));
 
     if (!Number.isFinite(id) || id <= 0) {
@@ -251,6 +240,14 @@ export async function PATCH(req: NextRequest) {
       }
 
       try {
+        const {
+          ensureFileInExpectedParent,
+          getDriveClient,
+          getDriveFileInfo,
+          moveDriveFileToParent,
+          resolveExistingDocumentDriveParent,
+          resolveDocumentDriveParent,
+        } = await loadGoogleDriveModule();
         const drive = getDriveClient();
         const driveFile = await getDriveFileInfo(drive, fileId);
         const expectedSourceParentId = await resolveExistingDocumentDriveParent(
@@ -296,6 +293,8 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: error.message || "Failed to update document." }, { status: 500 });
     }
 
+    const { writeAuditLog } = await loadAuditLogModule();
+
     await writeAuditLog({
       userId: me.id,
       userEmail: me.email,
@@ -332,6 +331,18 @@ export async function PUT(req: NextRequest) {
     const body = await req.json();
 
     const category = normalizeCategory(String(body?.category || ""));
+    const {
+      deleteDriveFileById,
+      ensureFileInExpectedParent,
+      getDriveClient,
+      getDriveFileInfo,
+      isDriveFolderEmpty,
+      normalizeFolderName,
+      moveDriveFileToParent,
+      replaceDriveFileParents,
+      resolveDocumentDriveParent,
+      resolveExistingDocumentDriveParent,
+    } = await loadGoogleDriveModule();
     let oldFolder = normalizeFolderName(String(body?.oldFolder || ""));
     let newFolder = normalizeFolderName(String(body?.newFolder || ""));
 
@@ -476,6 +487,8 @@ export async function PUT(req: NextRequest) {
 
       return NextResponse.json({ error: error.message || "Failed to rename folder." }, { status: 500 });
     }
+
+    const { writeAuditLog } = await loadAuditLogModule();
 
     await writeAuditLog({
       userId: me.id,

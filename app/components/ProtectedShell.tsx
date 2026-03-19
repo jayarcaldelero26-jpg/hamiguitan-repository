@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
 import {
@@ -79,6 +79,7 @@ export default function ProtectedShell({
   const pathname = usePathname();
   const { user, loading, logout } = useAuth();
   const { theme: pageTheme, dark, toggleTheme } = useProtectedTheme();
+  const prefetchedRoutesRef = useRef(new Set<string>());
 
   const [collapsed, setCollapsed] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -98,22 +99,8 @@ export default function ProtectedShell({
   }, [loading, user, router]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!mobileNavOpen) return;
 
-    router.prefetch("/dashboard");
-    router.prefetch("/research");
-    router.prefetch("/calendar");
-    router.prefetch("/booking");
-    router.prefetch("/porters-identification");
-    router.prefetch("/organizational-chart");
-
-    if (canUpload(user.role)) router.prefetch("/upload");
-    if (canViewAudit(user.role)) router.prefetch("/audit");
-    if (canAccessSettings(user.role)) router.prefetch("/settings");
-    if (canViewRegisteredStaff(user.role)) router.prefetch("/admin/users");
-  }, [router, user]);
-
-  useEffect(() => {
     const onResize = () => {
       if (window.innerWidth >= 768) {
         setMobileNavOpen(false);
@@ -122,7 +109,7 @@ export default function ProtectedShell({
 
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
-  }, []);
+  }, [mobileNavOpen]);
 
   const handleNavigate = useCallback(
     (href: string) => {
@@ -131,6 +118,18 @@ export default function ProtectedShell({
       router.push(href);
     },
     [pathname, router]
+  );
+
+  const prefetchRoute = useCallback(
+    (href: string) => {
+      if (!user || pathname === href || prefetchedRoutesRef.current.has(href)) {
+        return;
+      }
+
+      prefetchedRoutesRef.current.add(href);
+      router.prefetch(href);
+    },
+    [pathname, router, user]
   );
 
   const ui = repoTheme(pageTheme);
@@ -149,6 +148,8 @@ export default function ProtectedShell({
           key={href}
           type="button"
           onClick={() => handleNavigate(href)}
+          onMouseEnter={() => prefetchRoute(href)}
+          onFocus={() => prefetchRoute(href)}
           aria-current={active ? "page" : undefined}
           className={`group relative flex w-full min-h-11 items-center gap-3 rounded-[20px] border px-3 py-2.5 transition-all duration-200 ease-out ${
             showLabel ? "" : "justify-center"
@@ -193,7 +194,7 @@ export default function ProtectedShell({
         </button>
       );
     },
-    [collapsed, dark, handleNavigate, mobileNavOpen, pathname]
+    [collapsed, dark, handleNavigate, mobileNavOpen, pathname, prefetchRoute]
   );
 
   const navItems = useMemo(() => {
@@ -571,51 +572,57 @@ export default function ProtectedShell({
         </div>
       </div>
 
-      <ConfirmDialog
-        open={confirmLogout}
-        title="Logout?"
-        message="Are you sure you want to logout from the repository system?"
-        confirmText="Logout"
-        cancelText="Cancel"
-        variant="danger"
-        onCancel={() => setConfirmLogoutPath(null)}
-        onConfirm={async () => {
-          setConfirmLogoutPath(null);
+      {confirmLogout && (
+        <ConfirmDialog
+          open
+          title="Logout?"
+          message="Are you sure you want to logout from the repository system?"
+          confirmText="Logout"
+          cancelText="Cancel"
+          variant="danger"
+          onCancel={() => setConfirmLogoutPath(null)}
+          onConfirm={async () => {
+            setConfirmLogoutPath(null);
 
-          const ok = await logout();
+            const ok = await logout();
 
-          if (!ok) {
-            setLogoutErrorMsg("Please try again.");
-            setLogoutErrorOpen(true);
-            return;
-          }
+            if (!ok) {
+              setLogoutErrorMsg("Please try again.");
+              setLogoutErrorOpen(true);
+              return;
+            }
 
-          setLogoutSuccessOpen(true);
-        }}
-      />
+            setLogoutSuccessOpen(true);
+          }}
+        />
+      )}
 
-      <ConfirmDialog
-        open={logoutSuccessOpen}
-        title="Logged Out"
-        message="You have been logged out successfully."
-        confirmText="Go to Login"
-        oneButton
-        variant="success"
-        onConfirm={() => {
-          setLogoutSuccessOpen(false);
-          window.location.replace("/login");
-        }}
-      />
+      {logoutSuccessOpen && (
+        <ConfirmDialog
+          open
+          title="Logged Out"
+          message="You have been logged out successfully."
+          confirmText="Go to Login"
+          oneButton
+          variant="success"
+          onConfirm={() => {
+            setLogoutSuccessOpen(false);
+            window.location.replace("/login");
+          }}
+        />
+      )}
 
-      <ConfirmDialog
-        open={logoutErrorOpen}
-        title="Logout Failed"
-        message={logoutErrorMsg}
-        confirmText="OK"
-        oneButton
-        variant="warning"
-        onConfirm={() => setLogoutErrorOpen(false)}
-      />
+      {logoutErrorOpen && (
+        <ConfirmDialog
+          open
+          title="Logout Failed"
+          message={logoutErrorMsg}
+          confirmText="OK"
+          oneButton
+          variant="warning"
+          onConfirm={() => setLogoutErrorOpen(false)}
+        />
+      )}
     </>
   );
 }

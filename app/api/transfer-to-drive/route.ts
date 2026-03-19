@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Readable } from "stream";
 import type { ReadableStream as NodeReadableStream } from "stream/web";
 import { supabaseAdmin } from "@/app/lib/db";
+import { writeAuditLog } from "@/app/lib/auditLog";
 import {
   getDriveClient,
   findOrCreateFolder,
@@ -238,6 +239,15 @@ export async function POST(req: NextRequest) {
       id: insertedRow?.id,
       fileId,
       name: originalName,
+    });
+
+    await writeAuditLog({
+      userId: me.id,
+      userEmail: me.email,
+      action: "document_upload",
+      fileName: originalName,
+      fromPath: null,
+      toPath: folder ? `${category} / ${folder}` : category,
     });
 
     return NextResponse.json({

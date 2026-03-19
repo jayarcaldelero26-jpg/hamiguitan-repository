@@ -22,6 +22,10 @@ function isValidUserId(value: number) {
   return Number.isInteger(value) && value > 0;
 }
 
+function normalizeRole(role?: string) {
+  return (role || "").trim().toLowerCase();
+}
+
 export async function PATCH(
   req: NextRequest,
   context: { params: Promise<{ id: string }> }
@@ -33,7 +37,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (me.role !== "admin") {
+    if (normalizeRole(me.role) !== "admin") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -263,7 +267,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (me.role !== "admin") {
+    if (normalizeRole(me.role) !== "admin") {
       console.warn("DELETE USER DEBUG: denied due to non-admin role", {
         currentUserId: me.id,
         currentUserRole: me.role,

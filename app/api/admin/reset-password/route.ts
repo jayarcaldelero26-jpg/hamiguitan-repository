@@ -3,6 +3,10 @@ import bcrypt from "bcrypt";
 import { supabaseAdmin } from "@/app/lib/db";
 import { getCurrentUser } from "@/app/lib/auth";
 
+function normalizeRole(role?: string) {
+  return (role || "").trim().toLowerCase();
+}
+
 function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i.test(email.trim());
 }
@@ -15,7 +19,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (me.role !== "admin") {
+    if (normalizeRole(me.role) !== "admin") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

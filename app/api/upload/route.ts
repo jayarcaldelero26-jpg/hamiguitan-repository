@@ -16,6 +16,10 @@ import {
 
 const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100 MB
 
+function normalizeRole(role?: string) {
+  return (role || "").trim().toLowerCase();
+}
+
 function requiredString(v: FormDataEntryValue | null) {
   if (!v || typeof v !== "string") return "";
   return v.trim();
@@ -45,7 +49,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (me.role !== "admin" && me.role !== "co_admin") {
+    const role = normalizeRole(me.role);
+
+    if (role !== "admin" && role !== "co_admin") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

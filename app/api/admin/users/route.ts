@@ -4,6 +4,10 @@ import { getCurrentUser } from "@/app/lib/auth";
 
 export const runtime = "nodejs";
 
+function normalizeRole(role?: string) {
+  return (role || "").trim().toLowerCase();
+}
+
 export async function GET() {
   try {
     const me = await getCurrentUser();
@@ -12,7 +16,9 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (me.role !== "admin" && me.role !== "co_admin") {
+    const role = normalizeRole(me.role);
+
+    if (role !== "admin" && role !== "co_admin") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
