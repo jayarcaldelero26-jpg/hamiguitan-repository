@@ -1,7 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import Link from "next/link";
+import { startTransition, useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
 import {
@@ -54,21 +55,8 @@ function roleLabel(role?: string) {
   return r.toUpperCase();
 }
 
-function darkButtonStyle(dark: boolean) {
-  return dark
-    ? "bg-white/[0.04] text-[var(--ui-text-main)] border-[var(--ui-border)] hover:bg-white/[0.08]"
-    : "bg-white text-[var(--ui-text-main)] border-[var(--ui-border-strong)] hover:bg-slate-50";
-}
-
-function navActionBase(active: boolean, dark: boolean) {
-  return active
-    ? dark
-      ? "bg-[linear-gradient(180deg,rgba(57,92,122,0.28),rgba(57,92,122,0.12))] text-[var(--ui-text-main)] border-[var(--ui-border-strong)] shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_10px_24px_rgba(0,0,0,0.18)]"
-      : "bg-[linear-gradient(180deg,rgba(57,92,122,0.12),rgba(57,92,122,0.06))] text-[var(--ui-text-main)] border-[var(--ui-border-strong)] shadow-[0_10px_24px_rgba(15,23,42,0.08)]"
-    : dark
-      ? "text-[color:rgba(230,237,243,0.84)] border-transparent hover:bg-white/[0.05] hover:border-[var(--ui-border)] hover:text-[var(--ui-text-main)]"
-      : "text-[color:rgba(75,85,99,0.92)] border-transparent hover:bg-black/[0.03] hover:border-[var(--ui-border)] hover:text-[var(--ui-text-main)]";
-}
+const IDLE_WARNING_MS = 15 * 60 * 1000;
+const IDLE_LOGOUT_MS = 30 * 60 * 1000;
 
 export default function ProtectedShell({
   children,
@@ -91,6 +79,10 @@ export default function ProtectedShell({
   const [logoutSuccessOpen, setLogoutSuccessOpen] = useState(false);
   const [logoutErrorOpen, setLogoutErrorOpen] = useState(false);
   const [logoutErrorMsg, setLogoutErrorMsg] = useState("Please try again.");
+  const [sessionWarningOpen, setSessionWarningOpen] = useState(false);
+  const warningTimerRef = useRef<number | null>(null);
+  const logoutTimerRef = useRef<number | null>(null);
+  const logoutInFlightRef = useRef(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -111,14 +103,63 @@ export default function ProtectedShell({
     return () => window.removeEventListener("resize", onResize);
   }, [mobileNavOpen]);
 
-  const handleNavigate = useCallback(
-    (href: string) => {
+  const closeMobileNav = useCallback(() => {
+    startTransition(() => {
       setMobileNavOpen(false);
-      if (pathname === href) return;
-      router.push(href);
-    },
-    [pathname, router]
-  );
+    });
+  }, []);
+
+  const clearIdleTimers = useCallback(() => {
+    if (warningTimerRef.current !== null) {
+      window.clearTimeout(warningTimerRef.current);
+      warningTimerRef.current = null;
+    }
+    if (logoutTimerRef.current !== null) {
+      window.clearTimeout(logoutTimerRef.current);
+      logoutTimerRef.current = null;
+    }
+  }, []);
+
+  const finishLogoutToLogin = useCallback(() => {
+    window.location.replace("/login");
+  }, []);
+
+  const runLogoutToLogin = useCallback(async () => {
+    if (logoutInFlightRef.current) return;
+    logoutInFlightRef.current = true;
+    clearIdleTimers();
+    setSessionWarningOpen(false);
+    setConfirmLogoutPath(null);
+
+    const ok = await logout();
+
+    if (!ok) {
+      logoutInFlightRef.current = false;
+      setLogoutErrorMsg("Please try again.");
+      setLogoutErrorOpen(true);
+      return;
+    }
+
+    finishLogoutToLogin();
+  }, [clearIdleTimers, finishLogoutToLogin, logout]);
+
+  const scheduleIdleTimers = useCallback(() => {
+    if (!user || logoutInFlightRef.current) return;
+    clearIdleTimers();
+
+    warningTimerRef.current = window.setTimeout(() => {
+      setSessionWarningOpen(true);
+    }, IDLE_WARNING_MS);
+
+    logoutTimerRef.current = window.setTimeout(() => {
+      void runLogoutToLogin();
+    }, IDLE_LOGOUT_MS);
+  }, [clearIdleTimers, runLogoutToLogin, user]);
+
+  const resetIdleTimer = useCallback(() => {
+    setSessionWarningOpen(false);
+    scheduleIdleTimers();
+  }, [scheduleIdleTimers]);
 
   const prefetchRoute = useCallback(
     (href: string) => {
@@ -137,6 +178,34 @@ export default function ProtectedShell({
     pathname.startsWith("/booking") || pathname.startsWith("/calendar");
   const showBookingNav = bookingNavOpen || bookingModuleActive;
   const themeToggleLabel = dark ? "Switch to light mode" : "Switch to dark mode";
+  const sidebarSurfaceClassName =
+    "border-white/10 bg-[linear-gradient(180deg,#182029_0%,#1d2831_46%,#22323b_100%)] text-[#E6EDF3] shadow-[0_26px_54px_rgba(0,0,0,0.3)]";
+  const sidebarDividerClassName =
+    "bg-gradient-to-r from-transparent via-white/10 to-transparent";
+  const sidebarLabelClassName =
+    "text-[10px] font-semibold uppercase tracking-[0.22em] text-[rgba(151,166,168,0.72)]";
+  const sidebarRoleBadgeClassName =
+    "border border-white/10 bg-white/[0.05] text-[rgba(230,237,243,0.72)] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]";
+  const sidebarIconBaseClassName =
+    "grid h-9 w-9 shrink-0 place-items-center rounded-[14px] border transition-colors";
+  const sidebarItemBaseClassName =
+    "group relative flex w-full min-h-11 items-center gap-3 rounded-[18px] border px-3 py-2.5 text-left transition-all duration-200 ease-out";
+  const sidebarItemInactiveClassName =
+    "border-transparent bg-transparent text-[rgba(230,237,243,0.84)] hover:border-white/10 hover:bg-white/[0.05] hover:text-[#F8FBFD]";
+  const sidebarItemActiveClassName =
+    "border-[#5D7892]/32 bg-[linear-gradient(180deg,rgba(57,92,122,0.28),rgba(57,92,122,0.12))] text-[#F8FBFD] shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_12px_30px_rgba(0,0,0,0.24)]";
+  const sidebarIconInactiveClassName =
+    "border-transparent bg-white/[0.04] text-[rgba(230,237,243,0.76)] group-hover:border-white/10 group-hover:bg-white/[0.07] group-hover:text-[#F8FBFD]";
+  const sidebarIconActiveClassName =
+    "border-white/12 bg-white/[0.08] text-[#F8FBFD] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]";
+  const sidebarActionButtonClassName =
+    "inline-flex min-h-11 items-center gap-3 rounded-[18px] border border-white/10 bg-white/[0.05] px-3 py-2.5 text-[#E6EDF3] transition hover:bg-white/[0.08]";
+  const sidebarSecondaryCardClassName =
+    "border border-white/8 bg-white/[0.04] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]";
+  const sidebarTooltipClassName =
+    "border-white/10 bg-[#182029]/96 text-[#E6EDF3]";
+  const sidebarUserCardClassName =
+    "rounded-[22px] border border-white/10 bg-white/[0.045] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]";
 
   const navBtn = useCallback(
     (href: string, label: string, icon: React.ReactNode) => {
@@ -144,30 +213,31 @@ export default function ProtectedShell({
       const showLabel = !collapsed || mobileNavOpen;
 
       return (
-        <button
+        <Link
           key={href}
-          type="button"
-          onClick={() => handleNavigate(href)}
+          href={href}
+          prefetch={false}
+          onClick={(event) => {
+            closeMobileNav();
+
+            if (pathname === href) {
+              event.preventDefault();
+            }
+          }}
           onMouseEnter={() => prefetchRoute(href)}
           onFocus={() => prefetchRoute(href)}
           aria-current={active ? "page" : undefined}
-          className={`group relative flex w-full min-h-11 items-center gap-3 rounded-[20px] border px-3 py-2.5 transition-all duration-200 ease-out ${
+          className={`${sidebarItemBaseClassName} ${
             showLabel ? "" : "justify-center"
-          } ${navActionBase(active, dark)}`}
+          } ${active ? sidebarItemActiveClassName : sidebarItemInactiveClassName}`}
         >
           {active && (
-            <span className="absolute bottom-2 left-0 top-2 w-1 rounded-r-full bg-[#868C65]" />
+            <span className="absolute bottom-2 left-[8px] top-2 w-[3px] rounded-full bg-[#8EB69B]" />
           )}
 
           <span
-            className={`grid h-9 w-9 shrink-0 place-items-center rounded-[14px] border transition-colors ${
-              active
-                ? dark
-                  ? "border-[var(--ui-border)] bg-white/[0.08] text-[var(--ui-text-main)]"
-                  : "border-[var(--ui-border)] bg-black/[0.04] text-[var(--ui-text-main)]"
-                : dark
-                  ? "border-transparent bg-transparent text-[color:rgba(230,237,243,0.78)] group-hover:border-[var(--ui-border)] group-hover:bg-white/[0.05] group-hover:text-[var(--ui-text-main)]"
-                  : "border-transparent bg-transparent text-[color:rgba(75,85,99,0.8)] group-hover:border-[var(--ui-border)] group-hover:bg-black/[0.03] group-hover:text-[var(--ui-text-main)]"
+            className={`${sidebarIconBaseClassName} ${
+              active ? sidebarIconActiveClassName : sidebarIconInactiveClassName
             }`}
           >
             {icon}
@@ -175,11 +245,11 @@ export default function ProtectedShell({
 
           {showLabel && (
             <span className="min-w-0 flex-1">
-              <span className="block text-[13px] font-semibold tracking-[0.01em] text-[var(--ui-text-main)]">
+              <span className="block text-[13px] font-semibold tracking-[0.01em] text-[#E6EDF3]">
                 {label}
               </span>
               {active && (
-                <span className="block text-[10px] font-medium uppercase tracking-[0.12em] text-[color:rgba(151,166,168,0.86)]">
+                <span className="block text-[10px] font-medium uppercase tracking-[0.12em] text-[rgba(151,166,168,0.86)]">
                   Active
                 </span>
               )}
@@ -187,14 +257,27 @@ export default function ProtectedShell({
           )}
 
           {!showLabel && (
-            <span className={`pointer-events-none absolute left-[calc(100%+12px)] top-1/2 z-20 hidden -translate-y-1/2 rounded-xl border px-3 py-2 text-[12px] font-medium text-[var(--ui-text-main)] opacity-0 shadow-[0_12px_28px_rgba(0,0,0,0.24)] transition-all duration-150 ease-out group-hover:translate-x-0 group-hover:opacity-100 md:block md:-translate-x-1 ${dark ? "border-[var(--ui-border)] bg-[#181F27]/96" : "border-[var(--ui-border-strong)] bg-white/98"}`}>
+            <span className={`pointer-events-none absolute left-[calc(100%+12px)] top-1/2 z-20 hidden -translate-y-1/2 rounded-xl border px-3 py-2 text-[12px] font-medium opacity-0 shadow-[0_12px_28px_rgba(0,0,0,0.16)] transition-all duration-150 ease-out group-hover:translate-x-0 group-hover:opacity-100 md:block md:-translate-x-1 ${sidebarTooltipClassName}`}>
               {label}
             </span>
           )}
-        </button>
+        </Link>
       );
     },
-    [collapsed, dark, handleNavigate, mobileNavOpen, pathname, prefetchRoute]
+    [
+      closeMobileNav,
+      collapsed,
+      mobileNavOpen,
+      pathname,
+      prefetchRoute,
+      sidebarIconActiveClassName,
+      sidebarIconBaseClassName,
+      sidebarIconInactiveClassName,
+      sidebarItemActiveClassName,
+      sidebarItemBaseClassName,
+      sidebarItemInactiveClassName,
+      sidebarTooltipClassName,
+    ]
   );
 
   const navItems = useMemo(() => {
@@ -283,6 +366,38 @@ export default function ProtectedShell({
     };
   }, [user]);
 
+  useEffect(() => {
+    if (!user) {
+      clearIdleTimers();
+      return;
+    }
+
+    const handleActivity = () => {
+      resetIdleTimer();
+    };
+
+    const events: Array<keyof WindowEventMap> = [
+      "mousemove",
+      "mousedown",
+      "keydown",
+      "scroll",
+      "touchstart",
+    ];
+
+    scheduleIdleTimers();
+
+    for (const eventName of events) {
+      window.addEventListener(eventName, handleActivity, { passive: true });
+    }
+
+    return () => {
+      for (const eventName of events) {
+        window.removeEventListener(eventName, handleActivity);
+      }
+      clearIdleTimers();
+    };
+  }, [clearIdleTimers, resetIdleTimer, scheduleIdleTimers, user]);
+
   const confirmLogout = confirmLogoutPath === pathname;
   const showSidebarLabels = !collapsed || mobileNavOpen;
 
@@ -326,14 +441,14 @@ export default function ProtectedShell({
           <aside
             aria-label="Sidebar"
             className={`fixed inset-y-0 left-0 z-50 flex h-full flex-col overflow-hidden border-r p-3 transition-transform duration-150 ease-out md:relative md:z-auto md:translate-x-0 md:p-4 md:shadow-none sm:p-4 ${
-              ui.sidebar
+              sidebarSurfaceClassName
             } ${
               mobileNavOpen ? "translate-x-0" : "-translate-x-full"
             } ${
-              collapsed ? "md:w-[96px]" : "md:w-[320px]"
-            } w-[min(88vw,320px)]`}
+              collapsed ? "md:w-[84px]" : "md:w-[224px]"
+            } w-[min(84vw,224px)]`}
           >
-            <div className={`pointer-events-none absolute inset-0 hidden md:block ${dark ? "bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.05),transparent_30%),radial-gradient(circle_at_bottom_left,rgba(57,92,122,0.16),transparent_40%)]" : "bg-[radial-gradient(circle_at_top_left,rgba(57,92,122,0.08),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(165,165,141,0.16),transparent_40%)]"}`} />
+            <div className="pointer-events-none absolute inset-0 hidden md:block bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.08),transparent_26%),radial-gradient(circle_at_bottom_left,rgba(57,92,122,0.22),transparent_40%)]" />
             <div role="banner" className="flex items-center justify-between gap-3">
               <button
                 type="button"
@@ -344,15 +459,15 @@ export default function ProtectedShell({
                   }
                   setCollapsed((v) => !v);
                 }}
-                className={`min-h-10 min-w-10 rounded-xl border border-transparent p-2 transition hover:border-[var(--ui-border)] ${dark ? "hover:bg-white/[0.06]" : "hover:bg-black/[0.03]"}`}
+                className="min-h-10 min-w-10 rounded-[16px] border border-transparent p-2 text-[#E6EDF3] transition hover:border-white/10 hover:bg-white/[0.06]"
                 title="Toggle sidebar"
                 aria-label="Toggle sidebar"
               >
-                <Bars3Icon className="h-6 w-6 text-[var(--ui-text-main)]" />
+                <Bars3Icon className="h-6 w-6" />
               </button>
 
               {showSidebarLabels && (
-                <span className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold ${dark ? "border-[var(--ui-border)] bg-white/[0.04] text-[color:rgba(230,237,243,0.72)]" : "border-[var(--ui-border-strong)] bg-black/[0.03] text-[color:rgba(75,85,99,0.82)]"}`}>
+                <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${sidebarRoleBadgeClassName}`}>
                   {roleLabel(user.role)}
                 </span>
               )}
@@ -361,23 +476,19 @@ export default function ProtectedShell({
             <button
               type="button"
               onClick={toggleTheme}
-              className={`mt-3 inline-flex min-h-11 items-center gap-3 rounded-[18px] border px-3 py-2.5 transition ${
-                dark
-                  ? "border-[var(--ui-border)] bg-white/[0.04] text-[var(--ui-text-main)] hover:bg-white/[0.08]"
-                  : "border-[var(--ui-border-strong)] bg-white/70 text-[var(--ui-text-main)] hover:bg-white"
-              } ${showSidebarLabels ? "w-full justify-start" : "w-full justify-center"}`}
+              className={`mt-3 ${sidebarActionButtonClassName} ${sidebarSecondaryCardClassName} ${showSidebarLabels ? "w-full justify-start" : "w-full justify-center"}`}
               aria-label={themeToggleLabel}
               title={themeToggleLabel}
             >
-                <span className={`grid h-9 w-9 place-items-center rounded-[14px] border ${dark ? "border-[var(--ui-border)] bg-white/[0.05]" : "border-[var(--ui-border-strong)] bg-black/[0.03]"}`}>
+                <span className="grid h-9 w-9 place-items-center rounded-[14px] border border-white/10 bg-white/[0.06] text-[#E6EDF3]">
                 {dark ? <SunIcon className="h-5 w-5" /> : <MoonIcon className="h-5 w-5" />}
               </span>
               {showSidebarLabels && (
                 <span className="min-w-0 flex-1 text-left">
-                  <span className="block text-[13px] font-semibold">
+                  <span className="block text-[13px] font-semibold text-[#E6EDF3]">
                     {dark ? "Light Mode" : "Dark Mode"}
                   </span>
-                  <span className="block text-[10px] uppercase tracking-[0.12em] text-[color:rgba(151,166,168,0.72)]">
+                  <span className="block text-[10px] uppercase tracking-[0.12em] text-[rgba(151,166,168,0.76)]">
                     Theme
                   </span>
                 </span>
@@ -385,8 +496,8 @@ export default function ProtectedShell({
             </button>
 
             <div className={`mt-4 ${showSidebarLabels ? "" : "text-center"}`}>
-              <div className={`flex items-center ${showSidebarLabels ? "gap-3" : "justify-center"}`}>
-                <div className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[18px] border border-[var(--ui-border)] bg-white/[0.06] p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] sm:h-14 sm:w-14 sm:p-2">
+              <div className={`flex items-center ${showSidebarLabels ? "gap-3.5" : "justify-center"}`}>
+                <div className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[20px] border border-white/10 bg-white/[0.05] p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_10px_20px_rgba(0,0,0,0.16)] sm:h-14 sm:w-14 sm:p-2">
                   <Image
                     src="/branding/mhrws-logo.png"
                     alt="Mount Hamiguitan Range Wildlife Sanctuary logo"
@@ -399,10 +510,10 @@ export default function ProtectedShell({
 
                 {showSidebarLabels && (
                   <div className="min-w-0">
-                    <div className="text-[15px] font-bold leading-tight tracking-[0.01em] text-[var(--ui-text-main)] sm:text-base">
+                    <div className="text-[15px] font-bold leading-tight tracking-[0.01em] text-[#E6EDF3] sm:text-base">
                       Hamiguitan
                     </div>
-                    <div className="truncate text-[11px] font-medium text-[color:rgba(151,166,168,0.8)]">
+                    <div className="truncate text-[11px] font-medium text-[rgba(151,166,168,0.8)]">
                       Internal Workspace
                     </div>
                   </div>
@@ -410,7 +521,7 @@ export default function ProtectedShell({
               </div>
             </div>
 
-            <div className="mt-5 h-px bg-gradient-to-r from-transparent via-white/12 to-transparent" />
+            <div className={`mt-5 h-px ${sidebarDividerClassName}`} />
 
             <div className="scroll-sidebar mt-4 flex-1 overflow-y-auto pr-1.5">
               <nav aria-label="Primary navigation" className="space-y-1.5">
@@ -428,21 +539,15 @@ export default function ProtectedShell({
                       setBookingNavOpen((current) => !current);
                     }}
                     aria-expanded={showBookingNav}
-                    className={`group relative flex w-full min-h-11 items-center gap-3 rounded-[20px] border px-3 py-2.5 transition-all duration-200 ease-out ${
+                    className={`${sidebarItemBaseClassName} ${
                       showSidebarLabels ? "" : "justify-center"
-                    } ${navActionBase(
-                      bookingModuleActive
-                    , dark)}`}
+                    } ${bookingModuleActive ? sidebarItemActiveClassName : sidebarItemInactiveClassName}`}
                   >
                     <span
-                      className={`grid h-9 w-9 shrink-0 place-items-center rounded-[14px] border transition-colors ${
+                      className={`${sidebarIconBaseClassName} ${
                         bookingModuleActive
-                          ? dark
-                            ? "border-[var(--ui-border)] bg-white/[0.08] text-[var(--ui-text-main)]"
-                            : "border-[var(--ui-border)] bg-black/[0.04] text-[var(--ui-text-main)]"
-                          : dark
-                            ? "border-transparent bg-transparent text-[color:rgba(230,237,243,0.78)] group-hover:border-[var(--ui-border)] group-hover:bg-white/[0.05] group-hover:text-[var(--ui-text-main)]"
-                            : "border-transparent bg-transparent text-[color:rgba(75,85,99,0.8)] group-hover:border-[var(--ui-border)] group-hover:bg-black/[0.03] group-hover:text-[var(--ui-text-main)]"
+                          ? sidebarIconActiveClassName
+                          : sidebarIconInactiveClassName
                       }`}
                     >
                       <TicketIcon className="h-5 w-5" />
@@ -451,14 +556,14 @@ export default function ProtectedShell({
                     {showSidebarLabels && (
                       <>
                         <span className="min-w-0 flex-1 text-left">
-                          <span className="block text-[13px] font-semibold tracking-[0.01em] text-[var(--ui-text-main)]">
+                          <span className="block text-[13px] font-semibold tracking-[0.01em] text-[#E6EDF3]">
                             Booking
                           </span>
-                          <span className="block text-[10px] font-medium uppercase tracking-[0.12em] text-[color:rgba(151,166,168,0.72)]">
+                          <span className="block text-[10px] font-medium uppercase tracking-[0.12em] text-[rgba(151,166,168,0.76)]">
                             Module
                           </span>
                         </span>
-                        <span className="text-lg font-semibold text-[color:rgba(230,237,243,0.72)]">
+                        <span className="text-lg font-semibold text-[rgba(230,237,243,0.72)]">
                           {showBookingNav ? "−" : "+"}
                         </span>
                       </>
@@ -466,7 +571,7 @@ export default function ProtectedShell({
                   </button>
 
                   {showSidebarLabels && showBookingNav && (
-                    <div className="ml-4 space-y-1 border-l border-[var(--ui-border)] pl-3">
+                    <div className="ml-4 space-y-1 border-l border-white/10 pl-3">
                       {navItems.booking.map((item) => navBtn(item.href, item.label, item.icon))}
                     </div>
                   )}
@@ -474,7 +579,7 @@ export default function ProtectedShell({
               </nav>
 
               {showSidebarLabels && navItems.admin.length > 0 && (
-                <div className="px-3 pb-2 pt-6 text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:rgba(151,166,168,0.66)]">
+                <div className={`px-3 pb-2 pt-6 ${sidebarLabelClassName}`}>
                   Admin Tools
                 </div>
               )}
@@ -484,18 +589,18 @@ export default function ProtectedShell({
               </nav>
             </div>
 
-            <div className="mt-4 border-t border-[var(--ui-border)] pt-4">
+            <div className="mt-4 border-t border-white/10 pt-4">
               {showSidebarLabels ? (
-                <div className="px-3.5 py-1 text-left">
-                  <div className="truncate text-[13px] font-semibold text-[var(--ui-text-main)]">
+                <div className={sidebarUserCardClassName}>
+                  <div className="truncate text-[13px] font-semibold text-[#E6EDF3]">
                     {user.email}
                   </div>
-                  <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[color:rgba(151,166,168,0.72)]">
+                  <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[rgba(151,166,168,0.76)]">
                     {roleLabel(user.role)}
                   </div>
                 </div>
               ) : (
-                <div className="px-1 text-center text-[10px] font-semibold uppercase tracking-[0.14em] text-[color:rgba(151,166,168,0.72)]">
+                <div className="px-1 text-center text-[10px] font-semibold uppercase tracking-[0.14em] text-[rgba(151,166,168,0.76)]">
                   {roleLabel(user.role)}
                 </div>
               )}
@@ -503,18 +608,18 @@ export default function ProtectedShell({
               <button
                 type="button"
                 onClick={() => setConfirmLogoutPath(pathname)}
-                className={`mt-3 flex w-full min-h-11 items-center gap-3 rounded-[20px] border px-3 py-2.5 transition ${
+                className={`mt-3 ${sidebarItemBaseClassName} ${
                   showSidebarLabels ? "" : "justify-center"
-                } ${navActionBase(false, dark)} ${darkButtonStyle(dark)}`}
+                } border-white/10 bg-white/[0.05] text-[#E6EDF3] hover:bg-white/[0.08]`}
                 aria-label="Logout"
               >
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[14px] border border-[var(--ui-border)] bg-white/[0.04] text-[color:rgba(230,237,243,0.88)]">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[14px] border border-white/10 bg-white/[0.06] text-[#E6EDF3]">
                   <ArrowRightOnRectangleIcon className="h-5 w-5" />
                 </span>
                 {showSidebarLabels && (
                   <span className="min-w-0 flex-1 text-left">
-                    <span className="block text-[13px] font-semibold text-[var(--ui-text-main)]">Logout</span>
-                    <span className="block text-[10px] uppercase tracking-[0.12em] text-[color:rgba(151,166,168,0.72)]">
+                    <span className="block text-[13px] font-semibold text-[#E6EDF3]">Logout</span>
+                    <span className="block text-[10px] uppercase tracking-[0.12em] text-[rgba(151,166,168,0.76)]">
                       End Session
                     </span>
                   </span>
@@ -526,7 +631,7 @@ export default function ProtectedShell({
           <main
             id="main-content"
             role="main"
-            className={`h-full flex-1 overflow-y-auto md:transition-colors md:duration-300 ${ui.page}`}
+            className={`scroll-page h-full flex-1 overflow-y-auto md:transition-colors md:duration-300 ${ui.page}`}
           >
             <div className={`sticky top-0 z-30 border-b px-4 py-2.5 md:hidden ${ui.mobileBar}`}>
               <div className="flex items-center justify-between gap-3">
@@ -621,6 +726,21 @@ export default function ProtectedShell({
           oneButton
           variant="warning"
           onConfirm={() => setLogoutErrorOpen(false)}
+        />
+      )}
+
+      {sessionWarningOpen && (
+        <ConfirmDialog
+          open
+          title="Session Expiring Soon"
+          message="Your session is about to expire due to inactivity. Stay signed in to continue working, or logout now."
+          confirmText="Stay Signed In"
+          cancelText="Logout Now"
+          variant="warning"
+          onConfirm={() => resetIdleTimer()}
+          onCancel={() => {
+            void runLogoutToLogin();
+          }}
         />
       )}
     </>

@@ -6,6 +6,7 @@ import {
   bookingCountsTowardCapacity,
   expandDateRange,
   formatDateOnly,
+  getEffectiveBookingStatus,
   parseDateOnly,
 } from "@/app/lib/bookingUtils";
 import type {
@@ -44,6 +45,17 @@ function validateEnum<T extends readonly string[]>(value: string, allowed: T) {
 
 function isOffSeasonLikeType(bookingType: string) {
   return bookingType === "Off Season" || bookingType === "Block Schedule";
+}
+
+function isRegularBookingType(bookingType: string) {
+  return bookingType === "Regular Booking";
+}
+
+function applyDerivedBookingStatus<T extends BookingRow>(booking: T) {
+  return {
+    ...booking,
+    booking_status: getEffectiveBookingStatus(booking) as BookingRow["booking_status"],
+  };
 }
 
 type ValidationResult =
@@ -104,7 +116,7 @@ export function validateBookingPayload(raw: unknown): ValidationResult {
     return { ok: false, error: "End Date must be on or after Start Date." };
   }
   const durationDays = expandDateRange(start_date, end_date).length;
-  if (!isOffSeasonLikeType(booking_type) && (durationDays < 2 || durationDays > 3)) {
+  if (isRegularBookingType(booking_type) && (durationDays < 2 || durationDays > 3)) {
     return { ok: false, error: "Hike duration must be between 2 and 3 days." };
   }
   if (!Number.isFinite(pax) || pax <= 0 || pax > 30) {
@@ -176,7 +188,7 @@ export async function listBookings() {
     throw wrapBookingsError(error, "Failed to load bookings.");
   }
 
-  return (data || []) as BookingRow[];
+  return ((data || []) as BookingRow[]).map(applyDerivedBookingStatus);
 }
 
 export async function getBookingById(id: number) {
@@ -191,7 +203,7 @@ export async function getBookingById(id: number) {
     throw wrapBookingsError(error, "Failed to load booking.");
   }
 
-  return (data as BookingRow | null) || null;
+  return data ? applyDerivedBookingStatus(data as BookingRow) : null;
 }
 
 export async function validateBookingCapacity(input: {
@@ -316,9 +328,11 @@ export async function getCalendarData(
   const relevantBookings = ((data || []) as BookingRow[]).filter((row) =>
     bookingCountsTowardCapacity(row)
   );
-  const filteredBookings = relevantBookings.filter((booking) =>
+  const filteredBookings = relevantBookings
+    .map(applyDerivedBookingStatus)
+    .filter((booking) =>
     matchesParticipantCategory(booking, category)
-  );
+    );
   const occupancyBookings = filteredBookings.filter(
     (booking) => !isOffSeasonLikeType(booking.booking_type)
   );
@@ -493,7 +507,7 @@ export async function createBooking(payload: BookingFormPayload) {
       .single();
 
     if (!error) {
-      return data as BookingRow;
+      return applyDerivedBookingStatus(data as BookingRow);
     }
 
     const message = String(error.message || "");
@@ -521,7 +535,7 @@ export async function updateBooking(id: number, payload: BookingWritePayload) {
     throw wrapBookingsError(error, "Failed to update booking.");
   }
 
-  return data as BookingRow;
+  return applyDerivedBookingStatus(data as BookingRow);
 }
 
 export async function softDeleteBooking(id: number, deletedBy: number) {

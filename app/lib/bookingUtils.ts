@@ -20,6 +20,40 @@ export function addDays(date: Date, days: number) {
   return next;
 }
 
+export function getTodayDateOnlyUtc(now = new Date()) {
+  return formatDateOnly(
+    new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+  );
+}
+
+export function getEffectiveBookingStatus<T extends {
+  booking_type?: string | null;
+  booking_status?: string | null;
+  end_date?: string | null;
+}>(booking: T, now = new Date()) {
+  const bookingType = String(booking.booking_type || "").trim();
+  const bookingStatus = String(booking.booking_status || "").trim();
+  const endDate = String(booking.end_date || "").trim();
+
+  if (
+    bookingType !== "Regular Booking" &&
+    bookingType !== "Special Climb"
+  ) {
+    return bookingStatus;
+  }
+
+  if (bookingStatus.toLowerCase() === "cancelled") {
+    return bookingStatus;
+  }
+
+  const parsedEndDate = parseDateOnly(endDate);
+  if (!parsedEndDate) {
+    return bookingStatus;
+  }
+
+  return getTodayDateOnlyUtc(now) > endDate ? "Completed" : bookingStatus;
+}
+
 export function expandDateRange(startDate: string, endDate: string) {
   const start = parseDateOnly(startDate);
   const end = parseDateOnly(endDate);
@@ -42,9 +76,11 @@ export function expandDateRange(startDate: string, endDate: string) {
 export function bookingCountsTowardCapacity(booking: {
   approval_status?: string | null;
   booking_status?: string | null;
+  booking_type?: string | null;
+  end_date?: string | null;
 }) {
   const approval = String(booking.approval_status || "").trim().toLowerCase();
-  const status = String(booking.booking_status || "").trim().toLowerCase();
+  const status = getEffectiveBookingStatus(booking).trim().toLowerCase();
 
   if (approval === "rejected") return false;
   if (status === "cancelled") return false;

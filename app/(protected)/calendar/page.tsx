@@ -17,6 +17,7 @@ import {
   formatDateOnly,
   formatDisplayDate,
   formatMonthLabel,
+  getEffectiveBookingStatus,
   shiftMonth,
 } from "@/app/lib/bookingUtils";
 import { repoTheme } from "@/app/lib/repoTheme";
@@ -56,6 +57,58 @@ function formatDayStateLabel(state?: CalendarDayData["sanState"] | null) {
   if (state === "full") return "High Demand";
   if (state === "limited") return "Limited";
   return "Open";
+}
+
+function getBookingStatusAppearance(booking: SelectedDateBooking) {
+  const status = getEffectiveBookingStatus(booking);
+
+  if (status === "Completed") {
+    return {
+      status,
+      cardClassName:
+        "border-slate-200/80 bg-[linear-gradient(180deg,rgba(248,250,252,0.94),rgba(241,245,249,0.9))] opacity-90",
+      badgeClassName:
+        "border-slate-200 bg-slate-100 text-slate-600",
+    };
+  }
+
+  if (status === "Active") {
+    return {
+      status,
+      cardClassName:
+        "border-emerald-200/85 bg-[linear-gradient(180deg,rgba(236,253,245,0.95),rgba(255,255,255,0.96))]",
+      badgeClassName:
+        "border-emerald-200 bg-emerald-50 text-emerald-700",
+    };
+  }
+
+  if (status === "Rescheduled") {
+    return {
+      status,
+      cardClassName:
+        "border-amber-200/85 bg-[linear-gradient(180deg,rgba(255,251,235,0.95),rgba(255,255,255,0.96))]",
+      badgeClassName:
+        "border-amber-200 bg-amber-50 text-amber-700",
+    };
+  }
+
+  if (status === "Cancelled") {
+    return {
+      status,
+      cardClassName:
+        "border-slate-200/80 bg-[linear-gradient(180deg,rgba(248,250,252,0.94),rgba(241,245,249,0.9))] opacity-80",
+      badgeClassName:
+        "border-slate-200 bg-slate-100 text-slate-500",
+    };
+  }
+
+  return {
+    status,
+    cardClassName:
+      "border-[color:var(--ui-panel-border)] [background:var(--ui-panel-soft-bg)]",
+    badgeClassName:
+      "border-slate-200 bg-slate-100 text-slate-700",
+  };
 }
 
 function getOverallState(day: CalendarDayData) {
@@ -356,8 +409,14 @@ function DayDetailsModal({
                   </div>
                 ) : (
                   <div className="mt-4 space-y-3">
-                    {selectedDateBookings.map((booking) => (
-                      <article key={booking.id} className={`${modalPanelSoftClassName} p-3.5`}>
+                    {selectedDateBookings.map((booking) => {
+                      const bookingStatusAppearance = getBookingStatusAppearance(booking);
+
+                      return (
+                      <article
+                        key={booking.id}
+                        className={`${modalPanelSoftClassName} border ${bookingStatusAppearance.cardClassName} p-3.5`}
+                      >
                         <p className={`text-sm font-semibold ${textMainClassName}`}>{booking.booking_code}</p>
                         <p className={`mt-1 text-xs ${textSoftClassName}`}>
                           {booking.start_date} to {booking.end_date}
@@ -369,9 +428,12 @@ function DayDetailsModal({
                           <span className="rounded-full bg-[#f4f7f5] px-3 py-1 text-xs font-semibold text-slate-700">
                             {booking.booking_type}
                           </span>
+                          <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${bookingStatusAppearance.badgeClassName}`}>
+                            {bookingStatusAppearance.status}
+                          </span>
                         </div>
                       </article>
-                    ))}
+                    );})}
                   </div>
                 )}
               </div>

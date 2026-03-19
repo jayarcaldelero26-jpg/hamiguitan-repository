@@ -1,10 +1,10 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams } from "next/navigation";
-import { PencilSquareIcon, TrashIcon } from "@heroicons/react/24/outline";
+import { PencilSquareIcon, TrashIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { useAuth } from "@/app/components/AuthProvider";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
 import { useProtectedTheme } from "@/app/components/ProtectedThemeProvider";
@@ -56,8 +56,8 @@ function isOffSeasonLikeType(bookingType: BookingFormPayload["booking_type"]) {
   return bookingType === "Off Season" || bookingType === "Block Schedule";
 }
 
-function isSpecialClimbType(bookingType: BookingFormPayload["booking_type"]) {
-  return bookingType === "Special Climb";
+function isRegularBookingType(bookingType: BookingFormPayload["booking_type"]) {
+  return bookingType === "Regular Booking";
 }
 
 function clearClosurePlaceholderName(contactName: string) {
@@ -365,9 +365,20 @@ export default function BookingPage() {
   const recordsMetaTextClassName = dark
     ? "text-[color:rgba(230,237,243,0.68)]"
     : "text-slate-500";
-  const recordsMutedTextClassName = dark
-    ? "text-[color:rgba(151,166,168,0.9)]"
-    : "text-slate-400";
+  const recordsDesktopGridClassName =
+    "lg:grid lg:grid-cols-[2.2fr_1.1fr_1.1fr_0.8fr_1fr_1fr] lg:items-center lg:gap-4";
+  const recordsDesktopSpacingClassName = "lg:px-5";
+  const detailDialogPanelClassName = `${ui.modal} relative w-full max-w-5xl overflow-hidden rounded-[28px] shadow-[0_32px_90px_rgba(0,0,0,0.34)]`;
+  const detailSectionCardClassName = dark
+    ? "rounded-[20px] border border-white/8 bg-white/[0.04] p-4"
+    : "rounded-[20px] border border-white/60 bg-white/72 p-4";
+  const detailValueClassName = dark ? "text-[#E6EDF3]" : "text-slate-900";
+  const detailLabelClassName = dark
+    ? "text-[11px] font-semibold uppercase tracking-[0.12em] text-[color:rgba(151,166,168,0.82)]"
+    : "text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500";
+  const detailMutedCardClassName = dark
+    ? "rounded-[18px] border border-dashed border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-[color:rgba(151,166,168,0.88)]"
+    : "rounded-[18px] border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500";
   const { user, loading: loadingUser } = useAuth();
   const searchParams = useSearchParams();
   const startDateParam = searchParams.get("startDate") || "";
@@ -380,6 +391,7 @@ export default function BookingPage() {
   const [submitting, setSubmitting] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [detailBooking, setDetailBooking] = useState<BookingRow | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [portalReady, setPortalReady] = useState(false);
   const [trailFilter, setTrailFilter] = useState("All Trails");
@@ -387,12 +399,12 @@ export default function BookingPage() {
   const [approvalFilter] = useState("All");
   const [monthFilter, setMonthFilter] = useState("");
   const [searchFilter, setSearchFilter] = useState("");
+  const deferredSearchFilter = useDeferredValue(searchFilter);
   const [form, setForm] = useState<BookingFormPayload>(createEmptyForm());
   const isOffSeasonLike = isOffSeasonLikeType(form.booking_type);
-  const isSpecialClimb = isSpecialClimbType(form.booking_type);
   const showParticipantCategory = !isOffSeasonLike;
   const showTrail = !isOffSeasonLike;
-  const showPax = !isOffSeasonLike && !isSpecialClimb;
+  const showPax = !isOffSeasonLike;
   const showStatusControls = !isOffSeasonLike;
   const isEditDialogOpen = editingId !== null;
   const normalizedRole = useMemo(() => normalizeRole(user?.role), [user?.role]);
@@ -511,6 +523,16 @@ export default function BookingPage() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isEditDialogOpen, resetForm]);
 
+  useEffect(() => {
+    if (!submitSuccess) return;
+
+    const timer = window.setTimeout(() => {
+      setSubmitSuccess("");
+    }, 2500);
+
+    return () => window.clearTimeout(timer);
+  }, [submitSuccess]);
+
   const summary = useMemo(() => {
     const activeBookings = bookings.filter(bookingCountsTowardCapacity);
     const occupancy = computeTrailDayOccupancy(activeBookings);
@@ -547,7 +569,7 @@ export default function BookingPage() {
   );
 
   const filteredBookings = useMemo(() => {
-    const query = searchFilter.trim().toLowerCase();
+    const query = deferredSearchFilter.trim().toLowerCase();
 
     return visibleRecordBookings.filter((booking) => {
       if (trailFilter !== "All Trails" && booking.trail !== trailFilter) return false;
@@ -577,7 +599,14 @@ export default function BookingPage() {
       }
       return true;
     });
-  }, [approvalFilter, bookingTypeFilter, monthFilter, searchFilter, trailFilter, visibleRecordBookings]);
+  }, [
+    approvalFilter,
+    bookingTypeFilter,
+    deferredSearchFilter,
+    monthFilter,
+    trailFilter,
+    visibleRecordBookings,
+  ]);
 
   const scheduleDurationDays = useMemo(
     () => getScheduleDurationDays(form.start_date, form.end_date),
@@ -629,7 +658,7 @@ export default function BookingPage() {
       return { kind: "idle" };
     }
 
-    if (scheduleDurationDays < 2 || scheduleDurationDays > 3) {
+    if (isRegularBookingType(form.booking_type) && (scheduleDurationDays < 2 || scheduleDurationDays > 3)) {
       return {
         kind: "invalid",
         title: "Invalid hike duration",
@@ -649,6 +678,7 @@ export default function BookingPage() {
   }, [
     camp3NightPax,
     form.end_date,
+    form.booking_type,
     form.pax,
     form.start_date,
     form.trail,
@@ -720,6 +750,7 @@ export default function BookingPage() {
   function startEdit(booking: BookingRow) {
     if (!canEditBookings) return;
 
+    setDetailBooking(null);
     setEditingId(booking.id);
     const nextForm: BookingFormPayload = {
       contact_name: booking.contact_name,
@@ -775,6 +806,9 @@ export default function BookingPage() {
       await refreshBookings();
       if (editingId === deleteTargetId) {
         resetForm();
+      }
+      if (detailBooking?.id === deleteTargetId) {
+        setDetailBooking(null);
       }
       setDeleteTargetId(null);
       setSubmitSuccess(
@@ -896,12 +930,6 @@ export default function BookingPage() {
         </div>
       )}
 
-      {submitSuccess && (
-        <div className="mt-4 rounded-[18px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-          {submitSuccess}
-        </div>
-      )}
-
       <div className={`mt-4 grid gap-3 ${isOffSeasonLike ? "xl:grid-cols-[1.15fr_0.85fr]" : "lg:grid-cols-[1.25fr_0.75fr]"}`}>
         <div className={`${cleanPanelClassName} p-3.5 sm:p-4`}>
           <p className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${ui.textSoft}`}>
@@ -991,7 +1019,11 @@ export default function BookingPage() {
                         type="date"
                         value={form.start_date}
                         onChange={(value) => setField("start_date", value)}
-                        helper="First hiking day (2-3 day schedule)"
+                        helper={
+                          isRegularBookingType(form.booking_type)
+                            ? "First hiking day (2-3 day schedule)"
+                            : "First hiking day"
+                        }
                         invalid={capacityState.kind === "invalid"}
                       />
                     </div>
@@ -1008,10 +1040,10 @@ export default function BookingPage() {
                     {showPax && (
                       <div className="xl:col-span-4 xl:pt-[1.625rem]">
                         <FloatingInput
-                          label="Number of Participants"
-                          type="number"
-                          min={1}
-                          max={30}
+                        label="Number of Participants"
+                        type="number"
+                        min={1}
+                        max={30}
                           value={form.pax}
                           onChange={(value) => setField("pax", Number(value || 0))}
                           helper="Camp 3 first-night capacity is shared by hikers with the same start date"
@@ -1152,25 +1184,164 @@ export default function BookingPage() {
     </>
   );
 
-  const tableEditButtonClassName = dark
+  const detailEditButtonClassName = dark
     ? `${compactTableActionBaseClassName} border-white/10 bg-[rgba(255,255,255,0.08)] text-[#E6EDF3] [&_svg]:text-inherit`
     : `${compactTableActionBaseClassName} border-slate-200/80 bg-[#F3F4F6] text-[#1F2937] [&_svg]:text-inherit`;
-  const tableDeleteButtonClassName = dark
+  const detailDeleteButtonClassName = dark
     ? `${compactTableActionBaseClassName} border-[rgba(220,38,38,0.26)] bg-[rgba(220,38,38,0.22)] text-[#FEE2E2] [&_svg]:text-inherit`
     : `${compactTableActionBaseClassName} border-[rgba(220,38,38,0.18)] bg-[rgba(220,38,38,0.12)] text-[#991B1B] [&_svg]:text-inherit`;
-
-  const mobileEditButtonClassName = dark
-    ? "app-glass-button app-protected-action-button inline-flex min-h-9 items-center justify-center rounded-full border border-white/10 bg-[rgba(255,255,255,0.08)] px-3.5 text-xs font-semibold text-[#E6EDF3] transition"
-    : "app-glass-button app-protected-action-button inline-flex min-h-9 items-center justify-center rounded-full border border-slate-200/80 bg-[#F3F4F6] px-3.5 text-xs font-semibold text-[#1F2937] transition";
-  const mobileDeleteButtonClassName = dark
-    ? "app-glass-button app-protected-action-button inline-flex min-h-9 items-center justify-center rounded-full border border-[rgba(220,38,38,0.26)] bg-[rgba(220,38,38,0.22)] px-3.5 text-xs font-semibold text-[#FEE2E2] transition"
-    : "app-glass-button app-protected-action-button inline-flex min-h-9 items-center justify-center rounded-full border border-[rgba(220,38,38,0.18)] bg-[rgba(220,38,38,0.12)] px-3.5 text-xs font-semibold text-[#991B1B] transition";
   const bookingNativeOptionStyle = dark
     ? { backgroundColor: "#F8FAFC", color: "#0F172A" }
     : undefined;
+  const recordsTable = useMemo(
+    () => (
+      <div className={`mt-5 overflow-hidden rounded-[22px] ${ui.tableWrap}`}>
+        <div className="hidden overflow-y-hidden booking-scroll-gutter lg:block">
+          <div className={`${recordsDesktopGridClassName} ${recordsDesktopSpacingClassName} py-3 text-[11px] font-semibold uppercase tracking-[0.14em] ${ui.tableHead}`}>
+            <span>Guest Name</span>
+            <span>Category</span>
+            <span>Trail</span>
+            <span>Pax</span>
+            <span>Start Date</span>
+            <span>End Date</span>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className={`px-5 py-8 text-sm ${ui.textMuted}`}>Loading booking records...</div>
+        ) : filteredBookings.length === 0 ? (
+          <div className={`px-5 py-8 text-sm ${ui.textMuted}`}>No booking records match the current filters.</div>
+        ) : (
+          <div className={`scroll-docs booking-scroll-gutter ${filteredBookings.length > 6 ? "max-h-[456px] overflow-y-auto" : ""}`}>
+            <div className={recordsDividerClassName}>
+              {filteredBookings.map((row) => (
+                <article key={row.id}>
+                  <button
+                    type="button"
+                    onClick={() => setDetailBooking(row)}
+                    className={`grid w-full gap-3 px-4 py-4 text-left transition lg:hidden ${
+                      dark
+                        ? "hover:bg-white/[0.04] focus-visible:bg-white/[0.04]"
+                        : "hover:bg-slate-50/80 focus-visible:bg-slate-50/80"
+                    }`}
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-2.5">
+                      <div>
+                        <p className={`text-sm font-semibold ${ui.textMain}`}>{row.contact_name}</p>
+                        <p className={`mt-1 text-xs leading-5 ${ui.textMuted}`}>
+                          {isOffSeasonLikeType(row.booking_type) ? "Closure" : row.participant_category}
+                        </p>
+                      </div>
+                      {isOffSeasonLikeType(row.booking_type) ? (
+                        <span className={`text-xs ${recordsMetaTextClassName}`}>All trails</span>
+                      ) : (
+                        <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] ${trailPillTone(row.trail)}`}>
+                          {row.trail === "San Isidro Trail" ? "San Isidro" : "Governor Generoso"}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="grid gap-2.5 sm:grid-cols-4">
+                      <div className={`${cleanPanelSoftClassName} p-3`}>
+                        <p className={`text-[11px] font-semibold uppercase tracking-[0.12em] ${ui.textSoft}`}>Category</p>
+                        <p className={`mt-1.5 text-sm ${ui.textMain}`}>
+                          {isOffSeasonLikeType(row.booking_type) ? "Closure" : row.participant_category}
+                        </p>
+                      </div>
+                      <div className={`${cleanPanelSoftClassName} p-3`}>
+                        <p className={`text-[11px] font-semibold uppercase tracking-[0.12em] ${ui.textSoft}`}>Pax</p>
+                        <p className={`mt-1.5 text-sm ${ui.textMain}`}>{isOffSeasonLikeType(row.booking_type) ? "Closure" : row.pax}</p>
+                      </div>
+                      <div className={`${cleanPanelSoftClassName} p-3`}>
+                        <p className={`text-[11px] font-semibold uppercase tracking-[0.12em] ${ui.textSoft}`}>Start</p>
+                        <p className={`mt-1.5 text-sm ${ui.textMain}`}>{row.start_date}</p>
+                      </div>
+                      <div className={`${cleanPanelSoftClassName} p-3`}>
+                        <p className={`text-[11px] font-semibold uppercase tracking-[0.12em] ${ui.textSoft}`}>End</p>
+                        <p className={`mt-1.5 text-sm ${ui.textMain}`}>{row.end_date}</p>
+                      </div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setDetailBooking(row)}
+                    className={`hidden w-full ${recordsDesktopGridClassName} ${recordsDesktopSpacingClassName} py-5 text-sm text-left transition lg:grid ${
+                      dark
+                        ? "hover:bg-white/[0.04] focus-visible:bg-white/[0.04]"
+                        : "hover:bg-slate-50/80 focus-visible:bg-slate-50/80"
+                    } ${recordsRowTextClassName}`}
+                  >
+                    <div>
+                      <p className={`font-medium ${ui.textMain}`}>{row.contact_name}</p>
+                      <p className={`mt-1 text-xs ${recordsMetaTextClassName}`}>{row.booking_code}</p>
+                    </div>
+                    <span>{isOffSeasonLikeType(row.booking_type) ? "Closure" : row.participant_category}</span>
+                    {isOffSeasonLikeType(row.booking_type) ? (
+                      <span className={recordsMetaTextClassName}>All trails</span>
+                    ) : (
+                      <span className={`inline-flex w-fit items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${trailPillTone(row.trail)}`}>
+                        {row.trail === "San Isidro Trail" ? "San Isidro" : "Governor Generoso"}
+                      </span>
+                    )}
+                    <span>{isOffSeasonLikeType(row.booking_type) ? "Closure" : row.pax}</span>
+                    <span>{row.start_date}</span>
+                    <span>{row.end_date}</span>
+                  </button>
+                </article>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    ),
+    [
+      cleanPanelSoftClassName,
+      dark,
+      filteredBookings,
+      loading,
+      recordsDesktopGridClassName,
+      recordsDesktopSpacingClassName,
+      recordsDividerClassName,
+      recordsMetaTextClassName,
+      recordsRowTextClassName,
+      setDetailBooking,
+      ui.tableHead,
+      ui.tableWrap,
+      ui.textMain,
+      ui.textMuted,
+      ui.textSoft,
+    ]
+  );
 
   return (
     <section className={`min-h-full px-4 py-5 sm:px-6 sm:py-6 lg:px-8 ${ui.page}`}>
+      <AnimatePresence>
+        {submitSuccess ? (
+          <motion.div
+            key={submitSuccess}
+            initial={{ opacity: 0, x: 18, y: -10 }}
+            animate={{ opacity: 1, x: 0, y: 0 }}
+            exit={{ opacity: 0, x: 18, y: -10 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className="pointer-events-none fixed right-4 top-4 z-[95] w-full max-w-sm sm:right-6 sm:top-6"
+          >
+            <div
+              className={`pointer-events-auto rounded-[22px] border px-4 py-3 shadow-[0_18px_50px_rgba(0,0,0,0.18)] backdrop-blur-xl ${
+                dark
+                  ? "border-emerald-300/18 bg-[rgba(15,23,42,0.84)] text-emerald-100"
+                  : "border-emerald-200/80 bg-[rgba(255,255,255,0.88)] text-emerald-700"
+              }`}
+            >
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-500/90">
+                Success
+              </p>
+              <p className="mt-1 text-sm font-medium leading-6">{submitSuccess}</p>
+            </div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+
       <div className="mx-auto max-w-7xl">
         <div className={`${ui.card} rounded-[34px] p-5 md:p-7`}>
           <div className="max-w-4xl">
@@ -1327,154 +1498,228 @@ export default function BookingPage() {
 
             </div>
 
-            <div className={`mt-5 overflow-hidden rounded-[22px] ${ui.tableWrap}`}>
-              <div className={`hidden grid-cols-[1.15fr_1.1fr_1fr_1fr_1fr_1fr_1.1fr_0.6fr_0.85fr_0.95fr_0.85fr_0.75fr] gap-3 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.14em] lg:grid ${ui.tableHead}`}>
-                <span>Booking Code</span>
-                <span>Guest Name</span>
-                <span>Type</span>
-                <span>Category</span>
-                <span>Start Date</span>
-                <span>End Date</span>
-                <span>Trail</span>
-                <span>Pax</span>
-                <span>Payment</span>
-                <span>Approval</span>
-                <span>Status</span>
-                <span>Actions</span>
-              </div>
-
-              {loading ? (
-                <div className={`px-5 py-8 text-sm ${ui.textMuted}`}>Loading booking records...</div>
-              ) : filteredBookings.length === 0 ? (
-                <div className={`px-5 py-8 text-sm ${ui.textMuted}`}>No booking records match the current filters.</div>
-              ) : (
-                <div className={recordsDividerClassName}>
-                  {filteredBookings.map((row) => (
-                    <article key={row.id}>
-                      <div className="grid gap-3 px-4 py-4 lg:hidden">
-                        <div className="flex flex-wrap items-start justify-between gap-2.5">
-                          <div>
-                            <p className={`text-sm font-semibold ${ui.textMain}`}>{row.booking_code}</p>
-                            <p className={`mt-1 text-xs leading-5 ${ui.textMuted}`}>{row.contact_name}</p>
-                          </div>
-                          <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] ${statusTone[row.booking_status]}`}>
-                            {row.booking_status}
-                          </span>
-                        </div>
-
-                        <div className="grid gap-2.5 sm:grid-cols-2">
-                          <div className={`${cleanPanelSoftClassName} p-3`}>
-                            <p className={`text-[11px] font-semibold uppercase tracking-[0.12em] ${ui.textSoft}`}>Schedule</p>
-                            <p className={`mt-1.5 text-sm ${ui.textMain}`}>{row.start_date} to {row.end_date}</p>
-                            <p className={`mt-1 text-xs ${ui.textMuted}`}>
-                              {isOffSeasonLikeType(row.booking_type) ? "All trails closed" : row.trail}
-                            </p>
-                          </div>
-                          <div className={`${cleanPanelSoftClassName} p-3`}>
-                            <p className={`text-[11px] font-semibold uppercase tracking-[0.12em] ${ui.textSoft}`}>Type and Pax</p>
-                            <p className={`mt-1.5 text-sm ${ui.textMain}`}>
-                              {row.booking_type}
-                              {isOffSeasonLikeType(row.booking_type) ? "" : ` | ${row.pax} pax`}
-                            </p>
-                            <p className={`mt-1 text-xs ${ui.textMuted}`}>
-                              {isOffSeasonLikeType(row.booking_type) ? "Closure record" : row.participant_category}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-wrap gap-1.5">
-                          <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] ${statusTone[row.payment_status]}`}>
-                            {isOffSeasonLikeType(row.booking_type) ? "Closure" : row.payment_status}
-                          </span>
-                          <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] ${statusTone[row.approval_status]}`}>
-                            {isOffSeasonLikeType(row.booking_type) ? "Closure" : row.approval_status}
-                          </span>
-                        </div>
-
-                        {(canEditBookings || canDeleteBookings) && (
-                          <div className="flex gap-2">
-                            {canEditBookings && (
-                              <button type="button" onClick={() => startEdit(row)} className={mobileEditButtonClassName}>
-                                Edit
-                              </button>
-                            )}
-                            {canDeleteBookings && (
-                              <button
-                                type="button"
-                                onClick={() => setDeleteTargetId(row.id)}
-                                className={mobileDeleteButtonClassName}
-                              >
-                                Delete
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </div>
-
-                      <div className={`hidden grid-cols-[1.15fr_1.1fr_1fr_1fr_1fr_1fr_1.1fr_0.6fr_0.85fr_0.95fr_0.85fr_0.75fr] items-center gap-3 px-5 py-5 text-sm lg:grid ${recordsRowTextClassName}`}>
-                        <div className={`font-semibold ${ui.textMain}`}>{row.booking_code}</div>
-                        <div>
-                          <p className={`font-medium ${ui.textMain}`}>{row.contact_name}</p>
-                          {!isOffSeasonLikeType(row.booking_type) && (
-                            <p className={`mt-1 text-xs ${recordsMetaTextClassName}`}>{row.participant_category}</p>
-                          )}
-                        </div>
-                        <span>{row.booking_type}</span>
-                        <span>{isOffSeasonLikeType(row.booking_type) ? "Closure" : row.participant_category}</span>
-                        <span>{row.start_date}</span>
-                        <span>{row.end_date}</span>
-                        {isOffSeasonLikeType(row.booking_type) ? (
-                          <span className={recordsMetaTextClassName}>All trails</span>
-                        ) : (
-                          <span className={`inline-flex w-fit items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${trailPillTone(row.trail)}`}>
-                            {row.trail === "San Isidro Trail" ? "San Isidro" : "Governor Generoso"}
-                          </span>
-                        )}
-                        <span>{isOffSeasonLikeType(row.booking_type) ? "Closure" : row.pax}</span>
-                        <span className={`inline-flex w-fit items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${statusTone[row.payment_status]}`}>
-                          {isOffSeasonLikeType(row.booking_type) ? "Closure" : row.payment_status}
-                        </span>
-                        <span className={`inline-flex w-fit items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${statusTone[row.approval_status]}`}>
-                          {isOffSeasonLikeType(row.booking_type) ? "Closure" : row.approval_status}
-                        </span>
-                        <span className={`inline-flex w-fit items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${statusTone[row.booking_status]}`}>{row.booking_status}</span>
-                        <div className="flex justify-center">
-                          {canEditBookings || canDeleteBookings ? (
-                            <div className="flex flex-wrap items-center justify-center gap-1.5">
-                              {canEditBookings && (
-                                <button
-                                  type="button"
-                                  onClick={() => startEdit(row)}
-                                  className={tableEditButtonClassName}
-                                >
-                                  <PencilSquareIcon className="h-3.5 w-3.5" />
-                                  Edit
-                                </button>
-                              )}
-                              {canDeleteBookings && (
-                                <button
-                                  type="button"
-                                  onClick={() => setDeleteTargetId(row.id)}
-                                  className={tableDeleteButtonClassName}
-                                >
-                                  <TrashIcon />
-                                  Delete
-                                </button>
-                              )}
-                            </div>
-                          ) : (
-                            <span className={`text-xs ${recordsMutedTextClassName}`}>Read only</span>
-                          )}
-                        </div>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              )}
-            </div>
+            {recordsTable}
           </div>
         </div>
       </div>
+
+      {detailBooking && portalReady
+        ? createPortal(
+            <AnimatePresence>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.18, ease: "easeOut" }}
+                data-protected-theme={theme}
+                className="fixed inset-0 z-[81] flex items-center justify-center p-3 sm:p-4 md:p-6"
+              >
+                <motion.button
+                  type="button"
+                  aria-label="Close booking details"
+                  onClick={() => setDetailBooking(null)}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.18, ease: "easeOut" }}
+                  className={`absolute inset-0 ${dialogOverlayClassName}`}
+                />
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.985, y: 10 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.985, y: 10 }}
+                  transition={{ duration: 0.22, ease: "easeOut" }}
+                  className={`scroll-docs relative z-[82] max-h-[calc(100vh-1.5rem)] w-full overflow-y-auto p-4 sm:max-h-[calc(100vh-2rem)] sm:p-5 md:max-h-[calc(100vh-3rem)] md:p-6 ${detailDialogPanelClassName}`}
+                >
+                  <div className="flex items-start justify-between gap-4 border-b border-[var(--ui-border)] pb-4 sm:pb-5">
+                    <div>
+                      <p className={`text-[11px] font-semibold uppercase tracking-[0.18em] ${ui.textSoft}`}>
+                        Booking details
+                      </p>
+                      <h3 className={`mt-2 text-xl font-semibold tracking-tight sm:text-2xl ${ui.textMain}`}>
+                        {detailBooking.contact_name}
+                      </h3>
+                      <p className={`mt-2 text-sm leading-6 ${ui.textMuted}`}>
+                        Review the booking summary, status signals, and record timestamps.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setDetailBooking(null)}
+                      className={`${ui.buttonSecondary} inline-flex h-11 w-11 items-center justify-center rounded-full p-0`}
+                      aria-label="Close booking details dialog"
+                    >
+                      <XMarkIcon className="h-5 w-5" />
+                    </button>
+                  </div>
+
+                  <div className="mt-5 grid gap-4 xl:grid-cols-[1.18fr_0.82fr] xl:items-start">
+                    <div className="grid gap-4">
+                      <section className={detailSectionCardClassName}>
+                        <p className={detailLabelClassName}>Primary Info</p>
+                        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                          <div>
+                            <p className={detailLabelClassName}>Booking Code</p>
+                            <p className={`mt-1.5 text-base font-semibold ${detailValueClassName}`}>
+                              {detailBooking.booking_code}
+                            </p>
+                          </div>
+                          <div>
+                            <p className={detailLabelClassName}>Guest Name</p>
+                            <p className={`mt-1.5 text-base font-semibold ${detailValueClassName}`}>
+                              {detailBooking.contact_name}
+                            </p>
+                          </div>
+                          <div>
+                            <p className={detailLabelClassName}>Booking Type</p>
+                            <p className={`mt-1.5 text-sm ${detailValueClassName}`}>
+                              {detailBooking.booking_type}
+                            </p>
+                          </div>
+                          <div>
+                            <p className={detailLabelClassName}>Category</p>
+                            <p className={`mt-1.5 text-sm ${detailValueClassName}`}>
+                              {isOffSeasonLikeType(detailBooking.booking_type)
+                                ? "Closure"
+                                : detailBooking.participant_category}
+                            </p>
+                          </div>
+                        </div>
+                      </section>
+
+                      <section className={detailSectionCardClassName}>
+                        <p className={detailLabelClassName}>Schedule</p>
+                        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                          <div>
+                            <p className={detailLabelClassName}>Trail</p>
+                            <div className="mt-1.5">
+                              {isOffSeasonLikeType(detailBooking.booking_type) ? (
+                                <p className={`text-sm ${detailValueClassName}`}>All trails</p>
+                              ) : (
+                                <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${trailPillTone(detailBooking.trail)}`}>
+                                  {detailBooking.trail}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div>
+                            <p className={detailLabelClassName}>Participants / Pax</p>
+                            <p className={`mt-1.5 text-sm ${detailValueClassName}`}>
+                              {isOffSeasonLikeType(detailBooking.booking_type)
+                                ? "Closure"
+                                : detailBooking.pax}
+                            </p>
+                          </div>
+                          <div>
+                            <p className={detailLabelClassName}>Start Date</p>
+                            <p className={`mt-1.5 text-sm ${detailValueClassName}`}>
+                              {formatDisplayDate(detailBooking.start_date)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className={detailLabelClassName}>End Date</p>
+                            <p className={`mt-1.5 text-sm ${detailValueClassName}`}>
+                              {formatDisplayDate(detailBooking.end_date)}
+                            </p>
+                          </div>
+                        </div>
+                      </section>
+                    </div>
+
+                    <div className="grid gap-4">
+                      <section className={detailSectionCardClassName}>
+                        <p className={detailLabelClassName}>Statuses</p>
+                        <div className="mt-4 grid gap-3">
+                          <div className="flex items-center justify-between gap-3 rounded-[18px] border border-[var(--ui-border)] px-4 py-3">
+                            <span className={`text-sm ${detailValueClassName}`}>Payment</span>
+                            <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${statusTone[detailBooking.payment_status]}`}>
+                              {detailBooking.payment_status}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between gap-3 rounded-[18px] border border-[var(--ui-border)] px-4 py-3">
+                            <span className={`text-sm ${detailValueClassName}`}>Approval</span>
+                            <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${statusTone[detailBooking.approval_status]}`}>
+                              {detailBooking.approval_status}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between gap-3 rounded-[18px] border border-[var(--ui-border)] px-4 py-3">
+                            <span className={`text-sm ${detailValueClassName}`}>Booking Status</span>
+                            <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${statusTone[detailBooking.booking_status]}`}>
+                              {detailBooking.booking_status}
+                            </span>
+                          </div>
+                        </div>
+                      </section>
+                      <section className={`${detailSectionCardClassName} xl:min-h-full`}>
+                        <p className={detailLabelClassName}>Record Metadata</p>
+                        <div className="mt-4 space-y-4">
+                          <div>
+                            <p className={detailLabelClassName}>Created</p>
+                            <p className={`mt-1.5 text-sm ${detailValueClassName}`}>
+                              {detailBooking.created_at
+                                ? new Date(detailBooking.created_at).toLocaleString()
+                                : "Not available"}
+                            </p>
+                          </div>
+                          <div>
+                            <p className={detailLabelClassName}>Last Updated</p>
+                            <p className={`mt-1.5 text-sm ${detailValueClassName}`}>
+                              {detailBooking.updated_at
+                                ? new Date(detailBooking.updated_at).toLocaleString()
+                                : "Not available"}
+                            </p>
+                          </div>
+                        </div>
+                      </section>
+                    </div>
+                  </div>
+
+                  <section className={`${detailSectionCardClassName} mt-4`}>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                      <div>
+                        <p className={detailLabelClassName}>Actions</p>
+                        <p className={`mt-1 text-sm ${ui.textMuted}`}>
+                          Existing booking actions are available here without changing current behavior.
+                        </p>
+                      </div>
+                      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                        {canEditBookings ? (
+                          <button
+                            type="button"
+                            onClick={() => startEdit(detailBooking)}
+                            className={detailEditButtonClassName}
+                          >
+                            <PencilSquareIcon />
+                            Edit booking
+                          </button>
+                        ) : null}
+                        {canDeleteBookings ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDetailBooking(null);
+                              setDeleteTargetId(detailBooking.id);
+                            }}
+                            className={detailDeleteButtonClassName}
+                          >
+                            <TrashIcon />
+                            Delete booking
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                    {!canEditBookings && !canDeleteBookings ? (
+                      <div className={`mt-4 ${detailMutedCardClassName}`}>
+                        You can review booking details here, but only authorized roles can edit or delete records.
+                      </div>
+                    ) : null}
+                  </section>
+                </motion.div>
+              </motion.div>
+            </AnimatePresence>,
+            document.body
+          )
+        : null}
 
       <ConfirmDialog
         open={deleteTargetId !== null}

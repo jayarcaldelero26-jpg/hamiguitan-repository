@@ -756,62 +756,46 @@ select:-webkit-autofill:active {
 
 /* ---------- CUSTOM SCROLLBAR FOR DOCUMENTS ---------- */
 
-/* SCROLLBAR hidden by default */
+.scroll-docs {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(134, 140, 101, 0.22) rgba(255, 255, 255, 0.02);
+}
 
 .scroll-docs::-webkit-scrollbar {
   width: 8px;
-  opacity: 0;
-}
-
-.scroll-docs::-webkit-scrollbar-thumb {
-  background: transparent;
-  border-radius: 9999px;
-  transition: background 0.2s ease;
-}
-
-/* visible when hover */
-
-.scroll-docs:hover::-webkit-scrollbar-thumb {
-  background: rgba(242, 244, 244, 0.35);
-}
-
-.scroll-docs:hover::-webkit-scrollbar-thumb:hover {
-  background: rgba(228, 228, 228, 0.55);
+  height: 8px;
 }
 
 .scroll-docs::-webkit-scrollbar-track {
-  background: transparent;
-}
-.scroll-docs {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(57, 92, 122, 0.55) transparent;
-}
-
-.scroll-docs::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-
-.scroll-docs::-webkit-scrollbar-track {
-  background: transparent;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 999px;
 }
 
 .scroll-docs::-webkit-scrollbar-thumb {
-  background: rgba(57, 92, 122, 0.38);
+  background: rgba(134, 140, 101, 0.18);
   border-radius: 999px;
   border: 2px solid transparent;
   background-clip: padding-box;
+  transition: background 0.18s ease;
 }
 
 .scroll-docs:hover::-webkit-scrollbar-thumb {
-  background: rgba(57, 92, 122, 0.62);
+  background: rgba(134, 140, 101, 0.34);
   border: 2px solid transparent;
   background-clip: padding-box;
+}
+
+.scroll-docs:hover::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.booking-scroll-gutter {
+  scrollbar-gutter: stable;
 }
 
 .scroll-sidebar {
   scrollbar-width: thin;
-  scrollbar-color: rgba(134, 140, 101, 0.32) rgba(255, 255, 255, 0.02);
+  scrollbar-color: rgba(151, 166, 168, 0.24) rgba(255, 255, 255, 0.03);
 }
 
 .scroll-sidebar::-webkit-scrollbar {
@@ -819,23 +803,48 @@ select:-webkit-autofill:active {
 }
 
 .scroll-sidebar::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(255, 255, 255, 0.03);
   border-radius: 999px;
 }
 
 .scroll-sidebar::-webkit-scrollbar-thumb {
-  background: rgba(134, 140, 101, 0.22);
+  background: rgba(151, 166, 168, 0.16);
   border-radius: 999px;
   border: 2px solid transparent;
   background-clip: padding-box;
 }
 
 .scroll-sidebar:hover::-webkit-scrollbar-thumb {
-  background: rgba(134, 140, 101, 0.36);
+  background: rgba(151, 166, 168, 0.32);
   border: 2px solid transparent;
   background-clip: padding-box;
 }
 
 .scroll-sidebar:hover::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.scroll-page {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(151, 166, 168, 0.18) transparent;
+}
+
+.scroll-page::-webkit-scrollbar {
+  width: 10px;
+}
+
+.scroll-page::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scroll-page::-webkit-scrollbar-thumb {
+  background: rgba(151, 166, 168, 0.14);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  transition: background 0.18s ease;
+}
+
+.scroll-page:hover::-webkit-scrollbar-thumb {
+  background: rgba(151, 166, 168, 0.3);
 }

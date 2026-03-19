@@ -8,7 +8,7 @@ import {
   useDocuments,
   type DocumentRow,
 } from "@/app/components/DocumentsProvider";
-import { useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   TrashIcon,
@@ -25,6 +25,11 @@ import {
 } from "@heroicons/react/24/outline";
 import { repoTheme } from "@/app/lib/repoTheme";
 import { useProtectedTheme } from "@/app/components/ProtectedThemeProvider";
+import type { BookingRow } from "@/app/lib/bookingTypes";
+import {
+  bookingCountsTowardCapacity,
+  getEffectiveBookingStatus,
+} from "@/app/lib/bookingUtils";
 
 function initials(name: string) {
   const parts = (name || "").trim().split(/\s+/).filter(Boolean);
@@ -96,6 +101,10 @@ function timeAgo(iso?: string | null) {
   if (day < 7) return `${day}d ago`;
 
   return fmtDate(iso);
+}
+
+function isClosureLikeBooking(bookingType?: string | null) {
+  return bookingType === "Off Season" || bookingType === "Block Schedule";
 }
 
 function canDeleteDocuments(role?: string) {
@@ -322,6 +331,53 @@ const fadeUpDelayed = (delay = 0) => ({
   transition: { duration: 0.18, delay },
 });
 
+const dashboardDateFormatter = new Intl.DateTimeFormat("en-US", {
+  weekday: "long",
+  month: "long",
+  day: "numeric",
+  year: "numeric",
+});
+
+const dashboardTimeFormatter = new Intl.DateTimeFormat("en-US", {
+  hour: "numeric",
+  minute: "2-digit",
+  second: "2-digit",
+});
+
+const LiveDateTimeMeta = memo(function LiveDateTimeMeta({
+  textMain,
+  textMuted,
+  textSoft,
+}: {
+  textMain: string;
+  textMuted: string;
+  textSoft: string;
+}) {
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setNow(new Date());
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, []);
+
+  return (
+    <div className="w-full rounded-[18px] border border-white/10 bg-white/[0.04] px-3 py-2 text-right backdrop-blur-sm sm:max-w-[228px]">
+      <div className={`text-[9px] uppercase tracking-[0.14em] font-semibold ${textSoft}`}>
+        Live Date & Time
+      </div>
+      <div className={`mt-0.5 text-[12px] font-medium ${textMuted}`}>
+        {dashboardDateFormatter.format(now)}
+      </div>
+      <div className={`mt-0.5 text-[1.05rem] font-semibold tracking-[-0.02em] ${textMain}`}>
+        {dashboardTimeFormatter.format(now)}
+      </div>
+    </div>
+  );
+});
+
 function DashboardContent() {
   const { user, loading: loadingUser } = useAuth();
   const {
@@ -350,6 +406,8 @@ function DashboardContent() {
   const [editSelectedFolder, setEditSelectedFolder] = useState("");
   const [editNewFolder, setEditNewFolder] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
+  const [bookings, setBookings] = useState<BookingRow[]>([]);
+  const [loadingBookings, setLoadingBookings] = useState(true);
 
   const stats = useMemo(() => {
     const total = docs.length;
@@ -439,6 +497,72 @@ function DashboardContent() {
     };
   }, [docs, stats.academe, stats.pamo, stats.stake]);
 
+  const bookingInsights = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    const currentMonth = today.slice(0, 7);
+    const visibleBookings = bookings.filter((booking) => !isClosureLikeBooking(booking.booking_type));
+    const totalThisMonth = visibleBookings.filter(
+      (booking) =>
+        booking.start_date.startsWith(currentMonth) || booking.end_date.startsWith(currentMonth)
+    ).length;
+    const activeCount = visibleBookings.filter(
+      (booking) => getEffectiveBookingStatus(booking) === "Active"
+    ).length;
+    const completedCount = visibleBookings.filter(
+      (booking) => getEffectiveBookingStatus(booking) === "Completed"
+    ).length;
+    const pendingApprovals = visibleBookings.filter(
+      (booking) => booking.approval_status === "Pending Review"
+    ).length;
+    const upcoming = [...visibleBookings]
+      .filter((booking) => booking.start_date >= today)
+      .filter((booking) => {
+        const status = getEffectiveBookingStatus(booking);
+        return status !== "Cancelled" && status !== "Completed";
+      })
+      .sort((a, b) => {
+        const dateDiff = a.start_date.localeCompare(b.start_date);
+        if (dateDiff !== 0) return dateDiff;
+        return a.contact_name.localeCompare(b.contact_name);
+      })
+      .slice(0, 5);
+
+    const occupancyByStartDate = new Map<string, number>();
+    for (const booking of visibleBookings.filter(bookingCountsTowardCapacity)) {
+      occupancyByStartDate.set(
+        booking.start_date,
+        (occupancyByStartDate.get(booking.start_date) || 0) + booking.pax
+      );
+    }
+
+    const nearCapacity = [...visibleBookings]
+      .filter((booking) => booking.start_date >= today)
+      .map((booking) => {
+        const usedSlots = occupancyByStartDate.get(booking.start_date) || 0;
+        return {
+          id: booking.id,
+          trail: booking.trail,
+          start_date: booking.start_date,
+          usedSlots,
+          remainingSlots: Math.max(30 - usedSlots, 0),
+        };
+      })
+      .filter((booking) => booking.usedSlots >= 24)
+      .sort((a, b) => {
+        if (b.usedSlots !== a.usedSlots) return b.usedSlots - a.usedSlots;
+        return a.start_date.localeCompare(b.start_date);
+      })[0] || null;
+
+    return {
+      totalThisMonth,
+      activeCount,
+      completedCount,
+      pendingApprovals,
+      upcoming,
+      nearCapacity,
+    };
+  }, [bookings]);
+
   const folderOptionsByCategory = useMemo(() => {
     const grouped = {
       Academe: new Set<string>(),
@@ -461,6 +585,40 @@ function DashboardContent() {
 
   const editFolderOptions = folderOptionsByCategory[editCategory as keyof typeof folderOptionsByCategory] || [];
   const finalEditFolder = (editNewFolder.trim() || editSelectedFolder).trim();
+
+  useEffect(() => {
+    if (loadingUser || !user) return;
+
+    let active = true;
+
+    (async () => {
+      try {
+        setLoadingBookings(true);
+        const res = await fetch("/api/bookings", {
+          cache: "no-store",
+          credentials: "include",
+        });
+        const data = (await res.json().catch(() => null)) as BookingRow[] | { error?: string } | null;
+        if (!active) return;
+
+        if (!res.ok || !Array.isArray(data)) {
+          setBookings([]);
+          return;
+        }
+
+        setBookings(data);
+      } catch {
+        if (!active) return;
+        setBookings([]);
+      } finally {
+        if (active) setLoadingBookings(false);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [loadingUser, user]);
 
   const deleteDoc = async (id: number) => {
     try {
@@ -688,31 +846,39 @@ function DashboardContent() {
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:w-[360px]">
-            <div className={`${ui.card} p-4`}>
-              <div className="flex items-center gap-3">
-                <div className="h-11 w-11 rounded-full grid place-items-center font-bold bg-[#235347] text-[#DAF1DE] border border-white/20 shadow-inner">
-                  {initials(user.name)}
-                </div>
-                <div className="min-w-0">
-                  <div className={`truncate text-sm font-medium ${textMain}`}>{user.name}</div>
-                  <div className={`text-[11px] font-semibold uppercase tracking-[0.12em] ${textMuted}`}>
-                    {user.role}
+          <div className="flex flex-col gap-3 lg:w-[360px] lg:items-end">
+            <LiveDateTimeMeta
+              textMain={textMain}
+              textMuted={textMuted}
+              textSoft={textSoft}
+            />
+
+            <div className="grid w-full gap-3 sm:grid-cols-2">
+              <div className={`${ui.card} p-4`}>
+                <div className="flex items-center gap-3">
+                  <div className="h-11 w-11 rounded-full grid place-items-center font-bold bg-[#235347] text-[#DAF1DE] border border-white/20 shadow-inner">
+                    {initials(user.name)}
+                  </div>
+                  <div className="min-w-0">
+                    <div className={`truncate text-sm font-medium ${textMain}`}>{user.name}</div>
+                    <div className={`text-[11px] font-semibold uppercase tracking-[0.12em] ${textMuted}`}>
+                      {user.role}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            <div className={`${ui.card} p-4`}>
-              <div className={`text-[11px] uppercase tracking-[0.16em] font-semibold ${textSoft}`}>
-                Lead Category
-              </div>
-              <div className={`mt-2 text-lg font-semibold ${textMain}`}>
-                {overview.leadCategory.label}
-              </div>
-              <div className={`mt-1 text-[12px] ${textMuted}`}>
-                {overview.leadCategory.value} document
-                {overview.leadCategory.value === 1 ? "" : "s"} currently lead the repository mix.
+              <div className={`${ui.card} p-4`}>
+                <div className={`text-[11px] uppercase tracking-[0.16em] font-semibold ${textSoft}`}>
+                  Lead Category
+                </div>
+                <div className={`mt-2 text-lg font-semibold ${textMain}`}>
+                  {overview.leadCategory.label}
+                </div>
+                <div className={`mt-1 text-[12px] ${textMuted}`}>
+                  {overview.leadCategory.value} document
+                  {overview.leadCategory.value === 1 ? "" : "s"} currently lead the repository mix.
+                </div>
               </div>
             </div>
           </div>
@@ -808,52 +974,45 @@ function DashboardContent() {
         </>
       ) : (
         <>
-          <div className="mb-6 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.95fr)]">
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-            <motion.div {...fadeUpDelayed(0)}>
-                <DashboardStatCard
-                  dark={dark}
-                  eyebrow="Total Documents"
-                  value={String(stats.total)}
-                  description="Current repository volume across all categories and synced document types."
-                  accent={dark ? "bg-[#8EB69B]/50" : "bg-[#8EB69B]/65"}
-                  iconTone={dark ? "text-[#8EB69B]" : "text-[#235347]"}
-                  iconCapsule={
-                    dark
-                      ? "border-[#8EB69B]/16 bg-[#8EB69B]/10"
-                      : "border-[#cfe0d6] bg-[#eef6f0]"
-                  }
-                  icon={<FolderIcon className="w-6 h-6" />}
+          <div className="mb-6 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-12">
+            <motion.div {...fadeUpDelayed(0)} className="md:col-span-1 xl:col-span-3 xl:row-start-1">
+              <DashboardStatCard
+                dark={dark}
+                eyebrow="Total Documents"
+                value={String(stats.total)}
+                description="Current repository volume across all categories and synced document types."
+                accent={dark ? "bg-[#8EB69B]/50" : "bg-[#8EB69B]/65"}
+                iconTone={dark ? "text-[#8EB69B]" : "text-[#235347]"}
+                iconCapsule={
+                  dark
+                    ? "border-[#8EB69B]/16 bg-[#8EB69B]/10"
+                    : "border-[#cfe0d6] bg-[#eef6f0]"
+                }
+                icon={<FolderIcon className="w-6 h-6" />}
                 meta={
                   <>
-                    <Pill dark={dark} tone="emerald">
-                      Academe: {stats.academe}
-                    </Pill>
-                    <Pill dark={dark} tone="indigo">
-                      Stakeholders: {stats.stake}
-                    </Pill>
-                    <Pill dark={dark} tone="amber">
-                      PAMO: {stats.pamo}
-                    </Pill>
+                    <Pill dark={dark} tone="emerald">Academe: {stats.academe}</Pill>
+                    <Pill dark={dark} tone="indigo">Stakeholders: {stats.stake}</Pill>
+                    <Pill dark={dark} tone="amber">PAMO: {stats.pamo}</Pill>
                   </>
                 }
               />
             </motion.div>
 
-            <motion.div {...fadeUpDelayed(0.03)}>
-                <DashboardStatCard
-                  dark={dark}
-                  eyebrow="Most Common Type"
-                  value={stats.topType}
-                  description={`${stats.topTypeCount} file${stats.topTypeCount === 1 ? "" : "s"} currently lead the format mix in the repository.`}
-                  accent={dark ? "bg-[#7c83d7]/60" : "bg-[#8b92de]/75"}
-                  iconTone={dark ? "text-[#c7cbff]" : "text-[#5d64b8]"}
-                  iconCapsule={
-                    dark
-                      ? "border-[#8b92de]/18 bg-[#8b92de]/12"
-                      : "border-[#d8dcfb] bg-[#eef0ff]"
-                  }
-                  icon={<ChartBarIcon className="w-6 h-6" />}
+            <motion.div {...fadeUpDelayed(0.03)} className="md:col-span-1 xl:col-span-3 xl:row-start-1">
+              <DashboardStatCard
+                dark={dark}
+                eyebrow="Most Common Type"
+                value={stats.topType}
+                description={`${stats.topTypeCount} file${stats.topTypeCount === 1 ? "" : "s"} currently lead the format mix in the repository.`}
+                accent={dark ? "bg-[#7c83d7]/60" : "bg-[#8b92de]/75"}
+                iconTone={dark ? "text-[#c7cbff]" : "text-[#5d64b8]"}
+                iconCapsule={
+                  dark
+                    ? "border-[#8b92de]/18 bg-[#8b92de]/12"
+                    : "border-[#d8dcfb] bg-[#eef0ff]"
+                }
+                icon={<ChartBarIcon className="w-6 h-6" />}
                 meta={
                   <div className={`text-[12px] flex items-center gap-2 ${textMuted}`}>
                     <ClockIcon className="w-4 h-4" />
@@ -863,66 +1022,39 @@ function DashboardContent() {
               />
             </motion.div>
 
-            <motion.div {...fadeUpDelayed(0.05)} className="md:col-span-2">
-              <div className={`${cardCls} relative overflow-hidden p-6 md:p-7`}>
-                <div className={`absolute inset-x-0 top-0 h-2 ${dark ? "bg-[#7c83d7]/60" : "bg-[#8b92de]/75"}`} />
-                <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
-                  <div className="max-w-[460px]">
-                    <div className={`text-[11px] uppercase tracking-[0.18em] font-semibold ${textSoft}`}>
-                      Repository Snapshot
-                    </div>
-                    <h2 className={`mt-3 text-2xl font-semibold tracking-tight ${textMain}`}>
-                      Cleaner oversight across folders and categories
-                    </h2>
-                    <p className={`mt-2 text-sm leading-6 ${textMuted}`}>
-                      Use this overview to see where files are concentrated, which category is
-                      leading, and how recently the repository changed.
-                    </p>
-                  </div>
-
-                  <div className="grid gap-3 sm:grid-cols-3 md:min-w-[360px]">
-                    <div className={`${ui.cardSoft} p-4`}>
-                      <div className={`text-[11px] uppercase tracking-[0.14em] ${textSoft}`}>
-                        Folders
-                      </div>
-                      <div className={`mt-2 text-2xl font-semibold ${textMain}`}>
-                        {overview.folderCount}
-                      </div>
-                      <div className={`mt-1 text-[12px] ${textMuted}`}>Named repositories in use</div>
-                    </div>
-                    <div className={`${ui.cardSoft} p-4`}>
-                      <div className={`text-[11px] uppercase tracking-[0.14em] ${textSoft}`}>
-                        Lead Category
-                      </div>
-                      <div className={`mt-2 text-lg font-semibold leading-6 ${textMain}`}>
-                        {overview.leadCategory.label}
-                      </div>
-                      <div className={`mt-1 text-[12px] ${textMuted}`}>
-                        {overview.leadCategory.value} documents
-                      </div>
-                    </div>
-                    <div className={`${ui.cardSoft} p-4`}>
-                      <div className={`text-[11px] uppercase tracking-[0.14em] ${textSoft}`}>
-                        Last Upload
-                      </div>
-                      <div className={`mt-2 text-lg font-semibold leading-6 ${textMain}`}>
-                        {overview.latestUploadLabel}
-                      </div>
-                      <div className={`mt-1 text-[12px] ${textMuted}`}>Live activity signal</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+            <motion.div {...fadeUpDelayed(0.05)} className="md:col-span-1 xl:col-span-3 xl:row-start-1">
+              <DashboardStatCard
+                dark={dark}
+                eyebrow="Booking Summary"
+                value={loadingBookings ? "..." : String(bookingInsights.totalThisMonth)}
+                description="Current month booking activity across active hiking schedules."
+                accent={dark ? "bg-[#c89a52]/65" : "bg-[#d9aa63]/78"}
+                iconTone={dark ? "text-[#f3d49f]" : "text-[#8f6230]"}
+                iconCapsule={
+                  dark
+                    ? "border-[#c89a52]/18 bg-[#c89a52]/10"
+                    : "border-[#f2ddbb] bg-[#fff5e5]"
+                }
+                icon={<ChartBarIcon className="w-6 h-6" />}
+                meta={
+                  <>
+                    <Pill dark={dark} tone="emerald">
+                      Active: {loadingBookings ? "..." : bookingInsights.activeCount}
+                    </Pill>
+                    <Pill dark={dark} tone="slate">
+                      Completed: {loadingBookings ? "..." : bookingInsights.completedCount}
+                    </Pill>
+                    <Pill dark={dark} tone="amber">
+                      Pending: {loadingBookings ? "..." : bookingInsights.pendingApprovals}
+                    </Pill>
+                  </>
+                }
+              />
             </motion.div>
-            </div>
 
-            <motion.div {...fadeUpDelayed(0.06)}>
-              <div className={`${cardCls} relative h-full overflow-hidden p-6 md:p-7`}>
-                <div
-                  className={`absolute inset-x-0 top-0 h-2 ${
-                    dark ? "bg-[#c89a52]/65" : "bg-[#d9aa63]/78"
-                  }`}
-                />
+            <motion.div {...fadeUpDelayed(0.08)} className="md:col-span-2 xl:col-span-9 xl:row-start-2">
+              <div className={`${cardCls} relative overflow-hidden p-6 md:p-7`}>
+                <div className={`absolute inset-x-0 top-0 h-2 ${dark ? "bg-[#c89a52]/65" : "bg-[#d9aa63]/78"}`} />
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <div className={`text-[11px] uppercase tracking-[0.18em] font-semibold ${textSoft}`}>
@@ -944,47 +1076,39 @@ function DashboardContent() {
                   </div>
                 </div>
 
-                <div className="mt-5 space-y-3">
+                <div className="mt-4 grid gap-3 lg:grid-cols-3">
                   {recentUploads.length === 0 ? (
-                    <div className={`rounded-[22px] px-4 py-6 text-sm ${subBg} ${textMuted}`}>
+                    <div className={`rounded-[20px] px-4 py-6 text-sm lg:col-span-3 ${subBg} ${textMuted}`}>
                       No uploads yet.
                     </div>
                   ) : (
                     recentUploads.map((d, index) => (
                       <div
                         key={d.id}
-                        className={`rounded-[24px] p-4 transition ${subBg} ${
-                          dark
-                            ? "hover:bg-white/[0.05]"
-                            : "hover:bg-white/68"
+                        className={`rounded-[20px] px-3.5 py-3 transition ${subBg} ${
+                          dark ? "hover:bg-white/[0.05]" : "hover:bg-white/68"
                         }`}
                       >
                         <div className="flex items-start gap-3">
                           <div
-                            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px] ${
-                              dark
-                                ? "bg-[#9fb5ff]/10 text-[#c7cbff]"
-                                : "bg-[#eef0ff] text-[#5d64b8]"
+                            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[14px] ${
+                              dark ? "bg-[#9fb5ff]/10 text-[#c7cbff]" : "bg-[#eef0ff] text-[#5d64b8]"
                             }`}
                           >
-                            <DocumentTextIcon className="w-5 h-5" />
+                            <DocumentTextIcon className="h-[18px] w-[18px]" />
                           </div>
 
                           <div className="min-w-0 flex-1">
-                            <div className="flex items-center justify-between gap-3">
-                              <div
-                                className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${
-                                  dark ? "border-white/10 bg-white/[0.05]" : "border-white/70 bg-white/72"
-                                } ${textMuted}`}
-                              >
+                            <div className="flex items-center justify-between gap-2">
+                              <div className={`text-[10px] font-semibold uppercase tracking-[0.14em] ${textSoft}`}>
                                 {index === 0 ? "Newest" : `Recent ${index + 1}`}
                               </div>
-                              <div className={`text-[11px] ${textMuted}`}>{timeAgo(d.uploadedAt)}</div>
+                              <div className={`shrink-0 text-[11px] ${textMuted}`}>{timeAgo(d.uploadedAt)}</div>
                             </div>
 
                             <div
                               title={d.title?.trim() ? d.title : d.name}
-                              className={`mt-3 overflow-hidden font-semibold text-[15px] leading-6 ${textMain}`}
+                              className={`mt-1.5 overflow-hidden font-semibold text-[14px] leading-5 ${textMain}`}
                               style={{
                                 display: "-webkit-box",
                                 WebkitLineClamp: 2,
@@ -996,18 +1120,141 @@ function DashboardContent() {
 
                             <div className={`mt-1 truncate text-[12px] ${textMuted}`}>{d.name}</div>
 
-                            <div className="mt-3 flex flex-wrap gap-2">
+                            <div className="mt-2 flex flex-wrap gap-2">
                               {d.folder && <Pill dark={dark}>{d.folder}</Pill>}
                               {d.year && <Pill dark={dark} tone="slate">{d.year}</Pill>}
-                              <Pill dark={dark} tone="slate">
-                                {typeLabel(d.type)}
-                              </Pill>
+                              <Pill dark={dark} tone="slate">{typeLabel(d.type)}</Pill>
                             </div>
                           </div>
                         </div>
                       </div>
                     ))
                   )}
+                </div>
+              </div>
+            </motion.div>
+
+            <motion.div {...fadeUpDelayed(0.1)} className="md:col-span-2 xl:col-span-3 xl:row-start-1 xl:row-span-2">
+              <div className={`${cardCls} relative h-full overflow-hidden p-6 md:p-7`}>
+                <div className={`absolute inset-x-0 top-0 h-2 ${dark ? "bg-[#8EB69B]/55" : "bg-[#8EB69B]/70"}`} />
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className={`text-[11px] uppercase tracking-[0.18em] font-semibold ${textSoft}`}>
+                      Booking Insights
+                    </div>
+                    <div className={`mt-2 text-2xl font-semibold tracking-tight ${textMain}`}>
+                      Upcoming bookings
+                    </div>
+                    <div className={`mt-1 text-[12px] ${textMuted}`}>
+                      Next 5 scheduled hiking bookings
+                    </div>
+                  </div>
+                  <div
+                    className={`rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] ${
+                      dark ? "border-white/10 bg-white/[0.05]" : "border-white/70 bg-white/75"
+                    } ${textMain}`}
+                  >
+                    {loadingBookings ? "Loading" : `${bookingInsights.upcoming.length} listed`}
+                  </div>
+                </div>
+
+                <div className={`mt-5 ${bookingInsights.upcoming.length > 4 ? "max-h-[348px] overflow-y-auto pr-1 scroll-docs" : "space-y-3"}`}>
+                  {loadingBookings ? (
+                    <div className="space-y-3">
+                      {[1, 2, 3].map((item) => (
+                        <div key={item} className={`rounded-[22px] p-4 ${subBg}`}>
+                          <SkeletonBlock dark={dark} className="h-4 w-1/2" />
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <SkeletonBlock dark={dark} className="h-6 w-20 rounded-full" />
+                            <SkeletonBlock dark={dark} className="h-6 w-24 rounded-full" />
+                            <SkeletonBlock dark={dark} className="h-6 w-16 rounded-full" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : bookingInsights.upcoming.length === 0 ? (
+                    <div className={`rounded-[22px] px-4 py-6 text-sm ${subBg} ${textMuted}`}>
+                      No upcoming bookings in the current schedule window.
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {bookingInsights.upcoming.map((booking) => (
+                        <div
+                          key={booking.id}
+                          className={`rounded-[20px] p-4 transition ${subBg} ${
+                            dark ? "hover:bg-white/[0.05]" : "hover:bg-white/68"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className={`truncate text-[15px] font-semibold ${textMain}`}>
+                                {booking.contact_name}
+                              </div>
+                              <div className={`mt-1 text-[12px] ${textMuted}`}>
+                                Starts {fmtDate(booking.start_date)}
+                              </div>
+                            </div>
+                            <Pill dark={dark} tone="emerald">{booking.pax} pax</Pill>
+                          </div>
+
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <Pill dark={dark}>{booking.trail}</Pill>
+                            <Pill dark={dark} tone="slate">{booking.booking_type}</Pill>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {bookingInsights.nearCapacity ? (
+                  <div className={`mt-4 rounded-[20px] border px-4 py-3 text-[12px] ${
+                    dark
+                      ? "border-[#c89a52]/20 bg-[#c89a52]/10 text-[#f3d49f]"
+                      : "border-[#e8cd9f] bg-[#fff5e8] text-[#8f6230]"
+                  }`}>
+                    <span className="font-semibold">Capacity watch:</span>{" "}
+                    {bookingInsights.nearCapacity.trail} on {fmtDate(bookingInsights.nearCapacity.start_date)} is using{" "}
+                    {bookingInsights.nearCapacity.usedSlots}/30 slots. Remaining: {bookingInsights.nearCapacity.remainingSlots}.
+                  </div>
+                ) : null}
+              </div>
+            </motion.div>
+
+            <motion.div {...fadeUpDelayed(0.06)} className="md:col-span-2 xl:col-span-12 xl:row-start-3">
+              <div className={`${cardCls} relative overflow-hidden p-6 md:p-7`}>
+                <div className={`absolute inset-x-0 top-0 h-2 ${dark ? "bg-[#7c83d7]/60" : "bg-[#8b92de]/75"}`} />
+                <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+                  <div className="max-w-[520px]">
+                    <div className={`text-[11px] uppercase tracking-[0.18em] font-semibold ${textSoft}`}>
+                      Repository Snapshot
+                    </div>
+                    <h2 className={`mt-3 text-2xl font-semibold tracking-tight ${textMain}`}>
+                      Cleaner oversight across folders and categories
+                    </h2>
+                    <p className={`mt-2 text-sm leading-6 ${textMuted}`}>
+                      Use this overview to see where files are concentrated, which category is
+                      leading, and how recently the repository changed.
+                    </p>
+                  </div>
+
+                  <div className="grid flex-1 gap-3 sm:grid-cols-3 lg:min-w-[420px]">
+                    <div className={`${ui.cardSoft} p-4`}>
+                      <div className={`text-[11px] uppercase tracking-[0.14em] ${textSoft}`}>Folders</div>
+                      <div className={`mt-2 text-2xl font-semibold ${textMain}`}>{overview.folderCount}</div>
+                      <div className={`mt-1 text-[12px] ${textMuted}`}>Named repositories in use</div>
+                    </div>
+                    <div className={`${ui.cardSoft} p-4`}>
+                      <div className={`text-[11px] uppercase tracking-[0.14em] ${textSoft}`}>Lead Category</div>
+                      <div className={`mt-2 text-lg font-semibold leading-6 ${textMain}`}>{overview.leadCategory.label}</div>
+                      <div className={`mt-1 text-[12px] ${textMuted}`}>{overview.leadCategory.value} documents</div>
+                    </div>
+                    <div className={`${ui.cardSoft} p-4`}>
+                      <div className={`text-[11px] uppercase tracking-[0.14em] ${textSoft}`}>Last Upload</div>
+                      <div className={`mt-2 text-lg font-semibold leading-6 ${textMain}`}>{overview.latestUploadLabel}</div>
+                      <div className={`mt-1 text-[12px] ${textMuted}`}>Live activity signal</div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </motion.div>
