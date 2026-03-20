@@ -22,6 +22,12 @@ import {
   TicketIcon,
 } from "@heroicons/react/24/outline";
 import { useAuth } from "@/app/components/AuthProvider";
+import {
+  AUTH_INACTIVITY_TIMEOUT_MS,
+  AUTH_WARNING_LEAD_MS,
+  markBrowserSessionActive,
+  recordBrowserSessionActivity,
+} from "@/app/lib/authSession";
 import { repoTheme } from "@/app/lib/repoTheme";
 import { useProtectedTheme } from "@/app/components/ProtectedThemeProvider";
 
@@ -55,8 +61,8 @@ function roleLabel(role?: string) {
   return r.toUpperCase();
 }
 
-const IDLE_WARNING_MS = 15 * 60 * 1000;
-const IDLE_LOGOUT_MS = 30 * 60 * 1000;
+const IDLE_WARNING_MS = AUTH_INACTIVITY_TIMEOUT_MS - AUTH_WARNING_LEAD_MS;
+const IDLE_LOGOUT_MS = AUTH_INACTIVITY_TIMEOUT_MS;
 
 export default function ProtectedShell({
   children,
@@ -86,7 +92,7 @@ export default function ProtectedShell({
 
   useEffect(() => {
     if (!loading && !user) {
-      router.replace("/login");
+      router.replace("/");
     }
   }, [loading, user, router]);
 
@@ -120,11 +126,11 @@ export default function ProtectedShell({
     }
   }, []);
 
-  const finishLogoutToLogin = useCallback(() => {
-    window.location.replace("/login");
+  const finishLogoutToHome = useCallback(() => {
+    window.location.replace("/");
   }, []);
 
-  const runLogoutToLogin = useCallback(async () => {
+  const runLogoutToHome = useCallback(async () => {
     if (logoutInFlightRef.current) return;
     logoutInFlightRef.current = true;
     clearIdleTimers();
@@ -140,8 +146,8 @@ export default function ProtectedShell({
       return;
     }
 
-    finishLogoutToLogin();
-  }, [clearIdleTimers, finishLogoutToLogin, logout]);
+    finishLogoutToHome();
+  }, [clearIdleTimers, finishLogoutToHome, logout]);
 
   const scheduleIdleTimers = useCallback(() => {
     if (!user || logoutInFlightRef.current) return;
@@ -152,12 +158,13 @@ export default function ProtectedShell({
     }, IDLE_WARNING_MS);
 
     logoutTimerRef.current = window.setTimeout(() => {
-      void runLogoutToLogin();
+      void runLogoutToHome();
     }, IDLE_LOGOUT_MS);
-  }, [clearIdleTimers, runLogoutToLogin, user]);
+  }, [clearIdleTimers, runLogoutToHome, user]);
 
   const resetIdleTimer = useCallback(() => {
     setSessionWarningOpen(false);
+    markBrowserSessionActive();
     scheduleIdleTimers();
   }, [scheduleIdleTimers]);
 
@@ -373,6 +380,7 @@ export default function ProtectedShell({
     }
 
     const handleActivity = () => {
+      recordBrowserSessionActivity();
       resetIdleTimer();
     };
 
@@ -385,6 +393,7 @@ export default function ProtectedShell({
     ];
 
     scheduleIdleTimers();
+    markBrowserSessionActive();
 
     for (const eventName of events) {
       window.addEventListener(eventName, handleActivity, { passive: true });
@@ -707,12 +716,12 @@ export default function ProtectedShell({
           open
           title="Logged Out"
           message="You have been logged out successfully."
-          confirmText="Go to Login"
+          confirmText="Go to Homepage"
           oneButton
           variant="success"
           onConfirm={() => {
             setLogoutSuccessOpen(false);
-            window.location.replace("/login");
+            window.location.replace("/");
           }}
         />
       )}
@@ -739,7 +748,7 @@ export default function ProtectedShell({
           variant="warning"
           onConfirm={() => resetIdleTimer()}
           onCancel={() => {
-            void runLogoutToLogin();
+            void runLogoutToHome();
           }}
         />
       )}

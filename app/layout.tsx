@@ -17,8 +17,8 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Hamiguitan Repository",
-  description: "Secure documents for stakeholders and academe records",
+  title: "Mount Hamiguitan | Official Portal",
+  description: "Mount Hamiguitan Range Wildlife Sanctuary Public Information System",
 };
 
 export default function RootLayout({

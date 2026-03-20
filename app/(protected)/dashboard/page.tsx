@@ -29,6 +29,7 @@ import type { BookingRow } from "@/app/lib/bookingTypes";
 import {
   bookingCountsTowardCapacity,
   getEffectiveBookingStatus,
+  getMonthlyStats,
 } from "@/app/lib/bookingUtils";
 
 function initials(name: string) {
@@ -292,24 +293,24 @@ function DashboardStatCard({
   const textSoft = ui.textSoft;
 
   return (
-    <div className={`${ui.card} relative overflow-hidden p-5 sm:p-6 md:p-7`}>
+    <div className={`${ui.card} relative min-h-[248px] overflow-hidden p-6 sm:p-7 md:min-h-[264px] md:p-8`}>
       <div className={`absolute inset-x-0 top-0 h-2 ${accent}`} />
       <div
-        className={`pointer-events-none absolute inset-x-6 top-0 h-20 rounded-b-[32px] blur-xl md:blur-2xl ${
+        className={`pointer-events-none absolute inset-x-6 top-0 h-24 rounded-b-[32px] blur-xl md:blur-2xl ${
           dark ? "opacity-35" : "opacity-60"
         } ${accent}`}
       />
 
-      <div className="relative">
+      <div className="relative flex h-full flex-col">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <div className={`text-[11px] uppercase tracking-[0.18em] font-semibold ${textSoft}`}>
               {eyebrow}
             </div>
-            <div className={`mt-3 text-3xl md:text-[2.6rem] font-semibold tracking-tight ${textMain}`}>
+            <div className={`mt-4 text-3xl md:text-[2.6rem] font-semibold tracking-tight ${textMain}`}>
               {value}
             </div>
-            <div className={`mt-2 text-sm leading-6 ${textMuted}`}>{description}</div>
+            <div className={`mt-3 text-sm leading-6 ${textMuted}`}>{description}</div>
           </div>
 
           <div
@@ -319,7 +320,7 @@ function DashboardStatCard({
           </div>
         </div>
 
-        {meta ? <div className="mt-5 flex flex-wrap gap-2">{meta}</div> : null}
+        {meta ? <div className="mt-6 flex flex-wrap gap-2.5">{meta}</div> : null}
       </div>
     </div>
   );
@@ -343,6 +344,8 @@ const dashboardTimeFormatter = new Intl.DateTimeFormat("en-US", {
   minute: "2-digit",
   second: "2-digit",
 });
+
+const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 const LiveDateTimeMeta = memo(function LiveDateTimeMeta({
   textMain,
@@ -408,6 +411,7 @@ function DashboardContent() {
   const [savingEdit, setSavingEdit] = useState(false);
   const [bookings, setBookings] = useState<BookingRow[]>([]);
   const [loadingBookings, setLoadingBookings] = useState(true);
+  const [selectedStatsYear, setSelectedStatsYear] = useState(() => new Date().getFullYear());
 
   const stats = useMemo(() => {
     const total = docs.length;
@@ -562,6 +566,41 @@ function DashboardContent() {
       nearCapacity,
     };
   }, [bookings]);
+
+  const statsYearOptions = useMemo(() => {
+    const years = new Set<number>([new Date().getFullYear()]);
+
+    for (const booking of bookings) {
+      const year = Number(String(booking.start_date || "").slice(0, 4));
+      if (Number.isInteger(year)) {
+        years.add(year);
+      }
+    }
+
+    return [...years].sort((a, b) => b - a);
+  }, [bookings]);
+
+  useEffect(() => {
+    if (statsYearOptions.includes(selectedStatsYear)) return;
+    setSelectedStatsYear(statsYearOptions[0] || new Date().getFullYear());
+  }, [selectedStatsYear, statsYearOptions]);
+
+  const monthlyBookingStats = useMemo(
+    () => getMonthlyStats(bookings, selectedStatsYear),
+    [bookings, selectedStatsYear]
+  );
+
+  const statsCategoryRows = useMemo(
+    () =>
+      Object.entries(monthlyBookingStats.categoryTotals)
+        .sort((left, right) => left[0].localeCompare(right[0]))
+        .map(([category, values]) => ({
+          category,
+          values,
+          total: values.reduce((sum, value) => sum + value, 0),
+        })),
+    [monthlyBookingStats.categoryTotals]
+  );
 
   const folderOptionsByCategory = useMemo(() => {
     const grouped = {
@@ -1135,17 +1174,17 @@ function DashboardContent() {
             </motion.div>
 
             <motion.div {...fadeUpDelayed(0.1)} className="md:col-span-2 xl:col-span-3 xl:row-start-1 xl:row-span-2">
-              <div className={`${cardCls} relative h-full overflow-hidden p-6 md:p-7`}>
+              <div className={`${cardCls} relative h-full min-h-[528px] overflow-hidden p-6 md:min-h-[564px] md:p-7`}>
                 <div className={`absolute inset-x-0 top-0 h-2 ${dark ? "bg-[#8EB69B]/55" : "bg-[#8EB69B]/70"}`} />
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <div className={`text-[11px] uppercase tracking-[0.18em] font-semibold ${textSoft}`}>
                       Booking Insights
                     </div>
-                    <div className={`mt-2 text-2xl font-semibold tracking-tight ${textMain}`}>
+                    <div className={`mt-3 text-2xl font-semibold tracking-tight ${textMain}`}>
                       Upcoming bookings
                     </div>
-                    <div className={`mt-1 text-[12px] ${textMuted}`}>
+                    <div className={`mt-2 text-[12px] ${textMuted}`}>
                       Next 5 scheduled hiking bookings
                     </div>
                   </div>
@@ -1158,11 +1197,11 @@ function DashboardContent() {
                   </div>
                 </div>
 
-                <div className={`mt-5 ${bookingInsights.upcoming.length > 4 ? "max-h-[348px] overflow-y-auto pr-1 scroll-docs" : "space-y-3"}`}>
+                <div className={`mt-6 ${bookingInsights.upcoming.length > 4 ? "max-h-[414px] overflow-y-auto pr-1 scroll-docs" : "space-y-3.5"}`}>
                   {loadingBookings ? (
-                    <div className="space-y-3">
+                    <div className="space-y-3.5">
                       {[1, 2, 3].map((item) => (
-                        <div key={item} className={`rounded-[22px] p-4 ${subBg}`}>
+                        <div key={item} className={`rounded-[22px] p-4 md:p-[18px] ${subBg}`}>
                           <SkeletonBlock dark={dark} className="h-4 w-1/2" />
                           <div className="mt-3 flex flex-wrap gap-2">
                             <SkeletonBlock dark={dark} className="h-6 w-20 rounded-full" />
@@ -1177,11 +1216,11 @@ function DashboardContent() {
                       No upcoming bookings in the current schedule window.
                     </div>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-3.5">
                       {bookingInsights.upcoming.map((booking) => (
                         <div
                           key={booking.id}
-                          className={`rounded-[20px] p-4 transition ${subBg} ${
+                          className={`rounded-[20px] p-4 md:p-[18px] transition ${subBg} ${
                             dark ? "hover:bg-white/[0.05]" : "hover:bg-white/68"
                           }`}
                         >
@@ -1194,10 +1233,12 @@ function DashboardContent() {
                                 Starts {fmtDate(booking.start_date)}
                               </div>
                             </div>
-                            <Pill dark={dark} tone="emerald">{booking.pax} pax</Pill>
+                            <Pill dark={dark} tone="emerald">
+                              {booking.pax} {booking.pax === 1 ? "guest" : "guests"}
+                            </Pill>
                           </div>
 
-                          <div className="mt-3 flex flex-wrap gap-2">
+                          <div className="mt-3.5 flex flex-wrap gap-2">
                             <Pill dark={dark}>{booking.trail}</Pill>
                             <Pill dark={dark} tone="slate">{booking.booking_type}</Pill>
                           </div>
@@ -1208,7 +1249,7 @@ function DashboardContent() {
                 </div>
 
                 {bookingInsights.nearCapacity ? (
-                  <div className={`mt-4 rounded-[20px] border px-4 py-3 text-[12px] ${
+                  <div className={`mt-5 rounded-[20px] border px-4 py-3 text-[12px] ${
                     dark
                       ? "border-[#c89a52]/20 bg-[#c89a52]/10 text-[#f3d49f]"
                       : "border-[#e8cd9f] bg-[#fff5e8] text-[#8f6230]"
@@ -1221,44 +1262,112 @@ function DashboardContent() {
               </div>
             </motion.div>
 
-            <motion.div {...fadeUpDelayed(0.06)} className="md:col-span-2 xl:col-span-12 xl:row-start-3">
-              <div className={`${cardCls} relative overflow-hidden p-6 md:p-7`}>
-                <div className={`absolute inset-x-0 top-0 h-2 ${dark ? "bg-[#7c83d7]/60" : "bg-[#8b92de]/75"}`} />
-                <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
-                  <div className="max-w-[520px]">
-                    <div className={`text-[11px] uppercase tracking-[0.18em] font-semibold ${textSoft}`}>
-                      Repository Snapshot
-                    </div>
-                    <h2 className={`mt-3 text-2xl font-semibold tracking-tight ${textMain}`}>
-                      Cleaner oversight across folders and categories
-                    </h2>
-                    <p className={`mt-2 text-sm leading-6 ${textMuted}`}>
-                      Use this overview to see where files are concentrated, which category is
-                      leading, and how recently the repository changed.
-                    </p>
-                  </div>
+          </div>
 
-                  <div className="grid flex-1 gap-3 sm:grid-cols-3 lg:min-w-[420px]">
-                    <div className={`${ui.cardSoft} p-4`}>
-                      <div className={`text-[11px] uppercase tracking-[0.14em] ${textSoft}`}>Folders</div>
-                      <div className={`mt-2 text-2xl font-semibold ${textMain}`}>{overview.folderCount}</div>
-                      <div className={`mt-1 text-[12px] ${textMuted}`}>Named repositories in use</div>
-                    </div>
-                    <div className={`${ui.cardSoft} p-4`}>
-                      <div className={`text-[11px] uppercase tracking-[0.14em] ${textSoft}`}>Lead Category</div>
-                      <div className={`mt-2 text-lg font-semibold leading-6 ${textMain}`}>{overview.leadCategory.label}</div>
-                      <div className={`mt-1 text-[12px] ${textMuted}`}>{overview.leadCategory.value} documents</div>
-                    </div>
-                    <div className={`${ui.cardSoft} p-4`}>
-                      <div className={`text-[11px] uppercase tracking-[0.14em] ${textSoft}`}>Last Upload</div>
-                      <div className={`mt-2 text-lg font-semibold leading-6 ${textMain}`}>{overview.latestUploadLabel}</div>
-                      <div className={`mt-1 text-[12px] ${textMuted}`}>Live activity signal</div>
-                    </div>
-                  </div>
+          <motion.div {...fadeUpDelayed(0.07)} className={`${cardCls} mb-6 relative overflow-hidden p-4 sm:p-6 md:p-7`}>
+            <div className={`absolute inset-x-0 top-0 h-2 ${dark ? "bg-[#7ea8d9]/58" : "bg-[#97bbe4]/72"}`} />
+            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div>
+                <div className={`text-[11px] uppercase tracking-[0.18em] font-semibold ${textSoft}`}>
+                  STAT
+                </div>
+                <h2 className={`mt-2 text-xl md:text-2xl font-semibold tracking-tight ${textMain}`}>
+                  Monthly Booking Summary
+                </h2>
+                <div className={`mt-1 text-[12px] ${textMuted}`}>
+                  Guest totals by start date month for the selected year.
                 </div>
               </div>
-            </motion.div>
-          </div>
+            </div>
+
+            <div className={`${ui.cardSoft} mt-5 overflow-hidden p-4 md:p-5`}>
+              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <div className={`text-[11px] uppercase tracking-[0.14em] font-semibold ${textSoft}`}>
+                    Category Breakdown
+                  </div>
+                  <div className={`mt-1 text-[12px] ${textMuted}`}>
+                    Guest totals by category and month
+                  </div>
+                </div>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                  <div className={`text-[12px] ${textMuted}`}>
+                    {statsCategoryRows.length} categor{statsCategoryRows.length === 1 ? "y" : "ies"}
+                  </div>
+                  <label className="block sm:min-w-[180px]">
+                    <span className={`mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] ${textSoft}`}>
+                      Year
+                    </span>
+                    <select
+                      value={selectedStatsYear}
+                      onChange={(event) => setSelectedStatsYear(Number(event.target.value))}
+                      className={inputCls}
+                    >
+                      {statsYearOptions.map((year) => (
+                        <option key={year} value={year}>
+                          {year}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Pill dark={dark} tone="emerald">
+                  Total Guests: {monthlyBookingStats.totalPax}
+                </Pill>
+                <Pill dark={dark} tone="emerald">Active/Completed included</Pill>
+                <Pill dark={dark} tone="amber">Cancelled excluded</Pill>
+                <Pill dark={dark} tone="slate">Closures/Special excluded</Pill>
+              </div>
+
+              <div className="mt-4 overflow-x-auto scroll-docs">
+                <table className="min-w-[940px] w-full border-separate border-spacing-0 text-sm">
+                  <thead>
+                    <tr className={textSoft}>
+                      <th className="border-b border-white/10 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-[0.12em]">
+                        Category
+                      </th>
+                      {MONTH_LABELS.map((month) => (
+                        <th key={month} className="border-b border-white/10 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-[0.12em]">
+                          {month}
+                        </th>
+                      ))}
+                      <th className="border-b border-white/10 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-[0.12em]">
+                        Total
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {statsCategoryRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={14} className={`px-3 py-5 text-sm ${textMuted}`}>
+                          No booking data available for {selectedStatsYear}.
+                        </td>
+                      </tr>
+                    ) : (
+                      statsCategoryRows.map((row) => (
+                        <tr key={row.category} className={textMain}>
+                          <td className="border-b border-white/8 px-3 py-3 font-semibold">
+                            {row.category}
+                          </td>
+                          {row.values.map((value, index) => (
+                            <td key={`${row.category}-${MONTH_LABELS[index]}`} className="border-b border-white/8 px-3 py-3">
+                              {value}
+                            </td>
+                          ))}
+                          <td className="border-b border-white/8 px-3 py-3 font-semibold">
+                            {row.total}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </motion.div>
 
           <motion.div
             {...fadeUpDelayed(0.08)}

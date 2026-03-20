@@ -22,6 +22,7 @@ import {
   bookingCountsTowardCapacity,
   computeTrailDayOccupancy,
   expandDateRange,
+  findSameYearDuplicateBookings,
   formatDisplayDate,
   trailPillTone,
 } from "@/app/lib/bookingUtils";
@@ -135,6 +136,40 @@ const statusTone: Record<string, string> = {
   Cancelled: "border-slate-200 bg-slate-100 text-slate-600",
   Completed: "border-slate-200 bg-slate-100 text-slate-700",
 };
+
+const RECORD_STATUS_OPTIONS = [
+  "All Statuses",
+  "Active",
+  "Rescheduled",
+  "Cancelled",
+  "Completed",
+] as const;
+
+type RecordStatusLabel = (typeof RECORD_STATUS_OPTIONS)[number];
+
+function getRecordStatus(booking: Partial<BookingRow>): Exclude<RecordStatusLabel, "All Statuses"> {
+  const bookingStatus = String(booking.booking_status || "").trim().toLowerCase();
+
+  if (bookingStatus === "rescheduled") return "Rescheduled";
+  if (bookingStatus === "cancelled") return "Cancelled";
+  if (bookingStatus === "completed") return "Completed";
+  return "Active";
+}
+
+function getRecordStatusAppearance(booking: Partial<BookingRow>) {
+  const label = getRecordStatus(booking);
+
+  const tone =
+    label === "Rescheduled"
+      ? "border-amber-200 bg-amber-50 text-amber-700"
+      : label === "Cancelled"
+        ? "border-rose-200 bg-rose-50 text-rose-700"
+        : label === "Completed"
+          ? "border-sky-200 bg-sky-50 text-sky-700"
+          : "border-emerald-200 bg-emerald-50 text-emerald-700";
+
+  return { label, tone };
+}
 
 function LabeledInput({
   label,
@@ -366,7 +401,7 @@ export default function BookingPage() {
     ? "text-[color:rgba(230,237,243,0.68)]"
     : "text-slate-500";
   const recordsDesktopGridClassName =
-    "lg:grid lg:grid-cols-[2.2fr_1.1fr_1.1fr_0.8fr_1fr_1fr] lg:items-center lg:gap-4";
+    "lg:grid lg:grid-cols-[2.1fr_1fr_1.05fr_0.7fr_0.95fr_0.95fr_0.95fr] lg:items-center lg:gap-4";
   const recordsDesktopSpacingClassName = "lg:px-5";
   const detailDialogPanelClassName = `${ui.modal} relative w-full max-w-5xl overflow-hidden rounded-[28px] shadow-[0_32px_90px_rgba(0,0,0,0.34)]`;
   const detailSectionCardClassName = dark
@@ -397,6 +432,8 @@ export default function BookingPage() {
   const [trailFilter, setTrailFilter] = useState("All Trails");
   const [bookingTypeFilter, setBookingTypeFilter] = useState("All");
   const [approvalFilter] = useState("All");
+  const [recordStatusFilter, setRecordStatusFilter] =
+    useState<RecordStatusLabel>("All Statuses");
   const [monthFilter, setMonthFilter] = useState("");
   const [searchFilter, setSearchFilter] = useState("");
   const deferredSearchFilter = useDeferredValue(searchFilter);
@@ -576,6 +613,12 @@ export default function BookingPage() {
       if (bookingTypeFilter !== "All" && booking.booking_type !== bookingTypeFilter) return false;
       if (approvalFilter !== "All" && booking.approval_status !== approvalFilter) return false;
       if (
+        recordStatusFilter !== "All Statuses" &&
+        getRecordStatus(booking) !== recordStatusFilter
+      ) {
+        return false;
+      }
+      if (
         monthFilter &&
         !booking.start_date.startsWith(monthFilter) &&
         !booking.end_date.startsWith(monthFilter)
@@ -604,6 +647,7 @@ export default function BookingPage() {
     bookingTypeFilter,
     deferredSearchFilter,
     monthFilter,
+    recordStatusFilter,
     trailFilter,
     visibleRecordBookings,
   ]);
@@ -727,6 +771,38 @@ export default function BookingPage() {
       })),
     };
   }, [bookings, editingId, form.end_date, form.start_date, form.trail, isOffSeasonLike]);
+
+  const sameYearDuplicateMatch = useMemo(() => {
+    if (loading || isOffSeasonLike) {
+      return findSameYearDuplicateBookings({
+        guestName: "",
+        category: "",
+        startDate: "",
+        bookings: [],
+      });
+    }
+
+    return findSameYearDuplicateBookings({
+      guestName: form.contact_name,
+      category: form.participant_category,
+      startDate: form.start_date,
+      bookings,
+      currentBookingId: editingId,
+    });
+  }, [
+    bookings,
+    editingId,
+    form.contact_name,
+    form.participant_category,
+    form.start_date,
+    isOffSeasonLike,
+    loading,
+  ]);
+
+  const duplicateHighlightIds = useMemo(
+    () => new Set(sameYearDuplicateMatch.highlightedRowIds),
+    [sameYearDuplicateMatch.highlightedRowIds]
+  );
 
   function setField<K extends keyof BookingFormPayload>(key: K, value: BookingFormPayload[K]) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -1011,6 +1087,25 @@ export default function BookingPage() {
                   )}
                 </div>
 
+                {sameYearDuplicateMatch.hasDuplicate && (
+                  <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                    <p className="font-semibold text-amber-900">
+                      This guest is already booked this year.
+                    </p>
+                    <p className="mt-1 leading-6 text-amber-700">
+                      Previous booking: {sameYearDuplicateMatch.previousBookingDateText}
+                      {sameYearDuplicateMatch.previousBooking?.trail
+                        ? ` - ${sameYearDuplicateMatch.previousBooking.trail}`
+                        : ""}
+                      {sameYearDuplicateMatch.previousBooking?.booking_code
+                        ? ` - ${sameYearDuplicateMatch.previousBooking.booking_code}`
+                        : ""}
+                      .
+                    </p>
+                    <p className="mt-1 text-xs leading-5 text-amber-700">DIY bookings are limited to one per year. Submit is still allowed.</p>
+                  </div>
+                )}
+
                 <div className={`${cleanPanelSoftClassName} p-3 lg:p-4`}>
                   <div className={`grid items-start gap-2.5 md:grid-cols-2 ${showPax ? "xl:grid-cols-12" : "xl:grid-cols-8"}`}>
                     <div className="xl:col-span-4">
@@ -1202,6 +1297,7 @@ export default function BookingPage() {
             <span>Category</span>
             <span>Trail</span>
             <span>Pax</span>
+            <span>Booking Status</span>
             <span>Start Date</span>
             <span>End Date</span>
           </div>
@@ -1214,82 +1310,108 @@ export default function BookingPage() {
         ) : (
           <div className={`scroll-docs booking-scroll-gutter ${filteredBookings.length > 6 ? "max-h-[456px] overflow-y-auto" : ""}`}>
             <div className={recordsDividerClassName}>
-              {filteredBookings.map((row) => (
-                <article key={row.id}>
-                  <button
-                    type="button"
-                    onClick={() => setDetailBooking(row)}
-                    className={`grid w-full gap-3 px-4 py-4 text-left transition lg:hidden ${
-                      dark
-                        ? "hover:bg-white/[0.04] focus-visible:bg-white/[0.04]"
-                        : "hover:bg-slate-50/80 focus-visible:bg-slate-50/80"
-                    }`}
-                  >
-                    <div className="flex flex-wrap items-start justify-between gap-2.5">
-                      <div>
-                        <p className={`text-sm font-semibold ${ui.textMain}`}>{row.contact_name}</p>
-                        <p className={`mt-1 text-xs leading-5 ${ui.textMuted}`}>
-                          {isOffSeasonLikeType(row.booking_type) ? "Closure" : row.participant_category}
-                        </p>
+              {filteredBookings.map((row) => {
+                const recordStatus = getRecordStatusAppearance(row);
+                const isDuplicateHighlight = duplicateHighlightIds.has(row.id);
+                const mobileRowHighlightClassName = isDuplicateHighlight
+                  ? dark
+                    ? "bg-amber-400/10 ring-1 ring-inset ring-amber-300/30"
+                    : "bg-amber-50/90 ring-1 ring-inset ring-amber-200"
+                  : "";
+                const desktopRowHighlightClassName = isDuplicateHighlight
+                  ? dark
+                    ? "bg-amber-400/10 ring-1 ring-inset ring-amber-300/30"
+                    : "bg-amber-50/90 ring-1 ring-inset ring-amber-200"
+                  : "";
+
+                return (
+                  <article key={row.id}>
+                    <button
+                      type="button"
+                      onClick={() => setDetailBooking(row)}
+                      className={`grid w-full gap-3 px-4 py-4 text-left transition lg:hidden ${
+                        dark
+                          ? "hover:bg-white/[0.04] focus-visible:bg-white/[0.04]"
+                          : "hover:bg-slate-50/80 focus-visible:bg-slate-50/80"
+                      } ${mobileRowHighlightClassName}`}
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-2.5">
+                        <div>
+                          <p className={`text-sm font-semibold ${ui.textMain}`}>{row.contact_name}</p>
+                          <p className={`mt-1 text-xs leading-5 ${ui.textMuted}`}>
+                            {isOffSeasonLikeType(row.booking_type) ? "Closure" : row.participant_category}
+                          </p>
+                        </div>
+                        {isOffSeasonLikeType(row.booking_type) ? (
+                          <span className={`text-xs ${recordsMetaTextClassName}`}>All trails</span>
+                        ) : (
+                          <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] ${trailPillTone(row.trail)}`}>
+                            {row.trail === "San Isidro Trail" ? "San Isidro" : "Governor Generoso"}
+                          </span>
+                        )}
                       </div>
+
+                      <div className="grid gap-2.5 sm:grid-cols-4">
+                        <div className={`${cleanPanelSoftClassName} p-3`}>
+                          <p className={`text-[11px] font-semibold uppercase tracking-[0.12em] ${ui.textSoft}`}>Category</p>
+                          <p className={`mt-1.5 text-sm ${ui.textMain}`}>
+                            {isOffSeasonLikeType(row.booking_type) ? "Closure" : row.participant_category}
+                          </p>
+                        </div>
+                        <div className={`${cleanPanelSoftClassName} p-3`}>
+                          <p className={`text-[11px] font-semibold uppercase tracking-[0.12em] ${ui.textSoft}`}>Pax</p>
+                          <p className={`mt-1.5 text-sm ${ui.textMain}`}>{isOffSeasonLikeType(row.booking_type) ? "Closure" : row.pax}</p>
+                        </div>
+                        <div className={`${cleanPanelSoftClassName} p-3`}>
+                          <p className={`text-[11px] font-semibold uppercase tracking-[0.12em] ${ui.textSoft}`}>Booking Status</p>
+                          <span className={`mt-1.5 inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${recordStatus.tone}`}>
+                            {recordStatus.label}
+                          </span>
+                        </div>
+                        <div className={`${cleanPanelSoftClassName} p-3`}>
+                          <p className={`text-[11px] font-semibold uppercase tracking-[0.12em] ${ui.textSoft}`}>Start</p>
+                          <p className={`mt-1.5 text-sm ${ui.textMain}`}>{row.start_date}</p>
+                        </div>
+                        <div className={`${cleanPanelSoftClassName} p-3`}>
+                          <p className={`text-[11px] font-semibold uppercase tracking-[0.12em] ${ui.textSoft}`}>End</p>
+                          <p className={`mt-1.5 text-sm ${ui.textMain}`}>{row.end_date}</p>
+                        </div>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setDetailBooking(row)}
+                      className={`hidden w-full ${recordsDesktopGridClassName} ${recordsDesktopSpacingClassName} py-5 text-sm text-left transition lg:grid ${
+                        dark
+                          ? "hover:bg-white/[0.04] focus-visible:bg-white/[0.04]"
+                          : "hover:bg-slate-50/80 focus-visible:bg-slate-50/80"
+                      } ${recordsRowTextClassName} ${desktopRowHighlightClassName}`}
+                    >
+                      <div>
+                        <p className={`font-medium ${ui.textMain}`}>{row.contact_name}</p>
+                        <p className={`mt-1 text-xs ${recordsMetaTextClassName}`}>{row.booking_code}</p>
+                      </div>
+                      <span>{isOffSeasonLikeType(row.booking_type) ? "Closure" : row.participant_category}</span>
                       {isOffSeasonLikeType(row.booking_type) ? (
-                        <span className={`text-xs ${recordsMetaTextClassName}`}>All trails</span>
+                        <span className={recordsMetaTextClassName}>All trails</span>
                       ) : (
-                        <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] ${trailPillTone(row.trail)}`}>
+                        <span className={`inline-flex w-fit items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${trailPillTone(row.trail)}`}>
                           {row.trail === "San Isidro Trail" ? "San Isidro" : "Governor Generoso"}
                         </span>
                       )}
-                    </div>
-
-                    <div className="grid gap-2.5 sm:grid-cols-4">
-                      <div className={`${cleanPanelSoftClassName} p-3`}>
-                        <p className={`text-[11px] font-semibold uppercase tracking-[0.12em] ${ui.textSoft}`}>Category</p>
-                        <p className={`mt-1.5 text-sm ${ui.textMain}`}>
-                          {isOffSeasonLikeType(row.booking_type) ? "Closure" : row.participant_category}
-                        </p>
-                      </div>
-                      <div className={`${cleanPanelSoftClassName} p-3`}>
-                        <p className={`text-[11px] font-semibold uppercase tracking-[0.12em] ${ui.textSoft}`}>Pax</p>
-                        <p className={`mt-1.5 text-sm ${ui.textMain}`}>{isOffSeasonLikeType(row.booking_type) ? "Closure" : row.pax}</p>
-                      </div>
-                      <div className={`${cleanPanelSoftClassName} p-3`}>
-                        <p className={`text-[11px] font-semibold uppercase tracking-[0.12em] ${ui.textSoft}`}>Start</p>
-                        <p className={`mt-1.5 text-sm ${ui.textMain}`}>{row.start_date}</p>
-                      </div>
-                      <div className={`${cleanPanelSoftClassName} p-3`}>
-                        <p className={`text-[11px] font-semibold uppercase tracking-[0.12em] ${ui.textSoft}`}>End</p>
-                        <p className={`mt-1.5 text-sm ${ui.textMain}`}>{row.end_date}</p>
-                      </div>
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setDetailBooking(row)}
-                    className={`hidden w-full ${recordsDesktopGridClassName} ${recordsDesktopSpacingClassName} py-5 text-sm text-left transition lg:grid ${
-                      dark
-                        ? "hover:bg-white/[0.04] focus-visible:bg-white/[0.04]"
-                        : "hover:bg-slate-50/80 focus-visible:bg-slate-50/80"
-                    } ${recordsRowTextClassName}`}
-                  >
-                    <div>
-                      <p className={`font-medium ${ui.textMain}`}>{row.contact_name}</p>
-                      <p className={`mt-1 text-xs ${recordsMetaTextClassName}`}>{row.booking_code}</p>
-                    </div>
-                    <span>{isOffSeasonLikeType(row.booking_type) ? "Closure" : row.participant_category}</span>
-                    {isOffSeasonLikeType(row.booking_type) ? (
-                      <span className={recordsMetaTextClassName}>All trails</span>
-                    ) : (
-                      <span className={`inline-flex w-fit items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${trailPillTone(row.trail)}`}>
-                        {row.trail === "San Isidro Trail" ? "San Isidro" : "Governor Generoso"}
+                      <span>{isOffSeasonLikeType(row.booking_type) ? "Closure" : row.pax}</span>
+                      <span>
+                        <span className={`inline-flex w-fit items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${recordStatus.tone}`}>
+                          {recordStatus.label}
+                        </span>
                       </span>
-                    )}
-                    <span>{isOffSeasonLikeType(row.booking_type) ? "Closure" : row.pax}</span>
-                    <span>{row.start_date}</span>
-                    <span>{row.end_date}</span>
-                  </button>
-                </article>
-              ))}
+                      <span>{row.start_date}</span>
+                      <span>{row.end_date}</span>
+                    </button>
+                  </article>
+                );
+              })}
             </div>
           </div>
         )}
@@ -1298,6 +1420,7 @@ export default function BookingPage() {
     [
       cleanPanelSoftClassName,
       dark,
+      duplicateHighlightIds,
       filteredBookings,
       loading,
       recordsDesktopGridClassName,
@@ -1454,7 +1577,7 @@ export default function BookingPage() {
               </p>
             </div>
 
-            <div className="mt-4 grid grid-cols-2 items-end gap-2.5 sm:gap-3 lg:grid-cols-[1.15fr_1fr_1fr_1fr]">
+            <div className="mt-4 grid grid-cols-2 items-end gap-2.5 sm:gap-3 xl:grid-cols-[1.15fr_0.95fr_0.95fr_0.95fr_0.9fr]">
               <label className={`col-span-2 p-3 sm:p-4 lg:col-span-1 ${cleanPanelSoftClassName}`}>
                 <span className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${ui.textSoft}`}>Search</span>
                 <input
@@ -1481,6 +1604,15 @@ export default function BookingPage() {
                 <select value={bookingTypeFilter} onChange={(event) => setBookingTypeFilter(event.target.value)} className="mt-2 min-h-11 w-full rounded-2xl border border-[var(--ui-border)] bg-white/[0.05] px-3 text-sm text-[var(--ui-text-main)] outline-none">
                   <option style={bookingNativeOptionStyle}>All</option>
                   {visibleBookingTypeOptions.map((option) => (
+                    <option key={option} value={option} style={bookingNativeOptionStyle}>{option}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label className={`p-3 sm:p-4 ${cleanPanelSoftClassName}`}>
+                <span className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${ui.textSoft}`}>Status</span>
+                <select value={recordStatusFilter} onChange={(event) => setRecordStatusFilter(event.target.value as RecordStatusLabel)} className="mt-2 min-h-11 w-full rounded-2xl border border-[var(--ui-border)] bg-white/[0.05] px-3 text-sm text-[var(--ui-text-main)] outline-none">
+                  {RECORD_STATUS_OPTIONS.map((option) => (
                     <option key={option} value={option} style={bookingNativeOptionStyle}>{option}</option>
                   ))}
                 </select>

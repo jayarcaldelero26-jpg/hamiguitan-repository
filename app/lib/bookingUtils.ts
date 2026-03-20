@@ -108,6 +108,140 @@ export function formatDisplayDate(date: string) {
   }).format(parsed);
 }
 
+export function normalizeGuestName(name: string) {
+  return String(name || "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function isClosureLikeBookingType(bookingType?: string | null) {
+  const normalizedBookingType = String(bookingType || "").trim().toLowerCase();
+  return normalizedBookingType === "off season" || normalizedBookingType === "block schedule";
+}
+
+function isSpecialScheduleBookingType(bookingType?: string | null) {
+  return String(bookingType || "").trim().toLowerCase() === "special climb";
+}
+
+function isCancelledBookingStatus(bookingStatus?: string | null) {
+  return String(bookingStatus || "").trim().toLowerCase() === "cancelled";
+}
+
+function isRescheduledBookingStatus(bookingStatus?: string | null) {
+  return String(bookingStatus || "").trim().toLowerCase() === "rescheduled";
+}
+
+export type SameYearDuplicateBookingMatch = {
+  hasDuplicate: boolean;
+  matches: BookingRow[];
+  highlightedRowIds: number[];
+  previousBooking: BookingRow | null;
+  previousBookingDateText: string;
+};
+
+export function findSameYearDuplicateBookings({
+  guestName,
+  category,
+  startDate,
+  bookings,
+  currentBookingId,
+}: {
+  guestName: string;
+  category: string;
+  startDate: string;
+  bookings: BookingRow[];
+  currentBookingId?: number | null;
+}): SameYearDuplicateBookingMatch {
+  if (String(category || "").trim() !== "DIY") {
+    return {
+      hasDuplicate: false,
+      matches: [],
+      highlightedRowIds: [],
+      previousBooking: null,
+      previousBookingDateText: "",
+    };
+  }
+
+  const normalizedName = normalizeGuestName(guestName);
+  const selectedYear = String(startDate || "").slice(0, 4);
+
+  if (!normalizedName || selectedYear.length !== 4 || bookings.length === 0) {
+    return {
+      hasDuplicate: false,
+      matches: [],
+      highlightedRowIds: [],
+      previousBooking: null,
+      previousBookingDateText: "",
+    };
+  }
+
+  const matches = bookings
+    .filter((booking) => booking.id !== currentBookingId)
+    .filter((booking) => String(booking.start_date || "").slice(0, 4) === selectedYear)
+    .filter(
+      (booking) => normalizeGuestName(String(booking.contact_name || "")) === normalizedName
+    )
+    .filter((booking) => !isRescheduledBookingStatus(booking.booking_status))
+    .filter((booking) => !isCancelledBookingStatus(booking.booking_status))
+    .filter((booking) => !isClosureLikeBookingType(booking.booking_type))
+    .filter((booking) => !isSpecialScheduleBookingType(booking.booking_type))
+    .sort((left, right) => {
+      const dateCompare = left.start_date.localeCompare(right.start_date);
+      if (dateCompare !== 0) return dateCompare;
+      return left.id - right.id;
+    });
+
+  const previousBooking = matches[0] || null;
+
+  return {
+    hasDuplicate: matches.length > 0,
+    matches,
+    highlightedRowIds: matches.map((booking) => booking.id),
+    previousBooking,
+    previousBookingDateText: previousBooking ? formatDisplayDate(previousBooking.start_date) : "",
+  };
+}
+
+export type MonthlyBookingStats = {
+  monthlyTotals: number[];
+  categoryTotals: Record<string, number[]>;
+  totalPax: number;
+};
+
+export function getMonthlyStats(bookings: BookingRow[], year: number): MonthlyBookingStats {
+  const monthlyTotals = Array.from({ length: 12 }, () => 0);
+  const categoryTotals: Record<string, number[]> = {};
+  let totalPax = 0;
+
+  for (const booking of bookings) {
+    const startDate = String(booking.start_date || "");
+    const bookingYear = Number(startDate.slice(0, 4));
+    const bookingMonth = Number(startDate.slice(5, 7)) - 1;
+
+    if (!Number.isInteger(bookingYear) || bookingYear !== year) continue;
+    if (!Number.isInteger(bookingMonth) || bookingMonth < 0 || bookingMonth > 11) continue;
+    if (isCancelledBookingStatus(booking.booking_status)) continue;
+    if (isClosureLikeBookingType(booking.booking_type)) continue;
+    if (isSpecialScheduleBookingType(booking.booking_type)) continue;
+
+    const category = String(booking.participant_category || "").trim() || "Uncategorized";
+    const pax = Number.isFinite(booking.pax) ? booking.pax : 0;
+
+    monthlyTotals[bookingMonth] += pax;
+    totalPax += pax;
+
+    if (!categoryTotals[category]) {
+      categoryTotals[category] = Array.from({ length: 12 }, () => 0);
+    }
+
+    categoryTotals[category][bookingMonth] += pax;
+  }
+
+  return {
+    monthlyTotals,
+    categoryTotals,
+    totalPax,
+  };
+}
+
 export function shiftMonth(month: string, offset: number) {
   const parsed = parseDateOnly(`${month}-01`);
   if (!parsed) return month;

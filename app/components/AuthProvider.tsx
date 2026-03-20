@@ -10,6 +10,12 @@ import {
   useState,
 } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import {
+  clearBrowserSessionState,
+  hasActiveBrowserSessionMarker,
+  isBrowserSessionExpired,
+  markBrowserSessionActive,
+} from "@/app/lib/authSession";
 
 export type AuthUser = {
   id: number;
@@ -30,7 +36,7 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({
   children,
-  redirectTo = "/login",
+  redirectTo = "/",
 }: {
   children: React.ReactNode;
   redirectTo?: string;
@@ -81,6 +87,8 @@ export function AuthProvider({
         if (mountedRef.current) {
           setUser(data);
         }
+
+        markBrowserSessionActive();
       } catch {
         if (mountedRef.current) {
           setUser(null);
@@ -108,6 +116,25 @@ export function AuthProvider({
       };
     }
 
+    if (!hasActiveBrowserSessionMarker() || isBrowserSessionExpired()) {
+      clearBrowserSessionState();
+
+      void fetch("/api/logout", {
+        method: "POST",
+        credentials: "include",
+      }).finally(() => {
+        if (mountedRef.current) {
+          setUser(null);
+          setLoading(false);
+        }
+        router.replace(redirectTo);
+      });
+
+      return () => {
+        mountedRef.current = false;
+      };
+    }
+
     if (!fetchedOnceRef.current) {
       fetchedOnceRef.current = true;
       fetchMe({ silent: false, redirectOnFail: true });
@@ -116,7 +143,7 @@ export function AuthProvider({
     return () => {
       mountedRef.current = false;
     };
-  }, [fetchMe, isPublicRoute]);
+  }, [fetchMe, isPublicRoute, redirectTo, router]);
 
   const refreshUser = useCallback(async () => {
     await fetchMe({ silent: true, redirectOnFail: false });
@@ -128,6 +155,8 @@ export function AuthProvider({
         method: "POST",
         credentials: "include",
       });
+
+      clearBrowserSessionState();
 
       if (!res.ok) return false;
 

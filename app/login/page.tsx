@@ -5,6 +5,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
+import {
+  clearBrowserSessionState,
+  hasActiveBrowserSessionMarker,
+  markBrowserSessionActive,
+} from "@/app/lib/authSession";
 import styles from "./login.module.css";
 
 function EyeIcon({ open }: { open: boolean }) {
@@ -90,20 +95,39 @@ export default function LoginPage() {
   useEffect(() => {
     let active = true;
 
-    fetch("/api/me", {
-      credentials: "include",
-      cache: "no-store",
-    })
-      .then((res) => {
+    const syncSession = async () => {
+      if (!hasActiveBrowserSessionMarker()) {
+        clearBrowserSessionState();
+
+        try {
+          await fetch("/api/logout", {
+            method: "POST",
+            credentials: "include",
+          });
+        } catch {}
+
+        if (active) setCheckingSession(false);
+        return;
+      }
+
+      try {
+        const res = await fetch("/api/me", {
+          credentials: "include",
+          cache: "no-store",
+        });
+
         if (!active) return;
         if (res.ok) {
+          markBrowserSessionActive();
           window.location.replace("/dashboard");
+          return;
         }
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (active) setCheckingSession(false);
-      });
+      } catch {}
+
+      if (active) setCheckingSession(false);
+    };
+
+    void syncSession();
 
     return () => {
       active = false;
@@ -142,6 +166,7 @@ export default function LoginPage() {
         return;
       }
 
+      markBrowserSessionActive();
       setSuccessMsg("Login successful. Welcome back.");
       setShowSuccess(true);
     } catch {

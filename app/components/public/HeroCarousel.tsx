@@ -1,8 +1,9 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
+import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 
 type Slide = {
   image: string;
@@ -20,6 +21,23 @@ type Slide = {
 
 const AUTOPLAY_MS = 5000;
 const SWIPE_THRESHOLD = 48;
+const partnerLogos = [
+  {
+    src: "/images/branding/denr-logo.png",
+    alt: "DENR logo",
+    width: 54,
+  },
+  {
+    src: "/images/branding/asean-logo.png",
+    alt: "ASEAN Heritage Parks logo",
+    width: 54,
+  },
+  {
+    src: "/images/branding/unesco-logo.png",
+    alt: "UNESCO logo",
+    width: 54,
+  },
+] as const;
 
 const slides: Slide[] = [
   {
@@ -61,21 +79,21 @@ const slides: Slide[] = [
     },
     secondaryCta: {
       label: "View Schedule",
-      href: "/calendar",
+      href: "/schedule",
     },
   },
   {
     image: "/images/carousel/carousel-04.jpg",
     title: "Schedule And Climb Preparation",
     subtitle:
-      "Use the public calendar and booking preview to understand climb timing, requirements, and next steps more clearly.",
+      "Use the public schedule view to understand climb timing, trail occupancy, and next steps more clearly.",
     primaryCta: {
       label: "View Schedule",
-      href: "/calendar",
+      href: "/schedule",
     },
     secondaryCta: {
-      label: "Book Now",
-      href: "/booking",
+      label: "Sign In",
+      href: "/login",
     },
   },
   {
@@ -88,42 +106,44 @@ const slides: Slide[] = [
       href: "/contact",
     },
     secondaryCta: {
-      label: "Login",
+      label: "Sign In",
       href: "/login",
     },
   },
 ];
 
-export default function HeroCarousel() {
+function HeroCarousel() {
+  const prefersReducedMotion = useReducedMotion();
   const [activeIndex, setActiveIndex] = useState(0);
   const [hoverPaused, setHoverPaused] = useState(false);
-  const [touchPaused, setTouchPaused] = useState(false);
-  const intervalRef = useRef<number | null>(null);
+  const [isSmallScreen, setIsSmallScreen] = useState(false);
   const pointerStartXRef = useRef<number | null>(null);
   const pointerActiveRef = useRef(false);
 
-  const isPaused = hoverPaused || touchPaused;
+  const isPaused = hoverPaused;
+  const activeSlide = useMemo(() => slides[activeIndex] ?? slides[0], [activeIndex]);
+  const lightMotion = prefersReducedMotion || isSmallScreen;
 
   useEffect(() => {
-    if (isPaused) {
-      if (intervalRef.current) {
-        window.clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-      return;
-    }
+    if (typeof window === "undefined") return;
 
-    intervalRef.current = window.setInterval(() => {
+    const mediaQuery = window.matchMedia("(max-width: 767px)");
+    const update = () => setIsSmallScreen(mediaQuery.matches);
+    update();
+
+    mediaQuery.addEventListener("change", update);
+    return () => mediaQuery.removeEventListener("change", update);
+  }, []);
+
+  useEffect(() => {
+    if (lightMotion || isPaused) return;
+
+    const timer = window.setInterval(() => {
       setActiveIndex((current) => (current + 1) % slides.length);
     }, AUTOPLAY_MS);
 
-    return () => {
-      if (intervalRef.current) {
-        window.clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-    };
-  }, [isPaused]);
+    return () => window.clearInterval(timer);
+  }, [isPaused, lightMotion]);
 
   const goToSlide = (index: number) => {
     setActiveIndex(index);
@@ -173,8 +193,6 @@ export default function HeroCarousel() {
       className="relative isolate overflow-hidden"
       onMouseEnter={() => setHoverPaused(true)}
       onMouseLeave={() => setHoverPaused(false)}
-      onTouchStart={() => setTouchPaused(true)}
-      onTouchEnd={() => setTouchPaused(false)}
       onPointerDown={(event) => handlePointerStart(event.clientX)}
       onPointerUp={(event) => handlePointerEnd(event.clientX)}
       onPointerCancel={resetPointerTracking}
@@ -184,66 +202,130 @@ export default function HeroCarousel() {
         }
       }}
     >
-      <div className="relative min-h-[60vh] bg-[#181f27] md:min-h-[74vh]">
+      <div className="relative min-h-[72vh] overflow-hidden bg-[#05070b] md:min-h-[88vh]">
         {slides.map((slide, index) => (
           <div
             key={slide.image}
             aria-hidden={index !== activeIndex}
             className={`absolute inset-0 transition-opacity duration-1000 ease-out ${
+              lightMotion ? "duration-300" : ""
+            } ${
               index === activeIndex ? "opacity-100" : "opacity-0"
             }`}
-            style={{
-              backgroundImage: `linear-gradient(180deg, rgba(24, 31, 39, 0.28) 0%, rgba(24, 31, 39, 0.58) 30%, rgba(24, 31, 39, 0.76) 64%, rgba(24, 31, 39, 0.92) 100%), url(${slide.image})`,
-              backgroundColor: "#1f2a33",
-              backgroundPosition: "center",
-              backgroundRepeat: "no-repeat",
-              backgroundSize: "cover",
-            }}
+            style={{ backgroundColor: "#0a0f16" }}
           >
-            {/* Replace the placeholder image files in public/images/carousel with your final carousel images. */}
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(134,140,101,0.16),transparent_24%),radial-gradient(circle_at_bottom_left,rgba(57,92,122,0.18),transparent_32%),linear-gradient(90deg,rgba(24,31,39,0.34)_0%,rgba(24,31,39,0.08)_46%,rgba(24,31,39,0.18)_100%)]" />
+            <Image
+              src={slide.image}
+              alt=""
+              fill
+              priority={index === 0}
+              loading={index === 0 ? "eager" : "lazy"}
+              sizes="100vw"
+              className="object-cover"
+            />
+            <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,7,11,0.12)_0%,rgba(5,7,11,0.28)_34%,rgba(5,7,11,0.54)_68%,rgba(5,7,11,0.72)_100%)]" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(249,115,22,0.12),transparent_24%),radial-gradient(circle_at_78%_18%,rgba(245,158,11,0.1),transparent_22%),radial-gradient(circle_at_50%_100%,rgba(56,189,248,0.06),transparent_30%),linear-gradient(90deg,rgba(5,7,11,0.42)_0%,rgba(5,7,11,0.12)_42%,rgba(5,7,11,0.48)_100%)]" />
           </div>
         ))}
 
-        <div className="relative z-10 mx-auto flex min-h-[60vh] max-w-7xl items-end px-4 pb-14 pt-24 sm:px-6 sm:pb-16 sm:pt-26 md:min-h-[74vh] md:px-10 md:pb-20">
+        <div className="pointer-events-none absolute inset-0 z-[1]">
+          {!isSmallScreen ? (
+            <>
+              <div className="absolute left-[8%] top-[18%] h-32 w-32 rounded-full bg-[radial-gradient(circle,rgba(249,115,22,0.1),transparent_70%)] blur-lg md:h-40 md:w-40" />
+              <div className="absolute right-[6%] top-[14%] hidden h-40 w-40 rounded-full bg-[radial-gradient(circle,rgba(245,158,11,0.08),transparent_70%)] blur-xl md:block md:h-48 md:w-48" />
+            </>
+          ) : null}
+        </div>
+
+        <div className="relative z-10 mx-auto flex min-h-[72vh] max-w-[1180px] items-end px-5 pb-14 pt-28 sm:px-6 sm:pb-16 md:min-h-[88vh] md:px-8 md:pb-20 md:pt-32">
           <motion.div
             initial={{ opacity: 0, y: 28 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.45 }}
-            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-            className="max-w-3xl rounded-[2rem] border border-[var(--ui-border)] bg-[linear-gradient(180deg,rgba(31,42,51,0.46),rgba(24,31,39,0.22))] px-5 py-5 shadow-[0_28px_70px_rgba(0,0,0,0.22)] backdrop-blur-[3px] sm:px-6 sm:py-6 md:max-w-[52rem] md:rounded-[2.4rem] md:px-8 md:py-8"
+            transition={{ duration: lightMotion ? 0 : 0.58, ease: [0.22, 1, 0.36, 1] }}
+            className="grid w-full items-end gap-8 lg:grid-cols-[minmax(0,1fr)_280px] lg:gap-10"
           >
-            <h1 className="mt-3 leading-[1.05] tracking-[-0.02em] text-white md:mt-4 text-[2.1rem] sm:text-[2.8rem] md:text-[4.2rem] font-semibold">
-              <span className="block">
-                MT. HAMIGUITAN
-              </span>
-              <span className="block">
-                {slides[activeIndex].title}
-              </span>
-            </h1>
-            <p className="mt-3 max-w-2xl text-[0.94rem] leading-7 text-[color:rgba(230,237,243,0.9)] sm:text-[1rem] sm:leading-8 md:mt-4 md:max-w-3xl md:text-[1.12rem]">
-              {slides[activeIndex].subtitle}
-            </p>
+            <div className="public-panel-highlight pointer-events-auto max-w-4xl overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(13,18,28,0.68),rgba(7,10,16,0.5))] px-6 py-6 shadow-[0_16px_42px_rgba(0,0,0,0.24)] backdrop-blur-[6px] sm:px-7 sm:py-7 md:rounded-[38px] md:px-9 md:py-9">
+              <span className="public-kicker">UNESCO World Heritage Site</span>
+              <h1 className="mt-5 text-[2.5rem] font-semibold leading-[0.98] tracking-[-0.05em] text-white sm:text-[3.4rem] md:text-[5rem]">
+                <span className="block text-white/96">MT. HAMIGUITAN</span>
+                <span className="mt-2 block bg-[linear-gradient(180deg,#ffffff_0%,#ffddb0_100%)] bg-clip-text text-transparent">
+                  {activeSlide.title}
+                </span>
+              </h1>
+              <p className="mt-5 max-w-2xl text-[0.98rem] leading-8 text-[color:rgba(236,242,249,0.92)] sm:text-[1.05rem] md:text-[1.12rem]">
+                {activeSlide.subtitle}
+              </p>
 
-            <div className="mt-6 flex flex-col gap-2.5 sm:mt-7 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
-              <Link
-                href={slides[activeIndex].primaryCta.href}
-                className="app-primary-button inline-flex min-h-12 items-center justify-center rounded-full px-6 font-semibold sm:min-w-[168px]"
-              >
-                {slides[activeIndex].primaryCta.label}
-              </Link>
-              <Link
-                href={slides[activeIndex].secondaryCta.href}
-                className="app-secondary-button inline-flex min-h-12 items-center justify-center rounded-full px-6 font-semibold sm:min-w-[168px]"
-              >
-                {slides[activeIndex].secondaryCta.label}
-              </Link>
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+                <Link
+                  href={activeSlide.primaryCta.href}
+                  className="public-button-primary inline-flex min-h-12 items-center justify-center rounded-full px-6 font-semibold sm:min-w-[176px]"
+                >
+                  {activeSlide.primaryCta.label}
+                </Link>
+                <Link
+                  href={activeSlide.secondaryCta.href}
+                  className="public-button-secondary-light inline-flex min-h-12 items-center justify-center rounded-full px-6 font-semibold sm:min-w-[176px]"
+                >
+                  {activeSlide.secondaryCta.label}
+                </Link>
+              </div>
+
+              <div className="mt-8 flex flex-wrap items-center gap-3">
+                {partnerLogos.map((logo) => (
+                  <div
+                    key={logo.alt}
+                    className="flex h-14 items-center justify-center rounded-[18px] border border-white/12 bg-[rgba(255,255,255,0.12)] px-4 shadow-[0_10px_24px_rgba(0,0,0,0.16)] backdrop-blur-[2px]"
+                  >
+                    <Image
+                      src={logo.src}
+                      alt={logo.alt}
+                      width={logo.width}
+                      height={54}
+                      className="h-9 w-auto object-contain sm:h-10"
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
+
+            <motion.aside
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.45 }}
+              transition={{ duration: lightMotion ? 0 : 0.62, delay: lightMotion ? 0 : 0.08, ease: [0.22, 1, 0.36, 1] }}
+              className="hidden pointer-events-auto lg:grid lg:gap-4"
+            >
+              <div className="public-hero-stat rounded-[26px] p-5">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#ffd08a]">
+                  Visitor Journey
+                </p>
+                <p className="mt-3 text-sm leading-7 text-[var(--public-text-muted)]">
+                  Trail context, schedule visibility, and sign-in guidance presented in one cinematic landing experience.
+                </p>
+              </div>
+              <div className="public-hero-stat rounded-[26px] p-5">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#ffd08a]">
+                  Current Focus
+                </p>
+                <p className="mt-3 text-[1.65rem] font-semibold tracking-[-0.04em] text-white">
+                  {String(activeIndex + 1).padStart(2, "0")}
+                </p>
+                <div className="public-glow-divider mt-4" />
+                <p className="mt-4 text-sm leading-7 text-[var(--public-text-muted)]">
+                  Premium presentation with public information kept clear and uncluttered.
+                </p>
+              </div>
+            </motion.aside>
           </motion.div>
         </div>
 
-        <div className="absolute inset-x-0 bottom-5 z-20 mx-auto flex max-w-7xl items-end px-4 sm:bottom-6 sm:px-6 md:bottom-10 md:px-10">
-          <div className="flex items-center gap-2 sm:gap-3">
+        <div className="absolute inset-x-0 bottom-5 z-20 mx-auto flex max-w-[1180px] items-end justify-between px-5 sm:bottom-6 sm:px-6 md:bottom-10 md:px-8">
+          <div className="hidden rounded-full border border-white/10 bg-black/24 px-4 py-2 text-[11px] font-medium tracking-[0.16em] text-[var(--public-text-muted)] backdrop-blur-sm md:inline-flex">
+            Public trail planning and sanctuary overview
+          </div>
+          <div className="ml-auto flex items-center gap-2 sm:gap-3">
             {slides.map((slide, index) => (
               <button
                 key={slide.image}
@@ -253,8 +335,8 @@ export default function HeroCarousel() {
                 aria-current={index === activeIndex}
                 className={`h-3 rounded-full transition-all ${
                   index === activeIndex
-                    ? "w-10 bg-[#868c65]"
-                    : "w-3 bg-white/42 hover:bg-white/68"
+                    ? "w-12 bg-[linear-gradient(90deg,#f97316_0%,#f5b342_100%)] shadow-[0_0_16px_rgba(249,115,22,0.32)]"
+                    : "w-3 bg-white/40 hover:bg-white/58"
                 }`}
               />
             ))}
@@ -264,3 +346,5 @@ export default function HeroCarousel() {
     </section>
   );
 }
+
+export default memo(HeroCarousel);
