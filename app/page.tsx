@@ -1,7 +1,5 @@
-import { cookies } from "next/headers";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import {
   ArrowRightIcon,
   CalendarDaysIcon,
@@ -11,6 +9,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { Facebook, Mail, MapPin } from "lucide-react";
 import PublicShell from "@/app/components/public/PublicShell";
+import PublicAuthRedirectGate from "@/app/components/public/PublicAuthRedirectGate";
 import { Reveal, Stagger, StaggerItem } from "@/app/components/public/ScrollReveal";
 import { PUBLIC_TREKKING_CONTACT } from "@/app/lib/publicContact";
 import { listLatestPublicMinutesAndResolutions } from "@/app/lib/publicDocuments";
@@ -74,15 +73,11 @@ const bookingSteps = [
 ];
 
 export default async function Home() {
-  const cookieStore = await cookies();
   const latestPublicDocuments = await listLatestPublicMinutesAndResolutions();
-
-  if (cookieStore.get("auth_token")) {
-    redirect("/dashboard");
-  }
 
   return (
     <PublicShell>
+      <PublicAuthRedirectGate />
       <HeroCarousel />
 
       <section className="border-b border-[var(--public-border)] bg-[linear-gradient(180deg,rgba(8,11,18,0.92)_0%,rgba(10,15,22,0.98)_100%)]">

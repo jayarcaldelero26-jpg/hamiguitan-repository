@@ -5,6 +5,7 @@ import { supabaseAdmin } from "@/app/lib/db";
 import { getCurrentUser } from "@/app/lib/auth";
 import { writeAuditLog } from "@/app/lib/auditLog";
 import { deleteDriveFileById, getDriveClient } from "@/app/lib/googleDrive";
+import { getOrganizationalChartSourceModule } from "@/app/lib/organizationalChartDocuments";
 
 function isValidId(value: number) {
   return Number.isInteger(value) && value > 0;
@@ -43,7 +44,7 @@ export async function DELETE(req: NextRequest) {
 
     const { data: doc, error: findError } = await supabaseAdmin
       .from("documents")
-      .select("id, fileId, name, category, folder")
+      .select("id, fileId, name, category, folder, source_module, source_record_id")
       .eq("id", id)
       .maybeSingle();
 
@@ -111,6 +112,30 @@ export async function DELETE(req: NextRequest) {
         { error: "Failed to delete document." },
         { status: 500 }
       );
+    }
+
+    if (
+      doc.source_module === getOrganizationalChartSourceModule() &&
+      Number.isInteger(doc.source_record_id) &&
+      Number(doc.source_record_id) > 0
+    ) {
+      const { error: syncError } = await supabaseAdmin
+        .from("organizational_chart_entries")
+        .update({
+          attachment_path: null,
+          attachment_name: null,
+          attachment_size: null,
+          attachment_url: null,
+          attachment_mime_type: null,
+          attachment_drive_file_id: null,
+          attachment_uploaded_at: null,
+          attachment_type: null,
+        })
+        .eq("id", Number(doc.source_record_id));
+
+      if (syncError) {
+        console.error("ORG CHART DOCUMENT SYNC ERROR:", syncError);
+      }
     }
 
     await writeAuditLog({

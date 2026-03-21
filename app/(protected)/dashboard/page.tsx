@@ -123,6 +123,18 @@ function categoryLabel(value?: string | null) {
   return "Academe";
 }
 
+function isPersonnelDocument(doc: Pick<DocumentRow, "sourceModule">) {
+  return doc.sourceModule === "organizational_chart";
+}
+
+function getPersonnelSourceLabel(doc: Pick<DocumentRow, "sourceSection" | "sourceModule">) {
+  if (!isPersonnelDocument(doc)) return "";
+  if (doc.sourceSection === "pasu") return "Current PASU";
+  if (doc.sourceSection === "assistant_pasu") return "Assistant Superintendent";
+  if (doc.sourceSection === "former_pasu") return "Former PASU";
+  return "PAMO Staff";
+}
+
 function SkeletonBlock({
   className,
   dark,
@@ -1163,6 +1175,9 @@ function DashboardContent() {
                               {d.folder && <Pill dark={dark}>{d.folder}</Pill>}
                               {d.year && <Pill dark={dark} tone="slate">{d.year}</Pill>}
                               <Pill dark={dark} tone="slate">{typeLabel(d.type)}</Pill>
+                              {isPersonnelDocument(d) ? (
+                                <Pill dark={dark} tone="amber">{getPersonnelSourceLabel(d)}</Pill>
+                              ) : null}
                             </div>
                           </div>
                         </div>
@@ -1197,11 +1212,11 @@ function DashboardContent() {
                   </div>
                 </div>
 
-                <div className={`mt-6 ${bookingInsights.upcoming.length > 4 ? "max-h-[414px] overflow-y-auto pr-1 scroll-docs" : "space-y-3.5"}`}>
+                <div className={`mt-5 ${bookingInsights.upcoming.length > 4 ? "max-h-[414px] overflow-y-auto pr-1 scroll-docs" : "space-y-3"}`}>
                   {loadingBookings ? (
-                    <div className="space-y-3.5">
+                    <div className="space-y-3">
                       {[1, 2, 3].map((item) => (
-                        <div key={item} className={`rounded-[22px] p-4 md:p-[18px] ${subBg}`}>
+                        <div key={item} className={`rounded-[22px] p-4 md:p-4 ${subBg}`}>
                           <SkeletonBlock dark={dark} className="h-4 w-1/2" />
                           <div className="mt-3 flex flex-wrap gap-2">
                             <SkeletonBlock dark={dark} className="h-6 w-20 rounded-full" />
@@ -1216,29 +1231,35 @@ function DashboardContent() {
                       No upcoming bookings in the current schedule window.
                     </div>
                   ) : (
-                    <div className="space-y-3.5">
+                    <div className="space-y-3">
                       {bookingInsights.upcoming.map((booking) => (
                         <div
                           key={booking.id}
-                          className={`rounded-[20px] p-4 md:p-[18px] transition ${subBg} ${
+                          className={`rounded-[20px] p-4 md:p-4 transition ${subBg} ${
                             dark ? "hover:bg-white/[0.05]" : "hover:bg-white/68"
                           }`}
                         >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className={`truncate text-[15px] font-semibold ${textMain}`}>
+                          <div className="min-w-0">
+                            <div className="flex items-center justify-between gap-3">
+                              <div className={`min-w-0 truncate text-[15px] font-semibold ${textMain}`}>
                                 {booking.contact_name}
                               </div>
-                              <div className={`mt-1 text-[12px] ${textMuted}`}>
-                                Starts {fmtDate(booking.start_date)}
+                              <div
+                                className={`shrink-0 rounded-[12px] border px-2.5 py-1 text-[11px] font-semibold ${
+                                  dark
+                                    ? "border-white/10 bg-white/[0.05] text-[#E6EDF3]"
+                                    : "border-slate-200/80 bg-white/75 text-[#1F2937]"
+                                }`}
+                              >
+                                {booking.pax} pax
                               </div>
                             </div>
-                            <Pill dark={dark} tone="emerald">
-                              {booking.pax} {booking.pax === 1 ? "guest" : "guests"}
-                            </Pill>
+                            <div className={`mt-1 text-[12px] ${textMuted}`}>
+                              Starts {fmtDate(booking.start_date)}
+                            </div>
                           </div>
 
-                          <div className="mt-3.5 flex flex-wrap gap-2">
+                          <div className="mt-3 flex flex-wrap gap-2">
                             <Pill dark={dark}>{booking.trail}</Pill>
                             <Pill dark={dark} tone="slate">{booking.booking_type}</Pill>
                           </div>

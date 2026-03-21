@@ -11,9 +11,14 @@ import {
 } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  attachTabSessionResponder,
+  clearBrowserTabDenied,
   clearBrowserSessionState,
+  getBrowserTabSessionId,
+  hasConflictingTabSession,
   hasActiveBrowserSessionMarker,
   isBrowserSessionExpired,
+  markBrowserTabDenied,
   markBrowserSessionActive,
 } from "@/app/lib/authSession";
 
@@ -83,11 +88,41 @@ export function AuthProvider({
         }
 
         const data = await res.json();
+        const tabSessionId = getBrowserTabSessionId();
+
+        if (!hasActiveBrowserSessionMarker() || !tabSessionId) {
+          markBrowserTabDenied();
+          if (mountedRef.current) {
+            setUser(null);
+          }
+
+          if (redirectOnFail && !isPublicRoute) {
+            router.replace(redirectTo);
+          }
+          return;
+        }
+
+        const hasConflict = await hasConflictingTabSession(tabSessionId);
+
+        if (hasConflict) {
+          markBrowserTabDenied();
+          clearBrowserSessionState();
+
+          if (mountedRef.current) {
+            setUser(null);
+          }
+
+          if (redirectOnFail && !isPublicRoute) {
+            router.replace(redirectTo);
+          }
+          return;
+        }
 
         if (mountedRef.current) {
           setUser(data);
         }
 
+        clearBrowserTabDenied();
         markBrowserSessionActive();
       } catch {
         if (mountedRef.current) {
@@ -116,7 +151,25 @@ export function AuthProvider({
       };
     }
 
-    if (!hasActiveBrowserSessionMarker() || isBrowserSessionExpired()) {
+    if (!hasActiveBrowserSessionMarker() || !getBrowserTabSessionId()) {
+      markBrowserTabDenied();
+      clearBrowserSessionState();
+
+      if (mountedRef.current) {
+        setUser(null);
+        setLoading(false);
+      }
+
+      router.replace(redirectTo);
+
+      return () => {
+        mountedRef.current = false;
+      };
+    }
+
+    const sessionExpired = isBrowserSessionExpired();
+
+    if (sessionExpired) {
       clearBrowserSessionState();
 
       void fetch("/api/logout", {
@@ -145,6 +198,15 @@ export function AuthProvider({
     };
   }, [fetchMe, isPublicRoute, redirectTo, router]);
 
+  useEffect(() => {
+    if (!user) return;
+
+    const tabSessionId = getBrowserTabSessionId();
+    if (!tabSessionId) return;
+
+    return attachTabSessionResponder(tabSessionId);
+  }, [user]);
+
   const refreshUser = useCallback(async () => {
     await fetchMe({ silent: true, redirectOnFail: false });
   }, [fetchMe]);
@@ -156,6 +218,7 @@ export function AuthProvider({
         credentials: "include",
       });
 
+      clearBrowserTabDenied();
       clearBrowserSessionState();
 
       if (!res.ok) return false;

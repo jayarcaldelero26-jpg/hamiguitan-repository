@@ -318,7 +318,7 @@ export default function ProtectedShell({
       },
       {
         href: "/organizational-chart",
-        label: "Organizational Chart",
+        label: "PAMO Personnel",
         icon: <RectangleGroupIcon className="h-5 w-5" />,
       },
     ];

@@ -6,8 +6,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
 import {
+  clearBrowserTabDenied,
   clearBrowserSessionState,
+  getBrowserTabSessionId,
+  hasConflictingTabSession,
   hasActiveBrowserSessionMarker,
+  hasDeniedBrowserTabAccess,
   markBrowserSessionActive,
 } from "@/app/lib/authSession";
 import styles from "./login.module.css";
@@ -96,15 +100,16 @@ export default function LoginPage() {
     let active = true;
 
     const syncSession = async () => {
-      if (!hasActiveBrowserSessionMarker()) {
-        clearBrowserSessionState();
+      if (hasDeniedBrowserTabAccess()) {
+        if (active) setCheckingSession(false);
+        return;
+      }
 
-        try {
-          await fetch("/api/logout", {
-            method: "POST",
-            credentials: "include",
-          });
-        } catch {}
+      const hasSessionMarker = hasActiveBrowserSessionMarker();
+      const tabSessionId = getBrowserTabSessionId();
+
+      if (!hasSessionMarker || !tabSessionId) {
+        clearBrowserSessionState();
 
         if (active) setCheckingSession(false);
         return;
@@ -118,11 +123,22 @@ export default function LoginPage() {
 
         if (!active) return;
         if (res.ok) {
-          markBrowserSessionActive();
-          window.location.replace("/dashboard");
-          return;
+          const hasConflict = await hasConflictingTabSession(tabSessionId);
+
+          if (!active) return;
+
+          if (!hasConflict) {
+            clearBrowserTabDenied();
+            markBrowserSessionActive();
+            window.location.replace("/dashboard");
+            return;
+          }
+
+          clearBrowserSessionState();
         }
       } catch {}
+
+      clearBrowserSessionState();
 
       if (active) setCheckingSession(false);
     };
@@ -166,7 +182,8 @@ export default function LoginPage() {
         return;
       }
 
-      markBrowserSessionActive();
+      clearBrowserTabDenied();
+      markBrowserSessionActive(Date.now(), { regenerateTabId: true });
       setSuccessMsg("Login successful. Welcome back.");
       setShowSuccess(true);
     } catch {

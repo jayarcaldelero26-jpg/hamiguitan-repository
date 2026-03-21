@@ -36,6 +36,36 @@ function buildAuditPath(category: string, folder: string) {
   return folder ? `${category} / ${folder}` : category;
 }
 
+const BASE_DOCUMENT_SELECT = "id,fileId,name,type,category,folder,title,dateReceived,year,uploadedAt";
+const EXTENDED_DOCUMENT_SELECT = `${BASE_DOCUMENT_SELECT},source_module,source_record_type,source_record_id,source_section`;
+
+function isMissingOptionalDocumentColumnError(error: { code?: string | null; message?: string | null } | null | undefined) {
+  const code = String(error?.code || "").trim();
+  const message = String(error?.message || "").toLowerCase();
+
+  if (code === "PGRST204" || code === "42703") {
+    return true;
+  }
+
+  return (
+    message.includes("source_module") ||
+    message.includes("source_record_type") ||
+    message.includes("source_record_id") ||
+    message.includes("source_section")
+  );
+}
+
+function normalizeDocumentRows(rows: Array<Record<string, unknown>>) {
+  return rows.map((row) => ({
+    ...row,
+    sourceModule: row.source_module ?? null,
+    sourceRecordType: row.source_record_type ?? null,
+    sourceRecordId:
+      typeof row.source_record_id === "number" ? row.source_record_id : row.source_record_id ?? null,
+    sourceSection: row.source_section ?? null,
+  }));
+}
+
 export async function GET() {
   const me = await getCurrentUser();
 
@@ -46,16 +76,33 @@ export async function GET() {
   try {
     const { data: rows, error } = await supabaseAdmin
       .from("documents")
-      .select("id,fileId,name,type,category,folder,title,dateReceived,year,uploadedAt")
+      .select(EXTENDED_DOCUMENT_SELECT)
       .order("uploadedAt", { ascending: false })
       .limit(500);
 
     if (error) {
-      console.error("DOCUMENTS GET ERROR:", error);
-      return NextResponse.json({ error: "Failed to load documents." }, { status: 500 });
+      if (!isMissingOptionalDocumentColumnError(error)) {
+        console.error("DOCUMENTS GET ERROR:", error);
+        return NextResponse.json({ error: "Failed to load documents." }, { status: 500 });
+      }
+
+      console.error("DOCUMENTS GET FALLBACK:", error);
+
+      const { data: fallbackRows, error: fallbackError } = await supabaseAdmin
+        .from("documents")
+        .select(BASE_DOCUMENT_SELECT)
+        .order("uploadedAt", { ascending: false })
+        .limit(500);
+
+      if (fallbackError) {
+        console.error("DOCUMENTS GET FALLBACK ERROR:", fallbackError);
+        return NextResponse.json({ error: "Failed to load documents." }, { status: 500 });
+      }
+
+      return NextResponse.json(normalizeDocumentRows((fallbackRows || []) as Array<Record<string, unknown>>));
     }
 
-    return NextResponse.json(rows || []);
+    return NextResponse.json(normalizeDocumentRows((rows || []) as Array<Record<string, unknown>>));
   } catch (error) {
     console.error("DOCUMENTS GET FATAL:", error);
     return NextResponse.json({ error: "Failed to load documents." }, { status: 500 });

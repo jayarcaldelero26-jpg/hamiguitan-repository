@@ -21,6 +21,10 @@ export type DocumentRow = {
   year?: string | null;
   uploadedAt?: string | null;
   dateReceived?: string | null;
+  sourceModule?: string | null;
+  sourceRecordType?: string | null;
+  sourceRecordId?: number | null;
+  sourceSection?: string | null;
 };
 
 type ContextType = {

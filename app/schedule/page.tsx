@@ -56,6 +56,16 @@ function getStatusTone(state: "available" | "limited" | "full" | "blocked") {
   return "border-emerald-200/18 bg-emerald-400/10 text-emerald-100";
 }
 
+function formatShortDateLabel(date: string) {
+  const parsed = parseDateOnly(date);
+  if (!parsed) return date;
+
+  return parsed.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+}
+
 function buildCalendarGrid(month: string) {
   const start = parseDateOnly(firstDateOfMonth(month));
   if (!start) return [];
@@ -196,56 +206,90 @@ export default async function PublicSchedulePage({
           </div>
 
           <div className="public-card mt-6 overflow-hidden p-4 md:p-6">
-            <div className="grid grid-cols-7 gap-3 text-center">
-              {WEEKDAY_LABELS.map((label) => (
-                <div
-                  key={label}
-                  className="px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--public-text-muted)]"
-                >
-                  {label}
-                </div>
-              ))}
-            </div>
-
-            <div className="grid grid-cols-7 gap-3">
-              {preparedCalendarCells.map((entry) => {
-                return (
+            <div className="grid grid-cols-2 gap-3 md:hidden">
+              {preparedCalendarCells
+                .filter((entry) => entry.inMonth)
+                .map((entry) => (
                   <article
                     key={entry.date}
-                    title={entry.inMonth && entry.day ? entry.detailLabel : undefined}
-                    className={`min-h-[132px] rounded-[20px] border p-4 transition ${
-                      entry.inMonth
-                        ? "border-[var(--public-border)] bg-[rgba(255,255,255,0.04)]"
-                        : "border-[rgba(255,255,255,0.04)] bg-[rgba(255,255,255,0.02)] opacity-55"
-                    }`}
+                    className="min-h-[142px] rounded-[20px] border border-[var(--public-border)] bg-[rgba(255,255,255,0.04)] px-4 py-4"
                   >
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="text-sm font-semibold text-[var(--public-text)]">
-                        {getDayNumber(entry.date)}
-                      </span>
-                      {entry.inMonth && entry.day ? (
+                    <div className="flex h-full flex-col justify-between">
+                      <div>
+                        <p className="text-[1.05rem] font-semibold text-[var(--public-text)]">
+                          {formatShortDateLabel(entry.date)}
+                        </p>
+                        <p className="mt-3 text-sm font-medium text-[var(--public-text-muted)]">
+                          {getStatusLabel(entry.state)}
+                        </p>
+                      </div>
+                      <div className="mt-4">
                         <span
                           className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${getStatusTone(entry.state)}`}
                         >
                           {getStatusLabel(entry.state)}
                         </span>
-                      ) : null}
-                    </div>
-
-                    {entry.inMonth && entry.day ? (
-                      <div className="mt-6 space-y-3">
-                        <p className="text-base font-semibold text-[var(--public-text)]">
+                        <p className="mt-3 text-sm font-semibold text-[var(--public-text)]">
                           {entry.totalOccupied} / 30
                         </p>
                       </div>
-                    ) : entry.inMonth ? (
-                      <div className="mt-10 text-base font-semibold text-[var(--public-text-muted)]">
-                        0 / 30
-                      </div>
-                    ) : null}
+                    </div>
                   </article>
-                );
-              })}
+                ))}
+            </div>
+
+            <div className="hidden md:block">
+              <div className="grid grid-cols-7 gap-3 text-center">
+                {WEEKDAY_LABELS.map((label) => (
+                  <div
+                    key={label}
+                    className="px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--public-text-muted)]"
+                  >
+                    {label}
+                  </div>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-7 gap-3">
+                {preparedCalendarCells.map((entry) => {
+                  return (
+                    <article
+                      key={entry.date}
+                      title={entry.inMonth && entry.day ? entry.detailLabel : undefined}
+                      className={`min-h-[132px] rounded-[20px] border p-4 transition ${
+                        entry.inMonth
+                          ? "border-[var(--public-border)] bg-[rgba(255,255,255,0.04)]"
+                          : "border-[rgba(255,255,255,0.04)] bg-[rgba(255,255,255,0.02)] opacity-55"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="text-sm font-semibold text-[var(--public-text)]">
+                          {getDayNumber(entry.date)}
+                        </span>
+                        {entry.inMonth && entry.day ? (
+                          <span
+                            className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${getStatusTone(entry.state)}`}
+                          >
+                            {getStatusLabel(entry.state)}
+                          </span>
+                        ) : null}
+                      </div>
+
+                      {entry.inMonth && entry.day ? (
+                        <div className="mt-6 space-y-3">
+                          <p className="text-base font-semibold text-[var(--public-text)]">
+                            {entry.totalOccupied} / 30
+                          </p>
+                        </div>
+                      ) : entry.inMonth ? (
+                        <div className="mt-10 text-base font-semibold text-[var(--public-text-muted)]">
+                          0 / 30
+                        </div>
+                      ) : null}
+                    </article>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
