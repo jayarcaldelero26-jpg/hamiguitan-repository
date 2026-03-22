@@ -1,9 +1,10 @@
 "use client";
 
-import { motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
+import { useIsSmallScreen, useLightMotion } from "@/app/hooks/useLightMotion";
 
 type Slide = {
   image: string;
@@ -113,27 +114,15 @@ const slides: Slide[] = [
 ];
 
 function HeroCarousel() {
-  const prefersReducedMotion = useReducedMotion();
   const [activeIndex, setActiveIndex] = useState(0);
   const [hoverPaused, setHoverPaused] = useState(false);
-  const [isSmallScreen, setIsSmallScreen] = useState(false);
+  const isSmallScreen = useIsSmallScreen();
+  const lightMotion = useLightMotion();
   const pointerStartXRef = useRef<number | null>(null);
   const pointerActiveRef = useRef(false);
 
   const isPaused = hoverPaused;
-  const activeSlide = useMemo(() => slides[activeIndex] ?? slides[0], [activeIndex]);
-  const lightMotion = prefersReducedMotion || isSmallScreen;
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const mediaQuery = window.matchMedia("(max-width: 767px)");
-    const update = () => setIsSmallScreen(mediaQuery.matches);
-    update();
-
-    mediaQuery.addEventListener("change", update);
-    return () => mediaQuery.removeEventListener("change", update);
-  }, []);
+  const activeSlide = slides[activeIndex] ?? slides[0];
 
   useEffect(() => {
     if (lightMotion || isPaused) return;
@@ -203,30 +192,30 @@ function HeroCarousel() {
       }}
     >
       <div className="relative min-h-[72vh] overflow-hidden bg-[#05070b] md:min-h-[88vh]">
-        {slides.map((slide, index) => (
-          <div
-            key={slide.image}
-            aria-hidden={index !== activeIndex}
-            className={`absolute inset-0 transition-opacity duration-1000 ease-out ${
-              lightMotion ? "duration-300" : ""
-            } ${
-              index === activeIndex ? "opacity-100" : "opacity-0"
-            }`}
+        <AnimatePresence initial={false} mode="wait">
+          <motion.div
+            key={activeSlide.image}
+            initial={lightMotion ? { opacity: 1 } : { opacity: 0.72, scale: 1.01 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={lightMotion ? { opacity: 1 } : { opacity: 0 }}
+            transition={{ duration: lightMotion ? 0.2 : 0.7, ease: [0.22, 1, 0.36, 1] }}
+            className="absolute inset-0"
             style={{ backgroundColor: "#0a0f16" }}
           >
             <Image
-              src={slide.image}
+              src={activeSlide.image}
               alt=""
               fill
-              priority={index === 0}
-              loading={index === 0 ? "eager" : "lazy"}
+              priority={activeIndex === 0}
+              loading={activeIndex === 0 ? "eager" : "lazy"}
+              quality={82}
               sizes="100vw"
               className="object-cover"
             />
             <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,7,11,0.12)_0%,rgba(5,7,11,0.28)_34%,rgba(5,7,11,0.54)_68%,rgba(5,7,11,0.72)_100%)]" />
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(249,115,22,0.12),transparent_24%),radial-gradient(circle_at_78%_18%,rgba(245,158,11,0.1),transparent_22%),radial-gradient(circle_at_50%_100%,rgba(56,189,248,0.06),transparent_30%),linear-gradient(90deg,rgba(5,7,11,0.42)_0%,rgba(5,7,11,0.12)_42%,rgba(5,7,11,0.48)_100%)]" />
-          </div>
-        ))}
+          </motion.div>
+        </AnimatePresence>
 
         <div className="pointer-events-none absolute inset-0 z-[1]">
           {!isSmallScreen ? (

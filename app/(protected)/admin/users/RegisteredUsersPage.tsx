@@ -8,10 +8,12 @@ import {
   type UserRole,
   type EmploymentType,
 } from "@/app/components/UsersProvider";
-import { useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
+import SearchInput from "@/app/components/SearchInput";
 import { repoTheme } from "@/app/lib/repoTheme";
+import { useEditModalMotion } from "@/app/lib/modalMotion";
 import { useProtectedTheme } from "@/app/components/ProtectedThemeProvider";
 
 function initials(name: string) {
@@ -303,6 +305,7 @@ export default function RegisteredUsersPage() {
   const { theme: pageTheme } = useProtectedTheme();
 
   const [q, setQ] = useState("");
+  const deferredQuery = useDeferredValue(q);
   const [empFilter, setEmpFilter] = useState<
     "all" | "Job Order" | "Contract of Service" | "Casual" | "Permanent"
   >("all");
@@ -352,17 +355,11 @@ export default function RegisteredUsersPage() {
     return { total, admins, coAdmins, staff };
   }, [users, loadingUsers]);
 
-  const filtered = useMemo(() => {
-    const query = q.trim().toLowerCase();
-
-    return users
-      .filter((u) => {
-        if (empFilter !== "all" && (u.employmentType || "") !== empFilter) return false;
-        if (roleFilter !== "all" && (u.role || "") !== roleFilter) return false;
-
-        if (!query) return true;
-
-        const hay = [
+  const searchableUsers = useMemo(
+    () =>
+      users.map((u) => ({
+        user: u,
+        searchText: [
           safeText(u.name, ""),
           safeText(u.email, ""),
           safeText(u.role, ""),
@@ -380,12 +377,26 @@ export default function RegisteredUsersPage() {
           String(u.id),
         ]
           .join(" ")
-          .toLowerCase();
+          .toLowerCase(),
+      })),
+    [users]
+  );
 
-        return hay.includes(query);
+  const filtered = useMemo(() => {
+    const query = deferredQuery.trim().toLowerCase();
+
+    return searchableUsers
+      .filter(({ user: u, searchText }) => {
+        if (empFilter !== "all" && (u.employmentType || "") !== empFilter) return false;
+        if (roleFilter !== "all" && (u.role || "") !== roleFilter) return false;
+
+        if (!query) return true;
+
+        return searchText.includes(query);
       })
+      .map(({ user }) => user)
       .sort((a, b) => (a.id < b.id ? 1 : -1));
-  }, [users, q, empFilter, roleFilter]);
+  }, [deferredQuery, empFilter, roleFilter, searchableUsers]);
 
   const copyEmail = async (email: string) => {
     try {
@@ -525,6 +536,7 @@ export default function RegisteredUsersPage() {
 
   const dark = pageTheme === "dark";
   const ui = repoTheme(pageTheme);
+  const { overlayMotion, panelMotion } = useEditModalMotion();
   const inputCls = `${ui.input.replace("pl-11", "pl-4")} h-12`;
   const modalSecondaryActionClassName = `h-11 px-5 rounded-full font-semibold transition ${ui.buttonSecondary}`;
   const modalDangerActionClassName = `h-11 px-5 rounded-full font-semibold transition ${ui.buttonDanger}`;
@@ -657,25 +669,17 @@ export default function RegisteredUsersPage() {
             <div className={`absolute inset-x-0 top-0 h-1.5 ${dark ? "bg-[#7c8798]/45" : "bg-[#a7b0bd]/65"}`} />
             <div className="flex flex-col xl:flex-row gap-3 xl:items-center">
               <div className="min-w-0 flex-1">
-                <div className="relative">
-                  <span
-                    className={`absolute left-4 top-1/2 -translate-y-1/2 ${
-                      dark ? "text-cyan-100/45" : "text-slate-400"
-                    }`}
-                  >
-                    🔎
-                  </span>
-                  <input
-                    value={q}
-                    onChange={(e) => setQ(e.target.value)}
-                    placeholder="Search name, email, position, department, code, contact…"
-                    className={`w-full h-11 rounded-2xl pl-11 pr-4 text-sm shadow-sm outline-none ${
-                      dark
-                        ? "border border-cyan-300/12 bg-white/[0.04] text-white placeholder:text-cyan-100/35 focus:ring-4 focus:ring-cyan-400/10 focus:border-cyan-300/25"
-                        : "border border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 focus:ring-4 focus:ring-cyan-100 focus:border-cyan-400"
-                    }`}
-                  />
-                </div>
+                <SearchInput
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  placeholder="Search name, email, position, department, code, contact…"
+                  aria-label="Search users"
+                  inputClassName={`w-full h-11 rounded-2xl pr-4 text-sm shadow-sm outline-none ${
+                    dark
+                      ? "border border-cyan-300/12 bg-white/[0.04] text-white placeholder:text-cyan-100/35 focus:ring-4 focus:ring-cyan-400/10 focus:border-cyan-300/25"
+                      : "border border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 focus:ring-4 focus:ring-cyan-100 focus:border-cyan-400"
+                  }`}
+                />
               </div>
 
               <div className="flex flex-col sm:flex-row gap-2.5 xl:w-auto">
@@ -1028,17 +1032,15 @@ export default function RegisteredUsersPage() {
       <AnimatePresence>
         {selectedUser && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.16 }}
-            className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+            initial={overlayMotion.initial}
+            animate={overlayMotion.animate}
+            exit={overlayMotion.exit}
+            className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-[4px] flex items-center justify-center p-4"
           >
             <motion.div
-              initial={{ opacity: 0, y: 16, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 8, scale: 0.98 }}
-              transition={{ duration: 0.18 }}
+              initial={panelMotion.initial}
+              animate={panelMotion.animate}
+              exit={panelMotion.exit}
                 className={`relative w-full max-w-3xl max-h-[92dvh] rounded-[24px] sm:rounded-[30px] overflow-hidden shadow-[0_24px_70px_rgba(0,0,0,0.28)] ${ui.modal}`}
               >
               <div className={`absolute inset-x-6 top-0 h-1.5 rounded-b-full ${dark ? "bg-[#7c8798]/55" : "bg-[#a7b0bd]/72"}`} />

@@ -2,9 +2,10 @@
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import Link from "next/link";
-import { memo, useEffect, useState } from "react";
+import { memo, useState } from "react";
 import { ChevronLeftIcon, ChevronRightIcon } from "@heroicons/react/24/outline";
 import type { PublicDocumentRow } from "@/app/lib/publicDocuments";
+import { useIsSmallScreen } from "@/app/hooks/useLightMotion";
 
 function documentPreviewUrl(fileId: string) {
   return `https://drive.google.com/file/d/${fileId}/preview`;
@@ -28,23 +29,12 @@ function LatestPublicDocumentsShowcase({
 }) {
   const prefersReducedMotion = useReducedMotion();
   const [activeIndex, setActiveIndex] = useState(0);
-  const [isSmallScreen, setIsSmallScreen] = useState(false);
+  const isSmallScreen = useIsSmallScreen();
   const [previewRequested, setPreviewRequested] = useState(false);
   const activeDocument = documents[activeIndex] ?? null;
   const activePreviewUrl = activeDocument?.fileId ? documentPreviewUrl(activeDocument.fileId) : "";
   const canPreviewActiveDocument = supportsFeaturedPreview(activeDocument?.type);
   const lightMotion = prefersReducedMotion || isSmallScreen;
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const mediaQuery = window.matchMedia("(max-width: 767px)");
-    const update = () => setIsSmallScreen(mediaQuery.matches);
-    update();
-
-    mediaQuery.addEventListener("change", update);
-    return () => mediaQuery.removeEventListener("change", update);
-  }, []);
 
   const goTo = (index: number) => {
     if (!documents.length) return;

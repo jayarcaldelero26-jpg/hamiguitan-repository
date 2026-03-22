@@ -5,13 +5,13 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
 import { useAuth } from "@/app/components/AuthProvider";
+import SearchInput from "@/app/components/SearchInput";
 import {
   DocumentsProvider,
   useDocuments,
   type DocumentRow,
 } from "@/app/components/DocumentsProvider";
 import {
-  MagnifyingGlassIcon,
   FolderIcon,
   CloudArrowDownIcon,
   TrashIcon,
@@ -20,6 +20,7 @@ import {
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 import { repoTheme } from "@/app/lib/repoTheme";
+import { useEditModalMotion } from "@/app/lib/modalMotion";
 import { useProtectedTheme } from "@/app/components/ProtectedThemeProvider";
 
 type CategoryFilter = "All" | "Academe" | "Stakeholders" | "PAMO Activity";
@@ -177,7 +178,7 @@ function GroupCard({
       ? "text-[#f0cf97]"
       : "text-[#9d6c26]";
   const compactActionBtnCls =
-    "app-glass-button app-protected-action-button inline-flex min-h-9 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[11px] font-semibold leading-none transition shadow-[0_6px_16px_rgba(15,23,42,0.06)] [&_svg]:text-inherit";
+    "app-clickable app-glass-button app-protected-action-button inline-flex min-h-9 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[11px] font-semibold leading-none transition shadow-[0_6px_16px_rgba(15,23,42,0.06)] [&_svg]:text-inherit";
   const rowActionDownloadClassName = dark
     ? "border-[#5E7D9C]/28 bg-[rgba(57,92,122,0.28)] text-[#E6EDF3]"
     : "border-[#395C7A]/18 bg-[rgba(57,92,122,0.12)] text-[#1E3A5F]";
@@ -185,9 +186,9 @@ function GroupCard({
     ? "border-[rgba(220,38,38,0.26)] bg-[rgba(220,38,38,0.22)] text-[#FEE2E2]"
     : "border-[rgba(220,38,38,0.18)] bg-[rgba(220,38,38,0.12)] text-[#991B1B]";
   const compactUtilityBtnCls =
-    "app-glass-button app-protected-action-button inline-flex min-h-9 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[11px] font-semibold leading-none transition";
+    "app-clickable app-glass-button app-protected-action-button inline-flex min-h-9 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[11px] font-semibold leading-none transition";
   const compactHeaderIconBtnCls =
-    "app-glass-button app-protected-action-button flex h-8.5 w-8.5 shrink-0 items-center justify-center rounded-full border transition";
+    "app-clickable-icon app-glass-button app-protected-action-button flex h-8.5 w-8.5 shrink-0 items-center justify-center rounded-full border transition";
   const textMain = ui.textMain;
   const textMuted = ui.textMuted;
   const textSoft = ui.textSoft;
@@ -622,6 +623,7 @@ function ResearchPageContent() {
 
   const dark = pageTheme === "dark";
   const ui = repoTheme(pageTheme);
+  const { overlayMotion, panelMotion } = useEditModalMotion();
 
   const textMain = ui.textMain;
   const textMuted = ui.textMuted;
@@ -687,17 +689,15 @@ function ResearchPageContent() {
       <AnimatePresence>
         {renameFolderCategory && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.16 }}
+            initial={overlayMotion.initial}
+            animate={overlayMotion.animate}
+            exit={overlayMotion.exit}
             className="fixed inset-0 z-[65] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
           >
             <motion.div
-              initial={{ opacity: 0, y: 16, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 8, scale: 0.98 }}
-              transition={{ duration: 0.18 }}
+              initial={panelMotion.initial}
+              animate={panelMotion.animate}
+              exit={panelMotion.exit}
               className={`relative w-full max-w-xl rounded-[28px] shadow-2xl overflow-hidden ${ui.modal}`}
             >
               <div className={`px-4 sm:px-6 py-4 sm:py-5 border-b ${dark ? "border-white/8 bg-[#051F20]/45" : "border-white/55 bg-white/45"}`}>
@@ -791,7 +791,7 @@ function ResearchPageContent() {
               <button
                 type="button"
                 onClick={() => router.push("/upload")}
-                className={`min-h-10 px-4 py-2 rounded-[17px] transition font-medium text-sm ${ui.buttonPrimary}`}
+                className={`app-clickable min-h-10 px-4 py-2 rounded-[17px] transition font-medium text-sm ${ui.buttonPrimary}`}
               >
                 Upload Document
               </button>
@@ -805,26 +805,20 @@ function ResearchPageContent() {
         >
           <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center sm:justify-between">
             <div className="flex-1">
-              <div className="relative">
-                <MagnifyingGlassIcon
-                  className={`w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 ${
-                    dark ? "text-[#8EB69B]/65" : "text-[#235347]/45"
-                  }`}
-                />
-                <input
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
-                  placeholder="Search title, filename, folder, year…"
-                  className={inputCls}
-                />
-              </div>
+              <SearchInput
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Search title, filename, folder, year…"
+                aria-label="Search repository documents"
+                inputClassName={inputCls}
+              />
             </div>
 
             <div className="flex items-center gap-2">
               <select
                 value={cat}
                 onChange={(e) => setCat(e.target.value as CategoryFilter)}
-                className={`min-h-11 px-4 py-3 rounded-[20px] border shadow-sm outline-none text-sm ${
+                className={`app-clickable-trigger min-h-11 px-4 py-3 rounded-[20px] border shadow-sm outline-none text-sm ${
                   dark
                     ? "border-white/10 bg-white/[0.04] text-[#DAF1DE] focus:ring-4 focus:ring-[#8EB69B]/10"
                     : "border-white/55 bg-white/55 text-[#163832] focus:ring-4 focus:ring-[#8EB69B]/18"

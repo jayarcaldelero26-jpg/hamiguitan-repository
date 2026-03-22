@@ -31,7 +31,7 @@ export default function ProtectedFeaturePlaceholder({
         <div className="mt-8 flex flex-wrap gap-4">
           <Link
             href="/dashboard"
-            className="app-primary-button inline-flex min-h-12 items-center justify-center rounded-full px-6 font-semibold"
+            className="app-primary-button app-sidebar-btn app-sidebar-btn-primary inline-flex min-h-12 items-center justify-center rounded-full px-6 font-semibold"
           >
             Return to Dashboard
           </Link>

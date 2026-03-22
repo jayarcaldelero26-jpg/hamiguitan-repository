@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { AnimatePresence, motion } from "framer-motion";
-import { memo, useEffect, useMemo, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/app/components/AuthProvider";
 import { useProtectedTheme } from "@/app/components/ProtectedThemeProvider";
 import {
@@ -20,10 +20,12 @@ import {
   getEffectiveBookingStatus,
   shiftMonth,
 } from "@/app/lib/bookingUtils";
+import { createTiltCardMotion, useModalMotion } from "@/app/lib/modalMotion";
 import { repoTheme } from "@/app/lib/repoTheme";
 
 const ALL_CATEGORIES = "All Categories" as const;
 const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+const categoryOptions = [ALL_CATEGORIES, ...PARTICIPANT_CATEGORY_OPTIONS];
 
 type CalendarApiResponse = {
   days: CalendarDayData[];
@@ -137,21 +139,23 @@ function getOverallState(day: CalendarDayData) {
   return "available" as const;
 }
 
-
 const CalendarDayButton = memo(function CalendarDayButton({
   day,
   selected,
   onSelect,
+  todayDate,
 }: {
   day: CalendarDayData;
   selected: boolean;
   onSelect: (date: string) => void;
+  todayDate: string;
 }) {
   const { theme } = useProtectedTheme();
+  const prefersReducedMotion = useReducedMotion();
   const ui = repoTheme(theme);
   const dark = theme === "dark";
   const state = getOverallState(day);
-  const isToday = day.date === getCurrentDate();
+  const isToday = day.date === todayDate;
   const sanFull = day.sanState === "full";
   const govFull = day.govState === "full";
 
@@ -162,12 +166,10 @@ const CalendarDayButton = memo(function CalendarDayButton({
     blocked: "bg-slate-400",
   };
 
-  const baseCardTone = dark
-    ? "bg-[#1e2933] border-white/10 text-white"
-    : "bg-white border-gray-200 text-gray-800";
+  const baseCardTone = `${ui.panelSoft} ${ui.textMain}`;
   const selectedTone = dark
     ? "border-[#395C7A]/55 bg-[#22313c]"
-    : "border-[#395C7A]/25 bg-[#F8FAFC]";
+    : "border-[#395C7A]/32 bg-[#eef4fa]";
   const stateBorderTone =
     state === "limited"
       ? dark
@@ -182,7 +184,10 @@ const CalendarDayButton = memo(function CalendarDayButton({
             ? "border-white/12"
             : "border-slate-300"
           : "";
-  const cellTone = `border ${baseCardTone} ${selected ? selectedTone : stateBorderTone} hover:border-[#395C7A]/34`;
+  const hoverTone = dark
+    ? "hover:-translate-y-0.5 hover:border-[#547696]/42 hover:shadow-[0_14px_28px_rgba(0,0,0,0.2)]"
+    : "hover:-translate-y-0.5 hover:scale-[1.01] hover:border-[#395C7A]/34 hover:shadow-[0_14px_28px_rgba(15,23,42,0.08)]";
+  const cellTone = `border ${baseCardTone} ${selected ? selectedTone : stateBorderTone} ${selected ? "" : hoverTone}`;
   const labelTone = dark
     ? sanFull || govFull
       ? "text-rose-300"
@@ -200,11 +205,34 @@ const CalendarDayButton = memo(function CalendarDayButton({
     ? "border-white/10 bg-white/5 text-white/70"
     : "border-gray-200 bg-gray-50 text-gray-600";
 
+  const { hoverMotion, tapMotion, transition: motionTransition, style: motionStyle } = useMemo(
+    () =>
+      createTiltCardMotion(prefersReducedMotion ?? false, {
+        hoverY: -3,
+        hoverScale: 1.012,
+        hoverRotateX: 5,
+        hoverRotateY: -5,
+        tapScale: 0.985,
+        tapRotateX: -4,
+        tapRotateY: 4,
+        reducedHoverY: -2,
+        reducedHoverScale: 1.01,
+        reducedTapScale: 0.985,
+        perspective: 1100,
+      }),
+    [prefersReducedMotion]
+  );
+
   return (
-    <button
+    <motion.button
       type="button"
       onClick={() => onSelect(day.date)}
-      className={`group relative min-h-[98px] rounded-xl px-3.5 py-3 text-left transition-colors duration-200 ${cellTone}`}
+      whileHover={selected ? undefined : hoverMotion}
+      whileTap={tapMotion}
+      transition={motionTransition}
+      title="Select date"
+      style={motionStyle}
+      className={`app-clickable-card group relative min-h-[98px] rounded-xl px-3.5 py-3 text-left transition-[transform,border-color,box-shadow,background-color] duration-200 ease-out ${cellTone}`}
     >
       <div className="flex items-start justify-between gap-3">
         <span
@@ -244,7 +272,11 @@ const CalendarDayButton = memo(function CalendarDayButton({
           </span>
         </div>
       </div>
-    </button>
+
+      <span className="app-interactive-tooltip hidden rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] md:inline-flex">
+        Select date
+      </span>
+    </motion.button>
   );
 });
 
@@ -281,8 +313,9 @@ function DayDetailsModal({
   textSoftClassName: string;
   closeButtonClassName: string;
 }) {
-  const modalPanelClassName = "rounded-[24px] [background:var(--ui-panel-bg)]";
-  const modalPanelSoftClassName = "rounded-[18px] [background:var(--ui-panel-soft-bg)]";
+  const { overlayMotion, panelMotion } = useModalMotion();
+  const modalPanelClassName = "app-solid-surface rounded-[24px]";
+  const modalPanelSoftClassName = "app-soft-surface rounded-[18px]";
   return (
     <AnimatePresence mode="wait">
       {open && (
@@ -290,19 +323,20 @@ function DayDetailsModal({
           <motion.button
             type="button"
             aria-label="Close day details"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 bg-black/46 backdrop-blur-[3px]"
+            initial={overlayMotion.initial}
+            animate={overlayMotion.animate}
+            exit={overlayMotion.exit}
+            transition={overlayMotion.transition}
+            className="app-overlay absolute inset-0"
             onClick={onClose}
           />
 
           <motion.div
-            initial={{ opacity: 0, scale: 0.97, y: 16 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.98, y: 8 }}
-            transition={{ duration: 0.2, ease: "easeOut" }}
-            className={`relative z-[121] flex max-h-[calc(100vh-1.5rem)] w-full max-w-3xl flex-col overflow-hidden shadow-[0_32px_90px_rgba(0,0,0,0.34)] sm:max-h-[calc(100vh-3rem)] ${shellClassName}`}
+            initial={panelMotion.initial}
+            animate={panelMotion.animate}
+            exit={panelMotion.exit}
+            transition={panelMotion.transition}
+            className={`app-dialog-surface relative z-[121] flex max-h-[calc(100vh-1.5rem)] w-full max-w-3xl flex-col overflow-hidden sm:max-h-[calc(100vh-3rem)] ${shellClassName}`}
           >
             <div className="flex items-start justify-between gap-4 border-b border-[var(--ui-border)] px-5 py-5 sm:px-6">
               <div>
@@ -386,7 +420,7 @@ function DayDetailsModal({
                 ) : (
                   <Link
                     href={`/booking?startDate=${selectedDate}`}
-                    className="app-glass-button app-protected-action-button inline-flex min-h-12 items-center justify-center rounded-full border border-[#2B6658] bg-[#235347] px-5 text-sm font-semibold text-white shadow-[0_16px_30px_rgba(35,83,71,0.24)] transition hover:bg-[#1d463b]"
+                    className="app-glass-button app-protected-action-button app-sidebar-btn app-sidebar-btn-primary inline-flex min-h-12 items-center justify-center rounded-full px-5 text-sm font-semibold transition"
                   >
                     Open Booking Page
                   </Link>
@@ -398,7 +432,7 @@ function DayDetailsModal({
                   <p className={`text-[11px] font-semibold uppercase tracking-[0.16em] ${textSoftClassName}`}>
                     Affecting Bookings
                   </p>
-                  <span className="rounded-full border border-[var(--ui-border)] bg-white/[0.06] px-3 py-1 text-xs font-semibold text-[var(--ui-text-main)]">
+                  <span className="app-soft-surface rounded-full px-3 py-1 text-xs font-semibold">
                     {selectedDateBookings.length} record{selectedDateBookings.length === 1 ? "" : "s"}
                   </span>
                 </div>
@@ -422,10 +456,10 @@ function DayDetailsModal({
                           {booking.start_date} to {booking.end_date}
                         </p>
                         <div className="mt-3 flex flex-wrap gap-2">
-                          <span className="rounded-full bg-[#f4f7f5] px-3 py-1 text-xs font-semibold text-slate-700">
+                          <span className="app-soft-surface rounded-full px-3 py-1 text-xs font-semibold text-[var(--ui-text-main)]">
                             {booking.contact_name}
                           </span>
-                          <span className="rounded-full bg-[#f4f7f5] px-3 py-1 text-xs font-semibold text-slate-700">
+                          <span className="app-soft-surface rounded-full px-3 py-1 text-xs font-semibold text-[var(--ui-text-main)]">
                             {booking.booking_type}
                           </span>
                           <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${bookingStatusAppearance.badgeClassName}`}>
@@ -447,18 +481,39 @@ function DayDetailsModal({
 
 export default function CalendarPage() {
   const { theme } = useProtectedTheme();
+  const prefersReducedMotion = useReducedMotion();
   const ui = repoTheme(theme);
   const dark = theme === "dark";
   const sectionShellClassName = ui.sectionShell;
   const cleanBoardShellClassName = `${ui.shell} rounded-[26px] p-3 sm:p-4 md:p-5 shadow-none`;
-  const controlFieldClassName = `min-h-11 w-full rounded-2xl border border-[color:var(--ui-panel-border)] [background:var(--ui-panel-bg)] px-4 text-sm font-medium ${ui.textMain} shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] outline-none transition focus:border-[#235347] focus:ring-4 focus:ring-[#235347]/10`;
-  const controlButtonClassName = `inline-flex min-h-11 w-full items-center justify-center rounded-2xl px-4 text-sm font-semibold transition lg:w-auto ${ui.buttonSecondary}`;
+  const controlFieldClassName = `app-clickable app-input-surface min-h-11 w-full rounded-2xl px-4 text-sm font-medium ${ui.textMain} outline-none transition focus:border-[#235347] focus:ring-4 focus:ring-[#235347]/10`;
+  const controlButtonClassName = `app-clickable inline-flex min-h-11 w-full items-center justify-center rounded-2xl px-4 text-sm font-semibold transition lg:w-auto ${ui.buttonSecondary}`;
   const boardHeaderCellClassName = dark
     ? "px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:rgba(151,166,168,0.88)]"
     : "px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:rgba(75,85,99,0.68)]";
-  const blankCellClassName = dark
-    ? "min-h-[96px] bg-white/[0.02]"
-    : "min-h-[96px] bg-[rgba(248,250,252,0.88)]";
+  const blankCellClassName = "app-soft-surface min-h-[96px] opacity-70";
+  const {
+    hoverMotion: cardHoverMotion,
+    tapMotion: cardTapMotion,
+    transition: cardMotionTransition,
+    style: cardMotionStyle,
+  } = useMemo(
+    () =>
+      createTiltCardMotion(prefersReducedMotion ?? false, {
+        hoverY: -3,
+        hoverScale: 1.012,
+        hoverRotateX: 5,
+        hoverRotateY: -5,
+        tapScale: 0.985,
+        tapRotateX: -4,
+        tapRotateY: 4,
+        reducedHoverY: -2,
+        reducedHoverScale: 1.01,
+        reducedTapScale: 0.985,
+        perspective: 1100,
+      }),
+    [prefersReducedMotion]
+  );
   const { user, loading: loadingUser } = useAuth();
   const normalizedRole = String(user?.role || "").trim().toLowerCase();
   const canCreateBookings = normalizedRole === "admin" || normalizedRole === "co_admin";
@@ -471,24 +526,26 @@ export default function CalendarPage() {
   const [data, setData] = useState<CalendarApiResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const todayDate = getCurrentDate();
+  const todayMonth = getCurrentMonth();
 
   useEffect(() => {
     setSelectedDate(firstDateOfMonth(month));
   }, [month]);
 
-  function openDayModal(date: string) {
+  const openDayModal = useCallback((date: string) => {
     setSelectedDate(date);
     setIsDayModalOpen(true);
-  }
+  }, []);
 
-  function closeDayModal() {
+  const closeDayModal = useCallback(() => {
     setIsDayModalOpen(false);
-  }
+  }, []);
 
   useEffect(() => {
     if (loadingUser || !user) return;
 
-    let active = true;
+    const controller = new AbortController();
 
     (async () => {
       try {
@@ -502,14 +559,13 @@ export default function CalendarPage() {
         const res = await fetch(`/api/bookings/calendar?${params.toString()}`, {
           cache: "no-store",
           credentials: "include",
+          signal: controller.signal,
         });
 
         const json = (await res.json().catch(() => null)) as
           | CalendarApiResponse
           | { error?: string }
           | null;
-
-        if (!active) return;
 
         if (!res.ok) {
           setData(null);
@@ -523,21 +579,24 @@ export default function CalendarPage() {
 
         setData(json as CalendarApiResponse);
       } catch {
-        if (!active) return;
+        if (controller.signal.aborted) return;
         setData(null);
         setError("Failed to load calendar.");
       } finally {
-        if (active) setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     })();
 
     return () => {
-      active = false;
+      controller.abort();
     };
   }, [categoryFilter, loadingUser, month, user]);
 
   useEffect(() => {
     if (!isDayModalOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
@@ -546,7 +605,10 @@ export default function CalendarPage() {
     }
 
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
   }, [isDayModalOpen]);
 
   const selectedDay = useMemo(
@@ -609,9 +671,6 @@ export default function CalendarPage() {
         : selectedSanFull || selectedGovFull || selectedSanLimited || selectedGovLimited
         ? "This date has high occupancy or one or more full exact schedules. Other trail and 2-3 day schedule combinations may still be available."
       : "";
-
-  const todayMonth = getCurrentMonth();
-  const todayDate = getCurrentDate();
 
   return (
     <section className={`min-h-full px-4 py-5 sm:px-6 sm:py-6 lg:px-8 ${ui.page}`}>
@@ -681,7 +740,7 @@ export default function CalendarPage() {
                       setMonth(todayMonth);
                       setSelectedDate(todayDate);
                     }}
-                    className="app-primary-button inline-flex min-h-11 w-full items-center justify-center rounded-2xl px-4 text-sm font-semibold lg:w-auto"
+                    className="app-clickable app-primary-button app-sidebar-btn app-sidebar-btn-primary inline-flex min-h-11 w-full items-center justify-center rounded-2xl px-4 text-sm font-semibold lg:w-auto"
                   >
                     Today
                   </button>
@@ -697,7 +756,88 @@ export default function CalendarPage() {
             </div>
           </div>
 
-          <div className="mt-5 overflow-x-auto">
+          <div className="mt-5 md:hidden">
+            {loading ? (
+              <div className={`app-soft-surface rounded-[24px] px-5 py-12 text-center text-sm ${ui.textMuted}`}>
+                Loading calendar board...
+              </div>
+            ) : (
+              <div className="grid gap-3">
+                {(data?.days || []).map((day) => {
+                  const state = getOverallState(day);
+                  const stateLabel = formatDayStateLabel(day.sanState === "blocked" || day.govState === "blocked" ? "blocked" : state === "full" ? "full" : state === "limited" ? "limited" : "available");
+                  const stateTone =
+                    state === "full"
+                      ? "border-rose-200 bg-rose-50 text-rose-700"
+                      : state === "limited"
+                        ? "border-amber-200 bg-amber-50 text-amber-700"
+                        : state === "blocked"
+                          ? "border-slate-200 bg-slate-100 text-slate-600"
+                          : "border-emerald-200 bg-emerald-50 text-emerald-700";
+
+                  return (
+                    <motion.button
+                      key={day.date}
+                      type="button"
+                      onClick={() => openDayModal(day.date)}
+                      whileHover={day.date === selectedDate ? undefined : cardHoverMotion}
+                      whileTap={cardTapMotion}
+                      transition={cardMotionTransition}
+                      title="Select date"
+                      style={cardMotionStyle}
+                      className={`app-clickable-card group rounded-[22px] border p-4 text-left transition-[transform,border-color,box-shadow,background-color] duration-200 ease-out ${
+                        day.date === selectedDate
+                          ? dark
+                            ? "border-[#395C7A]/50 bg-[#22313c]"
+                            : "border-[#395C7A]/25 bg-[#F8FAFC]"
+                          : dark
+                            ? "border-white/10 bg-[var(--app-surface-soft-bg)] hover:-translate-y-0.5 hover:border-[#547696]/42 hover:shadow-[0_14px_28px_rgba(0,0,0,0.2)]"
+                            : "border-[var(--app-surface-border)] bg-[var(--app-surface-bg)] hover:-translate-y-0.5 hover:scale-[1.01] hover:border-[#395C7A]/28 hover:shadow-[0_14px_28px_rgba(15,23,42,0.08)]"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className={`text-xs font-semibold uppercase tracking-[0.14em] ${ui.textSoft}`}>
+                            {formatDisplayDate(day.date)}
+                          </p>
+                          <p className={`mt-2 text-3xl font-semibold tracking-[-0.05em] ${ui.textMain}`}>
+                            {formatDayNumber(day.date)}
+                          </p>
+                        </div>
+                        <span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${stateTone}`}>
+                          {stateLabel}
+                        </span>
+                      </div>
+
+                      <div className="mt-4 grid grid-cols-2 gap-2.5">
+                        <div className="app-soft-surface rounded-[18px] p-3">
+                          <p className={`text-[11px] font-semibold uppercase tracking-[0.12em] ${ui.textSoft}`}>
+                            San Isidro
+                          </p>
+                          <p className={`mt-1.5 text-base font-semibold ${ui.textMain}`}>
+                            {day.sanIsidro} <span className={ui.textMuted}>/ 30</span>
+                          </p>
+                        </div>
+                        <div className="app-soft-surface rounded-[18px] p-3">
+                          <p className={`text-[11px] font-semibold uppercase tracking-[0.12em] ${ui.textSoft}`}>
+                            Gov. Generoso
+                          </p>
+                          <p className={`mt-1.5 text-base font-semibold ${ui.textMain}`}>
+                            {day.governorGeneroso} <span className={ui.textMuted}>/ 30</span>
+                          </p>
+                        </div>
+                      </div>
+                      <span className="app-interactive-tooltip hidden rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] sm:inline-flex">
+                        Select date
+                      </span>
+                    </motion.button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <div className="mt-5 hidden overflow-x-auto md:block">
             <section className={`min-w-[720px] ${cleanBoardShellClassName}`}>
               <div className="grid grid-cols-7 text-center">
                 {WEEKDAY_LABELS.map((day) => (
@@ -708,7 +848,7 @@ export default function CalendarPage() {
               </div>
 
               {loading ? (
-                <div className={`mt-5 rounded-[24px] px-5 py-12 text-center text-sm ${ui.textMuted} ${dark ? "bg-white/[0.03]" : "bg-white/72"}`}>
+                <div className={`app-soft-surface mt-5 rounded-[24px] px-5 py-12 text-center text-sm ${ui.textMuted}`}>
                   Loading calendar board...
                 </div>
               ) : (
@@ -720,6 +860,7 @@ export default function CalendarPage() {
                         day={entry}
                         selected={entry.date === selectedDate}
                         onSelect={openDayModal}
+                        todayDate={todayDate}
                       />
                     ) : (
                       <div key={`blank-${index}`} className={blankCellClassName} />
@@ -752,4 +893,3 @@ export default function CalendarPage() {
     </section>
   );
 }
-  const categoryOptions = [ALL_CATEGORIES, ...PARTICIPANT_CATEGORY_OPTIONS];

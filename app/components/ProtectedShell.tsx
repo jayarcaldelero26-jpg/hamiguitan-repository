@@ -5,6 +5,7 @@ import Link from "next/link";
 import { startTransition, useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
+import ProtectedLoadingOverlay from "@/app/components/ProtectedLoadingOverlay";
 import {
   HomeIcon,
   DocumentTextIcon,
@@ -185,34 +186,27 @@ export default function ProtectedShell({
     pathname.startsWith("/booking") || pathname.startsWith("/calendar");
   const showBookingNav = bookingNavOpen || bookingModuleActive;
   const themeToggleLabel = dark ? "Switch to light mode" : "Switch to dark mode";
-  const sidebarSurfaceClassName =
-    "border-white/10 bg-[linear-gradient(180deg,#182029_0%,#1d2831_46%,#22323b_100%)] text-[#E6EDF3] shadow-[0_26px_54px_rgba(0,0,0,0.3)]";
+  const sidebarSurfaceClassName = "app-protected-sidebar text-[#E6EDF3]";
   const sidebarDividerClassName =
     "bg-gradient-to-r from-transparent via-white/10 to-transparent";
   const sidebarLabelClassName =
     "text-[10px] font-semibold uppercase tracking-[0.22em] text-[rgba(151,166,168,0.72)]";
   const sidebarRoleBadgeClassName =
-    "border border-white/10 bg-white/[0.05] text-[rgba(230,237,243,0.72)] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]";
+    "app-protected-sidebar-card text-[rgba(230,237,243,0.72)]";
   const sidebarIconBaseClassName =
     "grid h-9 w-9 shrink-0 place-items-center rounded-[14px] border transition-colors";
   const sidebarItemBaseClassName =
-    "group relative flex w-full min-h-11 items-center gap-3 rounded-[18px] border px-3 py-2.5 text-left transition-all duration-200 ease-out";
-  const sidebarItemInactiveClassName =
-    "border-transparent bg-transparent text-[rgba(230,237,243,0.84)] hover:border-white/10 hover:bg-white/[0.05] hover:text-[#F8FBFD]";
-  const sidebarItemActiveClassName =
-    "border-[#5D7892]/32 bg-[linear-gradient(180deg,rgba(57,92,122,0.28),rgba(57,92,122,0.12))] text-[#F8FBFD] shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_12px_30px_rgba(0,0,0,0.24)]";
-  const sidebarIconInactiveClassName =
-    "border-transparent bg-white/[0.04] text-[rgba(230,237,243,0.76)] group-hover:border-white/10 group-hover:bg-white/[0.07] group-hover:text-[#F8FBFD]";
-  const sidebarIconActiveClassName =
-    "border-white/12 bg-white/[0.08] text-[#F8FBFD] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]";
+    "app-clickable group relative flex w-full min-h-11 items-center gap-3 rounded-[18px] border px-3 py-2.5 text-left transition-all duration-200 ease-out";
+  const sidebarItemInactiveClassName = "app-protected-sidebar-link";
+  const sidebarItemActiveClassName = "app-protected-sidebar-link-active";
+  const sidebarIconInactiveClassName = "app-protected-sidebar-icon";
+  const sidebarIconActiveClassName = "app-protected-sidebar-icon-active";
   const sidebarActionButtonClassName =
-    "inline-flex min-h-11 items-center gap-3 rounded-[18px] border border-white/10 bg-white/[0.05] px-3 py-2.5 text-[#E6EDF3] transition hover:bg-white/[0.08]";
-  const sidebarSecondaryCardClassName =
-    "border border-white/8 bg-white/[0.04] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]";
+    "app-clickable app-protected-sidebar-card inline-flex min-h-11 items-center gap-3 rounded-[18px] px-3 py-2.5 text-[#E6EDF3] transition hover:bg-white/[0.08]";
+  const sidebarSecondaryCardClassName = "app-protected-sidebar-card";
   const sidebarTooltipClassName =
     "border-white/10 bg-[#182029]/96 text-[#E6EDF3]";
-  const sidebarUserCardClassName =
-    "rounded-[22px] border border-white/10 bg-white/[0.045] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]";
+  const sidebarUserCardClassName = "app-protected-sidebar-card rounded-[22px] p-3";
 
   const navBtn = useCallback(
     (href: string, label: string, icon: React.ReactNode) => {
@@ -411,18 +405,7 @@ export default function ProtectedShell({
   const showSidebarLabels = !collapsed || mobileNavOpen;
 
   if (loading) {
-    return (
-      <div className={`flex min-h-[100dvh] items-center justify-center ${ui.page}`}>
-        <div className={`${ui.card} w-[min(360px,calc(100vw-2rem))] p-6 text-center`}>
-          <div className="animate-pulse">
-            <div className="mx-auto mb-4 h-10 w-10 rounded-full bg-[#395C7A]/24" />
-            <div className="mb-2 h-4 rounded bg-white/10" />
-            <div className="mx-auto h-4 w-2/3 rounded bg-white/10" />
-          </div>
-          <p className="mt-4 text-sm text-[color:rgba(230,237,243,0.8)]">Loading...</p>
-        </div>
-      </div>
-    );
+    return <ProtectedLoadingOverlay mode="auth" />;
   }
 
   if (!user) return null;
@@ -436,7 +419,7 @@ export default function ProtectedShell({
         Skip to main content
       </a>
 
-      <div className={`h-[100dvh] overflow-hidden ${ui.page}`}>
+      <div className={`protected-sidebar-shell h-[100dvh] overflow-hidden ${ui.page}`}>
         <div className="flex h-full">
           {mobileNavOpen && (
             <button
@@ -468,7 +451,7 @@ export default function ProtectedShell({
                   }
                   setCollapsed((v) => !v);
                 }}
-                className="min-h-10 min-w-10 rounded-[16px] border border-transparent p-2 text-[#E6EDF3] transition hover:border-white/10 hover:bg-white/[0.06]"
+                className="app-clickable min-h-10 min-w-10 rounded-[16px] border border-transparent p-2 text-[#E6EDF3] transition hover:border-white/10 hover:bg-white/[0.06]"
                 title="Toggle sidebar"
                 aria-label="Toggle sidebar"
               >
@@ -489,7 +472,7 @@ export default function ProtectedShell({
               aria-label={themeToggleLabel}
               title={themeToggleLabel}
             >
-                <span className="grid h-9 w-9 place-items-center rounded-[14px] border border-white/10 bg-white/[0.06] text-[#E6EDF3]">
+                <span className="app-protected-sidebar-card grid h-9 w-9 place-items-center rounded-[14px] text-[#E6EDF3]">
                 {dark ? <SunIcon className="h-5 w-5" /> : <MoonIcon className="h-5 w-5" />}
               </span>
               {showSidebarLabels && (
@@ -506,7 +489,7 @@ export default function ProtectedShell({
 
             <div className={`mt-4 ${showSidebarLabels ? "" : "text-center"}`}>
               <div className={`flex items-center ${showSidebarLabels ? "gap-3.5" : "justify-center"}`}>
-                <div className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[20px] border border-white/10 bg-white/[0.05] p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_10px_20px_rgba(0,0,0,0.16)] sm:h-14 sm:w-14 sm:p-2">
+                <div className="app-protected-sidebar-card relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[20px] p-1.5 sm:h-14 sm:w-14 sm:p-2">
                   <Image
                     src="/branding/mhrws-logo.png"
                     alt="Mount Hamiguitan Range Wildlife Sanctuary logo"
@@ -617,12 +600,12 @@ export default function ProtectedShell({
               <button
                 type="button"
                 onClick={() => setConfirmLogoutPath(pathname)}
-                className={`mt-3 ${sidebarItemBaseClassName} ${
+                className={`mt-3 ${sidebarItemBaseClassName} app-protected-sidebar-card ${
                   showSidebarLabels ? "" : "justify-center"
-                } border-white/10 bg-white/[0.05] text-[#E6EDF3] hover:bg-white/[0.08]`}
+                } text-[#E6EDF3] hover:bg-white/[0.08]`}
                 aria-label="Logout"
               >
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[14px] border border-white/10 bg-white/[0.06] text-[#E6EDF3]">
+                <span className="app-protected-sidebar-card grid h-9 w-9 shrink-0 place-items-center rounded-[14px] text-[#E6EDF3]">
                   <ArrowRightOnRectangleIcon className="h-5 w-5" />
                 </span>
                 {showSidebarLabels && (
@@ -647,11 +630,7 @@ export default function ProtectedShell({
                 <button
                   type="button"
                   onClick={() => setMobileNavOpen(true)}
-                  className={`grid min-h-11 min-w-11 place-items-center rounded-xl border text-[var(--ui-text-main)] ${
-                    dark
-                      ? "border-[var(--ui-border)] bg-white/[0.05]"
-                      : "border-[var(--ui-border-strong)] bg-white"
-                  }`}
+                  className="app-clickable app-protected-sidebar-bar-button grid min-h-11 min-w-11 place-items-center rounded-xl border"
                   aria-label="Open navigation"
                 >
                   <Bars3Icon className="h-6 w-6" />
@@ -660,11 +639,7 @@ export default function ProtectedShell({
                 <button
                   type="button"
                   onClick={toggleTheme}
-                  className={`grid min-h-11 min-w-11 place-items-center rounded-xl border text-[var(--ui-text-main)] ${
-                    dark
-                      ? "border-[var(--ui-border)] bg-white/[0.05]"
-                      : "border-[var(--ui-border-strong)] bg-white"
-                  }`}
+                  className="app-clickable app-protected-sidebar-bar-button grid min-h-11 min-w-11 place-items-center rounded-xl border"
                   aria-label={themeToggleLabel}
                 >
                   {dark ? <SunIcon className="h-5 w-5" /> : <MoonIcon className="h-5 w-5" />}
@@ -681,7 +656,7 @@ export default function ProtectedShell({
               </div>
             </div>
 
-            <div className="min-h-full">{children}</div>
+            <div className="protected-main-content min-h-full">{children}</div>
           </main>
         </div>
       </div>

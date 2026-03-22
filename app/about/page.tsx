@@ -84,7 +84,7 @@ export default function AboutPage() {
           className="absolute inset-0 bg-cover bg-center"
           style={{
             backgroundImage:
-              "linear-gradient(180deg, rgba(6,9,14,0.02) 0%, rgba(6,9,14,0.14) 24%, rgba(6,9,14,0.54) 68%, rgba(5,7,11,0.88) 100%), url('/images/bg.jpg')",
+              "linear-gradient(180deg, rgba(6,9,14,0.02) 0%, rgba(6,9,14,0.14) 24%, rgba(6,9,14,0.54) 68%, rgba(5,7,11,0.88) 100%), url('/images/carousel/carousel-02.jpg')",
           }}
         />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_16%_18%,rgba(245,158,11,0.18),transparent_20%),radial-gradient(circle_at_82%_14%,rgba(56,189,248,0.12),transparent_18%),linear-gradient(90deg,rgba(7,10,16,0.46)_0%,rgba(7,10,16,0.1)_45%,rgba(7,10,16,0.56)_100%)]" />

@@ -1,13 +1,15 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams } from "next/navigation";
 import { PencilSquareIcon, TrashIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import SearchInput from "@/app/components/SearchInput";
 import { useAuth } from "@/app/components/AuthProvider";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
 import { useProtectedTheme } from "@/app/components/ProtectedThemeProvider";
+import { createTiltCardMotion, useEditModalMotion, useModalMotion } from "@/app/lib/modalMotion";
 import type { BookingFormPayload, BookingRow } from "@/app/lib/bookingTypes";
 import { repoTheme } from "@/app/lib/repoTheme";
 import {
@@ -114,13 +116,13 @@ function getCamp3NightPax(
 }
 
 const baseFieldClassName =
-  "min-h-12 w-full rounded-2xl border border-[var(--ui-border)] bg-white/[0.05] px-3.5 text-sm text-[var(--ui-text-main)] outline-none transition placeholder:text-[color:rgba(151,166,168,0.82)] focus:border-[#395C7A] focus:bg-white/[0.08] focus:ring-4 focus:ring-[#395C7A]/18";
+  "app-input-surface min-h-12 w-full rounded-2xl px-3.5 text-sm text-[var(--ui-text-main)] outline-none transition placeholder:text-[color:rgba(151,166,168,0.82)] focus:border-[#395C7A] focus:ring-4 focus:ring-[#395C7A]/18";
 
 const invalidFieldClassName =
   "border-rose-400/50 bg-rose-500/10 focus:border-rose-400 focus:ring-rose-500/16";
 
 const compactTableActionBaseClassName =
-  "app-glass-button app-protected-action-button inline-flex min-h-9 items-center gap-1.5 rounded-full px-3.5 py-2 text-[11px] font-semibold leading-none transition shadow-sm [&_svg]:h-3.5 [&_svg]:w-3.5 [&_svg]:shrink-0 [&_svg]:stroke-[1.9]";
+  "app-clickable app-glass-button app-protected-action-button inline-flex min-h-9 items-center gap-1.5 rounded-full px-3.5 py-2 text-[11px] font-semibold leading-none transition shadow-sm [&_svg]:h-3.5 [&_svg]:w-3.5 [&_svg]:shrink-0 [&_svg]:stroke-[1.9]";
 
 const statusTone: Record<string, string> = {
   Paid: "border-emerald-200 bg-emerald-50 text-emerald-700",
@@ -204,7 +206,7 @@ function LabeledInput({
         max={max}
         placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)}
-        className={`${baseFieldClassName} ${invalid ? invalidFieldClassName : ""}`}
+        className={`${type === "date" ? "app-clickable-trigger" : ""} ${baseFieldClassName} ${invalid ? invalidFieldClassName : ""}`}
       />
       {helper && <span className="mt-1 block text-xs leading-5 text-slate-500">{helper}</span>}
     </label>
@@ -240,7 +242,7 @@ function FloatingInput({
 }) {
   const labelTone = invalid
     ? "bg-rose-50 text-rose-600"
-    : "bg-white/[0.05] text-[var(--ui-text-soft)] peer-focus:bg-white/[0.08] peer-focus:text-[var(--ui-text-main)]";
+    : "bg-[var(--app-input-bg)] text-[var(--ui-text-soft)] peer-focus:text-[var(--ui-text-main)]";
 
   return (
     <label className={`block ${className}`}>
@@ -293,7 +295,7 @@ function FloatingTextarea({
 }) {
   const labelTone = invalid
     ? "bg-rose-50 text-rose-600"
-    : "bg-white/[0.05] text-[var(--ui-text-soft)] peer-focus:bg-white/[0.08] peer-focus:text-[var(--ui-text-main)]";
+    : "bg-[var(--app-input-bg)] text-[var(--ui-text-soft)] peer-focus:text-[var(--ui-text-main)]";
 
   return (
     <label className={`block ${className}`}>
@@ -305,7 +307,7 @@ function FloatingTextarea({
           required={required}
           disabled={disabled}
           onChange={(event) => onChange(event.target.value)}
-          className={`peer w-full rounded-2xl border border-[var(--ui-border)] bg-white/[0.05] px-3.5 pb-3 pt-6 text-sm text-[var(--ui-text-main)] outline-none transition placeholder:text-[color:rgba(151,166,168,0.82)] focus:border-[#395C7A] focus:bg-white/[0.08] focus:ring-4 focus:ring-[#395C7A]/18 ${invalid ? invalidFieldClassName : ""} ${textareaClassName}`}
+          className={`app-input-surface peer w-full rounded-2xl px-3.5 pb-3 pt-6 text-sm text-[var(--ui-text-main)] outline-none transition placeholder:text-[color:rgba(151,166,168,0.82)] focus:border-[#395C7A] focus:ring-4 focus:ring-[#395C7A]/18 ${invalid ? invalidFieldClassName : ""} ${textareaClassName}`}
         />
         <span
           className={`pointer-events-none absolute left-3 top-6 z-[1] -translate-y-1/2 px-1 text-sm transition-all duration-200 peer-placeholder-shown:text-sm peer-focus:top-0 peer-focus:translate-y-[-50%] peer-focus:text-[11px] peer-[:not(:placeholder-shown)]:top-0 peer-[:not(:placeholder-shown)]:translate-y-[-50%] peer-[:not(:placeholder-shown)]:text-[11px] ${labelTone}`}
@@ -346,7 +348,7 @@ function LabeledSelect({
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className={`${baseFieldClassName} ${invalid ? invalidFieldClassName : ""}`}
+        className={`app-clickable-trigger ${baseFieldClassName} ${invalid ? invalidFieldClassName : ""}`}
       >
         {options.map((option) => (
           <option key={option} style={optionStyle}>
@@ -379,20 +381,17 @@ type OffSeasonWarningState =
 
 export default function BookingPage() {
   const { theme } = useProtectedTheme();
+  const prefersReducedMotion = useReducedMotion();
+  const { overlayMotion, panelMotion } = useModalMotion();
+  const { overlayMotion: editOverlayMotion, panelMotion: editPanelMotion } = useEditModalMotion();
   const ui = repoTheme(theme);
   const dark = theme === "dark";
   const sectionShellClassName = ui.sectionShell;
   const panelSoftClassName = ui.panelSoft;
   const cleanSectionShellClassName = `${ui.shell} p-4 sm:p-5 md:p-6 shadow-none`;
-  const cleanPanelClassName = dark
-    ? "rounded-[20px] bg-white/[0.03]"
-    : "rounded-[20px] bg-white/72";
-  const cleanPanelSoftClassName = dark
-    ? "rounded-[18px] bg-white/[0.03]"
-    : "rounded-[18px] bg-white/78";
-  const dialogOverlayClassName = dark
-    ? "bg-black/28 backdrop-blur-[2px]"
-    : "bg-slate-900/10 backdrop-blur-[2px]";
+  const cleanPanelClassName = `${ui.panel} rounded-[20px]`;
+  const cleanPanelSoftClassName = `${ui.panelSoft} rounded-[18px]`;
+  const dialogOverlayClassName = "app-overlay";
   const recordsDividerClassName = dark ? "divide-y divide-white/8" : "divide-y divide-slate-200/70";
   const recordsRowTextClassName = dark
     ? "text-[color:rgba(230,237,243,0.82)]"
@@ -403,17 +402,37 @@ export default function BookingPage() {
   const recordsDesktopGridClassName =
     "lg:grid lg:grid-cols-[2.1fr_1fr_1.05fr_0.7fr_0.95fr_0.95fr_0.95fr] lg:items-center lg:gap-4";
   const recordsDesktopSpacingClassName = "lg:px-5";
-  const detailDialogPanelClassName = `${ui.modal} relative w-full max-w-5xl overflow-hidden rounded-[28px] shadow-[0_32px_90px_rgba(0,0,0,0.34)]`;
-  const detailSectionCardClassName = dark
-    ? "rounded-[20px] border border-white/8 bg-white/[0.04] p-4"
-    : "rounded-[20px] border border-white/60 bg-white/72 p-4";
+  const detailDialogPanelClassName = `${ui.modal} relative w-full max-w-5xl overflow-hidden rounded-[28px]`;
+  const {
+    hoverMotion: bookingCardHoverMotion,
+    tapMotion: bookingCardTapMotion,
+    transition: bookingCardMotionTransition,
+    style: bookingCardMotionStyle,
+  } = useMemo(
+    () =>
+      createTiltCardMotion(prefersReducedMotion ?? false, {
+        hoverY: -4,
+        hoverScale: 1.015,
+        hoverRotateX: 6,
+        hoverRotateY: -6,
+        tapScale: 0.985,
+        tapRotateX: -8,
+        tapRotateY: 8,
+        tapY: -1,
+        reducedHoverY: -2,
+        reducedHoverScale: 1.01,
+        reducedTapScale: 0.985,
+        reducedTapY: -1,
+        perspective: 1200,
+      }),
+    [prefersReducedMotion]
+  );
+  const detailSectionCardClassName = `${ui.panel} rounded-[20px] p-4`;
   const detailValueClassName = dark ? "text-[#E6EDF3]" : "text-slate-900";
   const detailLabelClassName = dark
     ? "text-[11px] font-semibold uppercase tracking-[0.12em] text-[color:rgba(151,166,168,0.82)]"
     : "text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500";
-  const detailMutedCardClassName = dark
-    ? "rounded-[18px] border border-dashed border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-[color:rgba(151,166,168,0.88)]"
-    : "rounded-[18px] border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500";
+  const detailMutedCardClassName = `app-soft-surface rounded-[18px] px-4 py-3 text-sm ${ui.textMuted}`;
   const { user, loading: loadingUser } = useAuth();
   const searchParams = useSearchParams();
   const startDateParam = searchParams.get("startDate") || "";
@@ -431,7 +450,7 @@ export default function BookingPage() {
   const [portalReady, setPortalReady] = useState(false);
   const [trailFilter, setTrailFilter] = useState("All Trails");
   const [bookingTypeFilter, setBookingTypeFilter] = useState("All");
-  const [approvalFilter] = useState("All");
+  const approvalFilter = "All";
   const [recordStatusFilter, setRecordStatusFilter] =
     useState<RecordStatusLabel>("All Statuses");
   const [monthFilter, setMonthFilter] = useState("");
@@ -561,6 +580,17 @@ export default function BookingPage() {
   }, [isEditDialogOpen, resetForm]);
 
   useEffect(() => {
+    if (!isEditDialogOpen && !detailBooking) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [detailBooking, isEditDialogOpen]);
+
+  useEffect(() => {
     if (!submitSuccess) return;
 
     const timer = window.setTimeout(() => {
@@ -605,10 +635,28 @@ export default function BookingPage() {
     [bookings, isAdmin]
   );
 
+  const searchableRecordBookings = useMemo(
+    () =>
+      visibleRecordBookings.map((booking) => ({
+        booking,
+        searchText: [
+          booking.booking_code,
+          booking.contact_name,
+          booking.booking_type,
+          booking.trail,
+          booking.participant_category,
+        ]
+          .join(" ")
+          .toLowerCase(),
+      })),
+    [visibleRecordBookings]
+  );
+
   const filteredBookings = useMemo(() => {
     const query = deferredSearchFilter.trim().toLowerCase();
 
-    return visibleRecordBookings.filter((booking) => {
+    return searchableRecordBookings
+      .filter(({ booking, searchText }) => {
       if (trailFilter !== "All Trails" && booking.trail !== trailFilter) return false;
       if (bookingTypeFilter !== "All" && booking.booking_type !== bookingTypeFilter) return false;
       if (approvalFilter !== "All" && booking.approval_status !== approvalFilter) return false;
@@ -627,29 +675,21 @@ export default function BookingPage() {
       }
       if (
         query &&
-        ![
-          booking.booking_code,
-          booking.contact_name,
-          booking.booking_type,
-          booking.trail,
-          booking.participant_category,
-        ]
-          .join(" ")
-          .toLowerCase()
-          .includes(query)
+        !searchText.includes(query)
       ) {
         return false;
       }
       return true;
-    });
+      })
+      .map(({ booking }) => booking);
   }, [
     approvalFilter,
     bookingTypeFilter,
     deferredSearchFilter,
     monthFilter,
     recordStatusFilter,
+    searchableRecordBookings,
     trailFilter,
-    visibleRecordBookings,
   ]);
 
   const scheduleDurationDays = useMemo(
@@ -985,7 +1025,7 @@ export default function BookingPage() {
             <button
               type="button"
               onClick={resetForm}
-              className={`inline-flex min-h-11 items-center justify-center rounded-full px-4 text-sm font-semibold transition ${ui.buttonSecondary}`}
+              className={`app-clickable inline-flex min-h-11 items-center justify-center rounded-full px-4 text-sm font-semibold transition ${ui.buttonSecondary}`}
             >
               Close
             </button>
@@ -993,7 +1033,7 @@ export default function BookingPage() {
         </div>
       </div>
 
-      <div className={`mt-4 px-4 py-3 text-sm ${panelSoftClassName} ${ui.textMuted}`}>
+          <div className={`mt-4 px-4 py-3 text-sm ${panelSoftClassName} ${ui.textMuted}`}>
         <span className={`font-semibold ${ui.textMain}`}>Booking Code:</span>{" "}
         {editingId
           ? bookings.find((booking) => booking.id === editingId)?.booking_code || "Unavailable"
@@ -1205,10 +1245,10 @@ export default function BookingPage() {
             </div>
 
             <div className="mt-5 flex flex-wrap gap-3">
-              <button type="submit" disabled={(editingId ? !canEditBookings : !canCreateBookings) || submitting} className="app-primary-button inline-flex min-h-11 items-center justify-center rounded-full px-5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60">
+              <button type="submit" disabled={(editingId ? !canEditBookings : !canCreateBookings) || submitting} className="app-clickable app-primary-button app-sidebar-btn app-sidebar-btn-primary inline-flex min-h-11 items-center justify-center rounded-full px-5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60">
                 {submitting ? "Saving..." : editingId ? `Update ${form.booking_type}` : `Create ${form.booking_type}`}
               </button>
-              <button type="button" onClick={resetForm} className={`app-glass-button inline-flex min-h-11 items-center justify-center rounded-full px-5 text-sm font-semibold transition ${ui.buttonSecondary}`}>
+              <button type="button" onClick={resetForm} className={`app-clickable app-glass-button app-sidebar-btn app-sidebar-btn-secondary inline-flex min-h-11 items-center justify-center rounded-full px-5 text-sm font-semibold transition ${ui.buttonSecondary}`}>
                 {editingId ? "Cancel Edit" : "Reset"}
               </button>
             </div>
@@ -1259,7 +1299,7 @@ export default function BookingPage() {
             </div>
 
             <div className="mt-5 flex flex-wrap gap-3">
-              <button type="submit" disabled={regularSubmitDisabled} className="app-primary-button inline-flex min-h-11 items-center justify-center rounded-full px-5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60">
+              <button type="submit" disabled={regularSubmitDisabled} className="app-clickable app-primary-button app-sidebar-btn app-sidebar-btn-primary inline-flex min-h-11 items-center justify-center rounded-full px-5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60">
                 {submitting
                   ? "Saving..."
                   : capacityState.kind === "invalid" &&
@@ -1269,7 +1309,7 @@ export default function BookingPage() {
                       ? "Update Booking"
                       : "Create Booking"}
               </button>
-              <button type="button" onClick={resetForm} className={`app-glass-button inline-flex min-h-11 items-center justify-center rounded-full px-5 text-sm font-semibold transition ${ui.buttonSecondary}`}>
+              <button type="button" onClick={resetForm} className={`app-clickable app-glass-button app-sidebar-btn app-sidebar-btn-secondary inline-flex min-h-11 items-center justify-center rounded-full px-5 text-sm font-semibold transition ${ui.buttonSecondary}`}>
                 {editingId ? "Cancel Edit" : "Reset"}
               </button>
             </div>
@@ -1326,10 +1366,21 @@ export default function BookingPage() {
 
                 return (
                   <article key={row.id}>
-                    <button
+                    <motion.button
                       type="button"
                       onClick={() => setDetailBooking(row)}
-                      className={`grid w-full gap-3 px-4 py-4 text-left transition lg:hidden ${
+                      whileHover={bookingCardHoverMotion}
+                      whileTap={bookingCardTapMotion}
+                      transition={bookingCardMotionTransition}
+                      style={{
+                        ...bookingCardMotionStyle,
+                        borderColor: isDuplicateHighlight
+                          ? undefined
+                          : dark
+                            ? "rgba(255,255,255,0.08)"
+                            : "rgba(148,163,184,0.18)",
+                      }}
+                      className={`app-clickable-row grid w-full gap-3 border px-4 py-4 text-left transition lg:hidden ${
                         dark
                           ? "hover:bg-white/[0.04] focus-visible:bg-white/[0.04]"
                           : "hover:bg-slate-50/80 focus-visible:bg-slate-50/80"
@@ -1339,7 +1390,7 @@ export default function BookingPage() {
                         <div>
                           <p className={`text-sm font-semibold ${ui.textMain}`}>{row.contact_name}</p>
                           <p className={`mt-1 text-xs leading-5 ${ui.textMuted}`}>
-                            {isOffSeasonLikeType(row.booking_type) ? "Closure" : row.participant_category}
+                            {row.booking_code}
                           </p>
                         </div>
                         {isOffSeasonLikeType(row.booking_type) ? (
@@ -1351,7 +1402,11 @@ export default function BookingPage() {
                         )}
                       </div>
 
-                      <div className="grid gap-2.5 sm:grid-cols-4">
+                      <div className="grid gap-2.5 sm:grid-cols-2">
+                        <div className={`${cleanPanelSoftClassName} p-3`}>
+                          <p className={`text-[11px] font-semibold uppercase tracking-[0.12em] ${ui.textSoft}`}>Booking Type</p>
+                          <p className={`mt-1.5 text-sm ${ui.textMain}`}>{row.booking_type}</p>
+                        </div>
                         <div className={`${cleanPanelSoftClassName} p-3`}>
                           <p className={`text-[11px] font-semibold uppercase tracking-[0.12em] ${ui.textSoft}`}>Category</p>
                           <p className={`mt-1.5 text-sm ${ui.textMain}`}>
@@ -1377,12 +1432,23 @@ export default function BookingPage() {
                           <p className={`mt-1.5 text-sm ${ui.textMain}`}>{row.end_date}</p>
                         </div>
                       </div>
-                    </button>
+                    </motion.button>
 
-                    <button
+                    <motion.button
                       type="button"
                       onClick={() => setDetailBooking(row)}
-                      className={`hidden w-full ${recordsDesktopGridClassName} ${recordsDesktopSpacingClassName} py-5 text-sm text-left transition lg:grid ${
+                      whileHover={bookingCardHoverMotion}
+                      whileTap={bookingCardTapMotion}
+                      transition={bookingCardMotionTransition}
+                      style={{
+                        ...bookingCardMotionStyle,
+                        borderColor: isDuplicateHighlight
+                          ? undefined
+                          : dark
+                            ? "rgba(255,255,255,0.08)"
+                            : "rgba(148,163,184,0.12)",
+                      }}
+                      className={`app-clickable-row hidden w-full border ${recordsDesktopGridClassName} ${recordsDesktopSpacingClassName} py-5 text-sm text-left transition lg:grid ${
                         dark
                           ? "hover:bg-white/[0.04] focus-visible:bg-white/[0.04]"
                           : "hover:bg-slate-50/80 focus-visible:bg-slate-50/80"
@@ -1408,7 +1474,7 @@ export default function BookingPage() {
                       </span>
                       <span>{row.start_date}</span>
                       <span>{row.end_date}</span>
-                    </button>
+                    </motion.button>
                   </article>
                 );
               })}
@@ -1423,6 +1489,10 @@ export default function BookingPage() {
       duplicateHighlightIds,
       filteredBookings,
       loading,
+      bookingCardHoverMotion,
+      bookingCardMotionTransition,
+      bookingCardMotionStyle,
+      bookingCardTapMotion,
       recordsDesktopGridClassName,
       recordsDesktopSpacingClassName,
       recordsDividerClassName,
@@ -1450,7 +1520,7 @@ export default function BookingPage() {
             className="pointer-events-none fixed right-4 top-4 z-[95] w-full max-w-sm sm:right-6 sm:top-6"
           >
             <div
-              className={`pointer-events-auto rounded-[22px] border px-4 py-3 shadow-[0_18px_50px_rgba(0,0,0,0.18)] backdrop-blur-xl ${
+              className={`pointer-events-auto rounded-[22px] border px-4 py-3 shadow-[0_14px_34px_rgba(0,0,0,0.16)] backdrop-blur-[8px] ${
                 dark
                   ? "border-emerald-300/18 bg-[rgba(15,23,42,0.84)] text-emerald-100"
                   : "border-emerald-200/80 bg-[rgba(255,255,255,0.88)] text-emerald-700"
@@ -1519,10 +1589,9 @@ export default function BookingPage() {
             ? createPortal(
                 <AnimatePresence>
                   <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.18, ease: "easeOut" }}
+                    initial={editOverlayMotion.initial}
+                    animate={editOverlayMotion.animate}
+                    exit={editOverlayMotion.exit}
                     data-protected-theme={theme}
                     className="fixed inset-0 z-[79] flex items-center justify-center p-3 sm:p-4 md:p-6"
                   >
@@ -1530,18 +1599,16 @@ export default function BookingPage() {
                       type="button"
                       aria-label="Close edit dialog"
                       onClick={resetForm}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.18, ease: "easeOut" }}
+                      initial={editOverlayMotion.initial}
+                      animate={editOverlayMotion.animate}
+                      exit={editOverlayMotion.exit}
                       className={`absolute inset-0 ${dialogOverlayClassName}`}
                     />
                     <motion.form
                       onSubmit={handleSubmit}
-                      initial={{ opacity: 0, scale: 0.985, y: 10 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.985, y: 10 }}
-                      transition={{ duration: 0.22, ease: "easeOut" }}
+                      initial={editPanelMotion.initial}
+                      animate={editPanelMotion.animate}
+                      exit={editPanelMotion.exit}
                       className={`relative z-[80] max-h-[calc(100vh-1.5rem)] w-full max-w-6xl overflow-y-auto p-4 shadow-[0_28px_90px_rgba(0,0,0,0.34)] sm:max-h-[calc(100vh-2rem)] sm:p-5 md:max-h-[calc(100vh-3rem)] md:p-6 ${sectionShellClassName}`}
                     >
                       {bookingFormContent}
@@ -1580,18 +1647,18 @@ export default function BookingPage() {
             <div className="mt-4 grid grid-cols-2 items-end gap-2.5 sm:gap-3 xl:grid-cols-[1.15fr_0.95fr_0.95fr_0.95fr_0.9fr]">
               <label className={`col-span-2 p-3 sm:p-4 lg:col-span-1 ${cleanPanelSoftClassName}`}>
                 <span className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${ui.textSoft}`}>Search</span>
-                <input
-                  type="text"
+                <SearchInput
                   value={searchFilter}
                   onChange={(event) => setSearchFilter(event.target.value)}
                   placeholder="Booking code, guest name, type, trail..."
-                  className="mt-2 min-h-11 w-full rounded-2xl border border-[var(--ui-border)] bg-white/[0.05] px-3 text-sm text-[var(--ui-text-main)] outline-none transition placeholder:text-[color:rgba(151,166,168,0.82)] focus:border-[#395C7A] focus:bg-white/[0.08] focus:ring-4 focus:ring-[#395C7A]/18"
+                  aria-label="Search booking records"
+                  inputClassName="app-input-surface mt-2 min-h-11 w-full rounded-2xl pr-3 text-sm text-[var(--ui-text-main)] outline-none transition placeholder:text-[color:rgba(151,166,168,0.82)] focus:border-[#395C7A] focus:ring-4 focus:ring-[#395C7A]/18"
                 />
               </label>
 
               <label className={`p-3 sm:p-4 ${cleanPanelSoftClassName}`}>
                 <span className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${ui.textSoft}`}>Trail</span>
-                <select value={trailFilter} onChange={(event) => setTrailFilter(event.target.value)} className="mt-2 min-h-11 w-full rounded-2xl border border-[var(--ui-border)] bg-white/[0.05] px-3 text-sm text-[var(--ui-text-main)] outline-none">
+                <select value={trailFilter} onChange={(event) => setTrailFilter(event.target.value)} className="app-clickable app-input-surface mt-2 min-h-11 w-full rounded-2xl px-3 text-sm text-[var(--ui-text-main)] outline-none">
                   <option style={bookingNativeOptionStyle}>All Trails</option>
                   {TRAIL_OPTIONS.map((option) => (
                     <option key={option} value={option} style={bookingNativeOptionStyle}>{option}</option>
@@ -1601,7 +1668,7 @@ export default function BookingPage() {
 
               <label className={`p-3 sm:p-4 ${cleanPanelSoftClassName}`}>
                 <span className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${ui.textSoft}`}>Booking Type</span>
-                <select value={bookingTypeFilter} onChange={(event) => setBookingTypeFilter(event.target.value)} className="mt-2 min-h-11 w-full rounded-2xl border border-[var(--ui-border)] bg-white/[0.05] px-3 text-sm text-[var(--ui-text-main)] outline-none">
+                <select value={bookingTypeFilter} onChange={(event) => setBookingTypeFilter(event.target.value)} className="app-clickable app-input-surface mt-2 min-h-11 w-full rounded-2xl px-3 text-sm text-[var(--ui-text-main)] outline-none">
                   <option style={bookingNativeOptionStyle}>All</option>
                   {visibleBookingTypeOptions.map((option) => (
                     <option key={option} value={option} style={bookingNativeOptionStyle}>{option}</option>
@@ -1611,7 +1678,7 @@ export default function BookingPage() {
 
               <label className={`p-3 sm:p-4 ${cleanPanelSoftClassName}`}>
                 <span className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${ui.textSoft}`}>Status</span>
-                <select value={recordStatusFilter} onChange={(event) => setRecordStatusFilter(event.target.value as RecordStatusLabel)} className="mt-2 min-h-11 w-full rounded-2xl border border-[var(--ui-border)] bg-white/[0.05] px-3 text-sm text-[var(--ui-text-main)] outline-none">
+                <select value={recordStatusFilter} onChange={(event) => setRecordStatusFilter(event.target.value as RecordStatusLabel)} className="app-clickable app-input-surface mt-2 min-h-11 w-full rounded-2xl px-3 text-sm text-[var(--ui-text-main)] outline-none">
                   {RECORD_STATUS_OPTIONS.map((option) => (
                     <option key={option} value={option} style={bookingNativeOptionStyle}>{option}</option>
                   ))}
@@ -1624,7 +1691,7 @@ export default function BookingPage() {
                   type="month"
                   value={monthFilter}
                   onChange={(event) => setMonthFilter(event.target.value)}
-                  className="mt-2 min-h-11 w-full rounded-2xl border border-[var(--ui-border)] bg-white/[0.05] px-3 text-sm text-[var(--ui-text-main)] outline-none"
+                  className="app-clickable app-input-surface mt-2 min-h-11 w-full rounded-2xl px-3 text-sm text-[var(--ui-text-main)] outline-none"
                 />
               </label>
 
@@ -1635,219 +1702,224 @@ export default function BookingPage() {
         </div>
       </div>
 
-      {detailBooking && portalReady
+      {portalReady
         ? createPortal(
             <AnimatePresence>
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.18, ease: "easeOut" }}
-                data-protected-theme={theme}
-                className="fixed inset-0 z-[81] flex items-center justify-center p-3 sm:p-4 md:p-6"
-              >
-                <motion.button
-                  type="button"
-                  aria-label="Close booking details"
-                  onClick={() => setDetailBooking(null)}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.18, ease: "easeOut" }}
-                  className={`absolute inset-0 ${dialogOverlayClassName}`}
-                />
+              {detailBooking ? (
                 <motion.div
-                  initial={{ opacity: 0, scale: 0.985, y: 10 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.985, y: 10 }}
-                  transition={{ duration: 0.22, ease: "easeOut" }}
-                  className={`scroll-docs relative z-[82] max-h-[calc(100vh-1.5rem)] w-full overflow-y-auto p-4 sm:max-h-[calc(100vh-2rem)] sm:p-5 md:max-h-[calc(100vh-3rem)] md:p-6 ${detailDialogPanelClassName}`}
+                  key={`booking-detail-${detailBooking.id}`}
+                  initial={overlayMotion.initial}
+                  animate={overlayMotion.animate}
+                  exit={overlayMotion.exit}
+                  transition={overlayMotion.transition}
+                  data-protected-theme={theme}
+                  className="fixed inset-0 z-[81] flex items-center justify-center p-3 sm:p-4 md:p-6"
+                  style={{ perspective: prefersReducedMotion ? undefined : 1200 }}
                 >
-                  <div className="flex items-start justify-between gap-4 border-b border-[var(--ui-border)] pb-4 sm:pb-5">
-                    <div>
-                      <p className={`text-[11px] font-semibold uppercase tracking-[0.18em] ${ui.textSoft}`}>
-                        Booking details
-                      </p>
-                      <h3 className={`mt-2 text-xl font-semibold tracking-tight sm:text-2xl ${ui.textMain}`}>
-                        {detailBooking.contact_name}
-                      </h3>
-                      <p className={`mt-2 text-sm leading-6 ${ui.textMuted}`}>
-                        Review the booking summary, status signals, and record timestamps.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setDetailBooking(null)}
-                      className={`${ui.buttonSecondary} inline-flex h-11 w-11 items-center justify-center rounded-full p-0`}
-                      aria-label="Close booking details dialog"
-                    >
-                      <XMarkIcon className="h-5 w-5" />
-                    </button>
-                  </div>
-
-                  <div className="mt-5 grid gap-4 xl:grid-cols-[1.18fr_0.82fr] xl:items-start">
-                    <div className="grid gap-4">
-                      <section className={detailSectionCardClassName}>
-                        <p className={detailLabelClassName}>Primary Info</p>
-                        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                          <div>
-                            <p className={detailLabelClassName}>Booking Code</p>
-                            <p className={`mt-1.5 text-base font-semibold ${detailValueClassName}`}>
-                              {detailBooking.booking_code}
-                            </p>
-                          </div>
-                          <div>
-                            <p className={detailLabelClassName}>Guest Name</p>
-                            <p className={`mt-1.5 text-base font-semibold ${detailValueClassName}`}>
-                              {detailBooking.contact_name}
-                            </p>
-                          </div>
-                          <div>
-                            <p className={detailLabelClassName}>Booking Type</p>
-                            <p className={`mt-1.5 text-sm ${detailValueClassName}`}>
-                              {detailBooking.booking_type}
-                            </p>
-                          </div>
-                          <div>
-                            <p className={detailLabelClassName}>Category</p>
-                            <p className={`mt-1.5 text-sm ${detailValueClassName}`}>
-                              {isOffSeasonLikeType(detailBooking.booking_type)
-                                ? "Closure"
-                                : detailBooking.participant_category}
-                            </p>
-                          </div>
-                        </div>
-                      </section>
-
-                      <section className={detailSectionCardClassName}>
-                        <p className={detailLabelClassName}>Schedule</p>
-                        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                          <div>
-                            <p className={detailLabelClassName}>Trail</p>
-                            <div className="mt-1.5">
-                              {isOffSeasonLikeType(detailBooking.booking_type) ? (
-                                <p className={`text-sm ${detailValueClassName}`}>All trails</p>
-                              ) : (
-                                <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${trailPillTone(detailBooking.trail)}`}>
-                                  {detailBooking.trail}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          <div>
-                            <p className={detailLabelClassName}>Participants / Pax</p>
-                            <p className={`mt-1.5 text-sm ${detailValueClassName}`}>
-                              {isOffSeasonLikeType(detailBooking.booking_type)
-                                ? "Closure"
-                                : detailBooking.pax}
-                            </p>
-                          </div>
-                          <div>
-                            <p className={detailLabelClassName}>Start Date</p>
-                            <p className={`mt-1.5 text-sm ${detailValueClassName}`}>
-                              {formatDisplayDate(detailBooking.start_date)}
-                            </p>
-                          </div>
-                          <div>
-                            <p className={detailLabelClassName}>End Date</p>
-                            <p className={`mt-1.5 text-sm ${detailValueClassName}`}>
-                              {formatDisplayDate(detailBooking.end_date)}
-                            </p>
-                          </div>
-                        </div>
-                      </section>
-                    </div>
-
-                    <div className="grid gap-4">
-                      <section className={detailSectionCardClassName}>
-                        <p className={detailLabelClassName}>Statuses</p>
-                        <div className="mt-4 grid gap-3">
-                          <div className="flex items-center justify-between gap-3 rounded-[18px] border border-[var(--ui-border)] px-4 py-3">
-                            <span className={`text-sm ${detailValueClassName}`}>Payment</span>
-                            <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${statusTone[detailBooking.payment_status]}`}>
-                              {detailBooking.payment_status}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between gap-3 rounded-[18px] border border-[var(--ui-border)] px-4 py-3">
-                            <span className={`text-sm ${detailValueClassName}`}>Approval</span>
-                            <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${statusTone[detailBooking.approval_status]}`}>
-                              {detailBooking.approval_status}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between gap-3 rounded-[18px] border border-[var(--ui-border)] px-4 py-3">
-                            <span className={`text-sm ${detailValueClassName}`}>Booking Status</span>
-                            <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${statusTone[detailBooking.booking_status]}`}>
-                              {detailBooking.booking_status}
-                            </span>
-                          </div>
-                        </div>
-                      </section>
-                      <section className={`${detailSectionCardClassName} xl:min-h-full`}>
-                        <p className={detailLabelClassName}>Record Metadata</p>
-                        <div className="mt-4 space-y-4">
-                          <div>
-                            <p className={detailLabelClassName}>Created</p>
-                            <p className={`mt-1.5 text-sm ${detailValueClassName}`}>
-                              {detailBooking.created_at
-                                ? new Date(detailBooking.created_at).toLocaleString()
-                                : "Not available"}
-                            </p>
-                          </div>
-                          <div>
-                            <p className={detailLabelClassName}>Last Updated</p>
-                            <p className={`mt-1.5 text-sm ${detailValueClassName}`}>
-                              {detailBooking.updated_at
-                                ? new Date(detailBooking.updated_at).toLocaleString()
-                                : "Not available"}
-                            </p>
-                          </div>
-                        </div>
-                      </section>
-                    </div>
-                  </div>
-
-                  <section className={`${detailSectionCardClassName} mt-4`}>
-                    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                  <motion.button
+                    type="button"
+                    aria-label="Close booking details"
+                    onClick={() => setDetailBooking(null)}
+                    initial={overlayMotion.initial}
+                    animate={overlayMotion.animate}
+                    exit={overlayMotion.exit}
+                    transition={overlayMotion.transition}
+                    className={`absolute inset-0 ${dialogOverlayClassName}`}
+                  />
+                  <motion.div
+                    initial={panelMotion.initial}
+                    animate={panelMotion.animate}
+                    exit={panelMotion.exit}
+                    transition={panelMotion.transition}
+                    style={{ transformOrigin: "top center" }}
+                    className={`scroll-docs relative z-[82] max-h-[calc(100vh-1.5rem)] w-full overflow-y-auto p-4 sm:max-h-[calc(100vh-2rem)] sm:p-5 md:max-h-[calc(100vh-3rem)] md:p-6 ${detailDialogPanelClassName}`}
+                  >
+                    <div className="flex items-start justify-between gap-4 border-b border-[var(--ui-border)] pb-4 sm:pb-5">
                       <div>
-                        <p className={detailLabelClassName}>Actions</p>
-                        <p className={`mt-1 text-sm ${ui.textMuted}`}>
-                          Existing booking actions are available here without changing current behavior.
+                        <p className={`text-[11px] font-semibold uppercase tracking-[0.18em] ${ui.textSoft}`}>
+                          Booking details
+                        </p>
+                        <h3 className={`mt-2 text-xl font-semibold tracking-tight sm:text-2xl ${ui.textMain}`}>
+                          {detailBooking.contact_name}
+                        </h3>
+                        <p className={`mt-2 text-sm leading-6 ${ui.textMuted}`}>
+                          Review the booking summary, status signals, and record timestamps.
                         </p>
                       </div>
-                      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-                        {canEditBookings ? (
-                          <button
-                            type="button"
-                            onClick={() => startEdit(detailBooking)}
-                            className={detailEditButtonClassName}
-                          >
-                            <PencilSquareIcon />
-                            Edit booking
-                          </button>
-                        ) : null}
-                        {canDeleteBookings ? (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setDetailBooking(null);
-                              setDeleteTargetId(detailBooking.id);
-                            }}
-                            className={detailDeleteButtonClassName}
-                          >
-                            <TrashIcon />
-                            Delete booking
-                          </button>
-                        ) : null}
+                      <button
+                        type="button"
+                        onClick={() => setDetailBooking(null)}
+                        className={`${ui.buttonSecondary} inline-flex h-11 w-11 items-center justify-center rounded-full p-0`}
+                        aria-label="Close booking details dialog"
+                      >
+                        <XMarkIcon className="h-5 w-5" />
+                      </button>
+                    </div>
+
+                    <div className="mt-5 grid gap-4 xl:grid-cols-[1.18fr_0.82fr] xl:items-start">
+                      <div className="grid gap-4">
+                        <section className={detailSectionCardClassName}>
+                          <p className={detailLabelClassName}>Primary Info</p>
+                          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                            <div>
+                              <p className={detailLabelClassName}>Booking Code</p>
+                              <p className={`mt-1.5 text-base font-semibold ${detailValueClassName}`}>
+                                {detailBooking.booking_code}
+                              </p>
+                            </div>
+                            <div>
+                              <p className={detailLabelClassName}>Guest Name</p>
+                              <p className={`mt-1.5 text-base font-semibold ${detailValueClassName}`}>
+                                {detailBooking.contact_name}
+                              </p>
+                            </div>
+                            <div>
+                              <p className={detailLabelClassName}>Booking Type</p>
+                              <p className={`mt-1.5 text-sm ${detailValueClassName}`}>
+                                {detailBooking.booking_type}
+                              </p>
+                            </div>
+                            <div>
+                              <p className={detailLabelClassName}>Category</p>
+                              <p className={`mt-1.5 text-sm ${detailValueClassName}`}>
+                                {isOffSeasonLikeType(detailBooking.booking_type)
+                                  ? "Closure"
+                                  : detailBooking.participant_category}
+                              </p>
+                            </div>
+                          </div>
+                        </section>
+
+                        <section className={detailSectionCardClassName}>
+                          <p className={detailLabelClassName}>Schedule</p>
+                          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                            <div>
+                              <p className={detailLabelClassName}>Trail</p>
+                              <div className="mt-1.5">
+                                {isOffSeasonLikeType(detailBooking.booking_type) ? (
+                                  <p className={`text-sm ${detailValueClassName}`}>All trails</p>
+                                ) : (
+                                  <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${trailPillTone(detailBooking.trail)}`}>
+                                    {detailBooking.trail}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div>
+                              <p className={detailLabelClassName}>Participants / Pax</p>
+                              <p className={`mt-1.5 text-sm ${detailValueClassName}`}>
+                                {isOffSeasonLikeType(detailBooking.booking_type)
+                                  ? "Closure"
+                                  : detailBooking.pax}
+                              </p>
+                            </div>
+                            <div>
+                              <p className={detailLabelClassName}>Start Date</p>
+                              <p className={`mt-1.5 text-sm ${detailValueClassName}`}>
+                                {formatDisplayDate(detailBooking.start_date)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className={detailLabelClassName}>End Date</p>
+                              <p className={`mt-1.5 text-sm ${detailValueClassName}`}>
+                                {formatDisplayDate(detailBooking.end_date)}
+                              </p>
+                            </div>
+                          </div>
+                        </section>
+                      </div>
+
+                      <div className="grid gap-4">
+                        <section className={detailSectionCardClassName}>
+                          <p className={detailLabelClassName}>Statuses</p>
+                          <div className="mt-4 grid gap-3">
+                            <div className="flex items-center justify-between gap-3 rounded-[18px] border border-[var(--ui-border)] px-4 py-3">
+                              <span className={`text-sm ${detailValueClassName}`}>Payment</span>
+                              <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${statusTone[detailBooking.payment_status]}`}>
+                                {detailBooking.payment_status}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between gap-3 rounded-[18px] border border-[var(--ui-border)] px-4 py-3">
+                              <span className={`text-sm ${detailValueClassName}`}>Approval</span>
+                              <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${statusTone[detailBooking.approval_status]}`}>
+                                {detailBooking.approval_status}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between gap-3 rounded-[18px] border border-[var(--ui-border)] px-4 py-3">
+                              <span className={`text-sm ${detailValueClassName}`}>Booking Status</span>
+                              <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${statusTone[detailBooking.booking_status]}`}>
+                                {detailBooking.booking_status}
+                              </span>
+                            </div>
+                          </div>
+                        </section>
+                        <section className={`${detailSectionCardClassName} xl:min-h-full`}>
+                          <p className={detailLabelClassName}>Record Metadata</p>
+                          <div className="mt-4 space-y-4">
+                            <div>
+                              <p className={detailLabelClassName}>Created</p>
+                              <p className={`mt-1.5 text-sm ${detailValueClassName}`}>
+                                {detailBooking.created_at
+                                  ? new Date(detailBooking.created_at).toLocaleString()
+                                  : "Not available"}
+                              </p>
+                            </div>
+                            <div>
+                              <p className={detailLabelClassName}>Last Updated</p>
+                              <p className={`mt-1.5 text-sm ${detailValueClassName}`}>
+                                {detailBooking.updated_at
+                                  ? new Date(detailBooking.updated_at).toLocaleString()
+                                  : "Not available"}
+                              </p>
+                            </div>
+                          </div>
+                        </section>
                       </div>
                     </div>
-                    {!canEditBookings && !canDeleteBookings ? (
-                      <div className={`mt-4 ${detailMutedCardClassName}`}>
-                        You can review booking details here, but only authorized roles can edit or delete records.
+
+                    <section className={`${detailSectionCardClassName} mt-4`}>
+                      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                        <div>
+                          <p className={detailLabelClassName}>Actions</p>
+                          <p className={`mt-1 text-sm ${ui.textMuted}`}>
+                            Existing booking actions are available here without changing current behavior.
+                          </p>
+                        </div>
+                        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                          {canEditBookings ? (
+                            <button
+                              type="button"
+                              onClick={() => startEdit(detailBooking)}
+                              className={detailEditButtonClassName}
+                            >
+                              <PencilSquareIcon />
+                              Edit booking
+                            </button>
+                          ) : null}
+                          {canDeleteBookings ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setDetailBooking(null);
+                                setDeleteTargetId(detailBooking.id);
+                              }}
+                              className={detailDeleteButtonClassName}
+                            >
+                              <TrashIcon />
+                              Delete booking
+                            </button>
+                          ) : null}
+                        </div>
                       </div>
-                    ) : null}
-                  </section>
+                      {!canEditBookings && !canDeleteBookings ? (
+                        <div className={`mt-4 ${detailMutedCardClassName}`}>
+                          You can review booking details here, but only authorized roles can edit or delete records.
+                        </div>
+                      ) : null}
+                    </section>
+                  </motion.div>
                 </motion.div>
-              </motion.div>
+              ) : null}
             </AnimatePresence>,
             document.body
           )

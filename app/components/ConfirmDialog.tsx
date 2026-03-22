@@ -1,6 +1,7 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
+import { useEffect } from "react";
 import {
   CheckIcon,
   ExclamationTriangleIcon,
@@ -9,6 +10,7 @@ import {
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 import { useOptionalProtectedTheme } from "@/app/components/ProtectedThemeProvider";
+import { useModalMotion } from "@/app/lib/modalMotion";
 
 type DialogVariant = "success" | "info" | "warning" | "danger";
 
@@ -71,6 +73,7 @@ export default function ConfirmDialog({
   onCancel,
 }: ConfirmDialogProps) {
   const protectedTheme = useOptionalProtectedTheme();
+  const { overlayMotion, panelMotion } = useModalMotion();
   const protectedLight = protectedTheme?.theme === "light";
   const finalVariant = getVariant(variant, danger);
   const isDanger = finalVariant === "danger";
@@ -94,16 +97,18 @@ export default function ConfirmDialog({
 
   const confirmBtnClass =
     finalVariant === "success"
-      ? "app-glass-button app-protected-action-button border border-[rgba(86,134,173,0.22)] bg-[linear-gradient(180deg,rgba(57,92,122,0.96),rgba(47,78,102,0.98))] text-[var(--ui-text-main)] shadow-[0_16px_34px_rgba(24,31,39,0.3)]"
+      ? "app-glass-button app-protected-action-button app-sidebar-btn app-sidebar-btn-primary border border-[rgba(86,134,173,0.22)] bg-[linear-gradient(180deg,rgba(57,92,122,0.96),rgba(47,78,102,0.98))] text-[var(--ui-text-main)] shadow-[0_16px_34px_rgba(24,31,39,0.3)]"
       : finalVariant === "warning"
-      ? "app-glass-button app-protected-action-button border border-[rgba(166,174,120,0.18)] bg-[linear-gradient(180deg,rgba(86,94,64,0.96),rgba(63,69,46,0.98))] text-[var(--ui-text-main)] shadow-[0_16px_34px_rgba(24,31,39,0.3)]"
+      ? "app-glass-button app-protected-action-button app-sidebar-btn app-sidebar-btn-warning border border-[rgba(166,174,120,0.18)] bg-[linear-gradient(180deg,rgba(86,94,64,0.96),rgba(63,69,46,0.98))] text-[var(--ui-text-main)] shadow-[0_16px_34px_rgba(24,31,39,0.3)]"
       : finalVariant === "danger"
-      ? "app-glass-button app-protected-action-button border border-[rgba(248,113,113,0.18)] bg-[linear-gradient(180deg,rgba(112,36,44,0.98),rgba(81,26,34,1))] text-[#FFF1F2] shadow-[0_18px_38px_rgba(63,16,23,0.36)]"
-      : "app-glass-button app-protected-action-button border border-[rgba(110,140,168,0.18)] bg-[linear-gradient(180deg,rgba(47,78,102,0.96),rgba(35,58,77,0.98))] text-[var(--ui-text-main)] shadow-[0_16px_34px_rgba(24,31,39,0.3)]";
+      ? "app-glass-button app-protected-action-button app-sidebar-btn app-sidebar-btn-danger border border-[rgba(248,113,113,0.18)] bg-[linear-gradient(180deg,rgba(112,36,44,0.98),rgba(81,26,34,1))] text-[#FFF1F2] shadow-[0_18px_38px_rgba(63,16,23,0.36)]"
+      : "app-glass-button app-protected-action-button app-sidebar-btn app-sidebar-btn-primary border border-[rgba(110,140,168,0.18)] bg-[linear-gradient(180deg,rgba(47,78,102,0.96),rgba(35,58,77,0.98))] text-[var(--ui-text-main)] shadow-[0_16px_34px_rgba(24,31,39,0.3)]";
 
   const cancelBtnClass = protectedLight
-    ? "app-glass-button app-protected-action-button border border-[rgba(15,23,42,0.1)] bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(248,250,252,0.96))] text-[#1F2937] shadow-[0_12px_28px_rgba(15,23,42,0.1)]"
+    ? "app-glass-button app-protected-action-button app-sidebar-btn app-sidebar-btn-secondary border border-[rgba(15,23,42,0.1)] bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(248,250,252,0.96))] text-[#1F2937] shadow-[0_12px_28px_rgba(15,23,42,0.1)]"
     : "app-glass-button app-protected-action-button border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.04))] text-[var(--ui-text-main)] shadow-[0_14px_30px_rgba(0,0,0,0.24)]";
+
+  const detailCardClassName = "app-soft-surface rounded-2xl px-4 py-3 text-left";
 
   const accentTextClass =
     finalVariant === "success"
@@ -114,32 +119,38 @@ export default function ConfirmDialog({
       ? "text-[#D3B5B5]"
       : "text-[#A9BDD1]";
 
+  useEffect(() => {
+    if (!open) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [open]);
+
   return (
     <AnimatePresence>
       {open && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-4">
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className={`absolute inset-0 backdrop-blur-md ${
-              protectedLight ? "bg-slate-900/16" : "bg-black/42"
-            }`}
+            initial={overlayMotion.initial}
+            animate={overlayMotion.animate}
+            exit={overlayMotion.exit}
+            transition={overlayMotion.transition}
+            className="app-overlay absolute inset-0"
             onClick={() => {
               if (!loading) onCancel?.();
             }}
           />
 
           <motion.div
-            initial={{ opacity: 0, scale: 0.965, y: 14 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.975, y: 8 }}
-            transition={{ duration: 0.2, ease: "easeOut" }}
-            className={`relative w-full max-w-[540px] max-h-[min(88dvh,760px)] overflow-y-auto rounded-[28px] border px-5 py-7 sm:px-7 sm:py-8 sm:rounded-[30px] ${
-              protectedLight
-                ? "border-[rgba(15,23,42,0.1)] bg-[linear-gradient(180deg,rgba(255,255,255,0.94),rgba(245,247,250,0.98))] text-[var(--ui-text-main)] shadow-[0_28px_72px_rgba(15,23,42,0.18)]"
-                : "border-white/10 bg-[linear-gradient(180deg,rgba(31,42,51,0.88),rgba(24,31,39,0.94))] text-[var(--ui-text-main)] shadow-[0_34px_90px_rgba(0,0,0,0.42)]"
-            }`}
+            initial={panelMotion.initial}
+            animate={panelMotion.animate}
+            exit={panelMotion.exit}
+            transition={panelMotion.transition}
+            className="app-dialog-surface relative max-h-[min(88dvh,760px)] w-full max-w-[540px] overflow-y-auto rounded-[28px] px-5 py-7 sm:rounded-[30px] sm:px-7 sm:py-8"
           >
             <div
               className={`pointer-events-none absolute inset-x-0 top-0 h-28 rounded-t-[inherit] ${
@@ -187,7 +198,7 @@ export default function ConfirmDialog({
                 {title}
               </h2>
 
-              <p className="mt-3 max-w-[420px] whitespace-pre-line text-[14px] leading-6 text-[var(--ui-text-soft)] sm:text-[15px] sm:leading-7">
+              <p className="app-muted-text mt-3 max-w-[420px] whitespace-pre-line text-[14px] leading-6 sm:text-[15px] sm:leading-7">
                 {message}
               </p>
 
@@ -196,11 +207,7 @@ export default function ConfirmDialog({
                   {details.map((item, i) => (
                     <div
                       key={`${item.label}-${i}`}
-                      className={`rounded-2xl border px-4 py-3 text-left ${
-                        protectedLight
-                          ? "border-[rgba(15,23,42,0.08)] bg-white/68"
-                          : "border-white/8 bg-white/[0.04]"
-                      }`}
+                      className={detailCardClassName}
                     >
                       <div className="text-[12px] text-[var(--ui-text-soft)]">{item.label}</div>
                       <div className={`mt-1 text-[15px] font-extrabold ${accentTextClass}`}>

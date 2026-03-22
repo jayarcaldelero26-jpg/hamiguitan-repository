@@ -1,5 +1,6 @@
 "use client";
 
+import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -22,6 +23,7 @@ import {
 import ConfirmDialog from "@/app/components/ConfirmDialog";
 import { useAuth } from "@/app/components/AuthProvider";
 import { useProtectedTheme } from "@/app/components/ProtectedThemeProvider";
+import { useEditModalMotion, useModalMotion } from "@/app/lib/modalMotion";
 import { repoTheme } from "@/app/lib/repoTheme";
 
 type OrgSection = "pasu" | "assistant_pasu" | "pamo_staff" | "former_pasu";
@@ -503,10 +505,20 @@ function SectionTabs({
             key={value}
             type="button"
             onClick={() => onChange(value as PageTab)}
-            className={`min-h-11 flex-1 rounded-[18px] px-4 py-3 text-left transition sm:min-w-[210px] sm:flex-none ${selected ? ui.buttonPrimary : "border border-transparent bg-transparent shadow-none hover:border-[var(--ui-border)] hover:bg-[var(--ui-bg)]/55"}`}
+            className={`min-h-11 flex-1 rounded-[18px] px-4 py-3 text-left transition sm:min-w-[210px] sm:flex-none ${
+              selected
+                ? ui.buttonPrimary
+                : "app-clickable app-sidebar-btn app-sidebar-btn-neutral border border-transparent bg-transparent shadow-none hover:border-[var(--ui-border)]"
+            }`}
           >
             <span className="block text-sm font-semibold">{label}</span>
-            <span className={`mt-1 block text-[10px] uppercase tracking-[0.14em] ${ui.textSoft}`}>{detail}</span>
+            <span
+              className={`app-button-subtext mt-1 block text-[10px] uppercase tracking-[0.14em] ${
+                selected ? "" : ui.textSoft
+              }`}
+            >
+              {detail}
+            </span>
           </button>
         );
       })}
@@ -623,7 +635,7 @@ function PhotoWorkflowCard({
           </p>
           <div className="mt-4 flex flex-wrap gap-3">
             <label
-              className={`${ui.buttonSecondary} inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-full px-4 text-xs font-semibold`}
+              className={`app-clickable ${ui.buttonSecondary} inline-flex min-h-10 items-center gap-2 rounded-full px-4 text-xs font-semibold`}
             >
               <CameraIcon className="h-4 w-4" />
               Upload Photo
@@ -715,7 +727,7 @@ function AttachmentWorkflowCard({
         </div>
       </div>
 
-      <label className={`${ui.panelSoft} mt-4 flex min-h-[72px] cursor-pointer items-center justify-between gap-3 rounded-[22px] border border-dashed border-[var(--ui-border)] px-4 py-3`}>
+      <label className={`app-clickable ${ui.panelSoft} mt-4 flex min-h-[72px] items-center justify-between gap-3 rounded-[22px] border border-dashed border-[var(--ui-border)] px-4 py-3`}>
         <div className="min-w-0">
           <p className="truncate text-sm font-medium text-[var(--ui-text-main)]">
             {form.attachmentFile?.name || form.attachmentName || "Select PDF / SO file"}
@@ -741,7 +753,7 @@ function AttachmentWorkflowCard({
             href={form.attachmentUrl}
             target="_blank"
             rel="noreferrer"
-            className={`${ui.buttonSecondary} inline-flex min-h-10 items-center gap-2 rounded-full px-4 text-xs font-semibold`}
+            className={`app-clickable ${ui.buttonSecondary} inline-flex min-h-10 items-center gap-2 rounded-full px-4 text-xs font-semibold`}
           >
             <ArrowTopRightOnSquareIcon className="h-4 w-4" />
             View Current PDF
@@ -865,7 +877,7 @@ function PersonnelSummaryCard({
                 <button
                   type="button"
                   onClick={onEdit}
-                  className={`${ui.buttonPrimary} inline-flex min-h-10 items-center gap-2 rounded-full px-4 text-xs font-semibold`}
+                  className={`app-clickable ${ui.buttonPrimary} inline-flex min-h-10 items-center gap-2 rounded-full px-4 text-xs font-semibold`}
                 >
                   <PencilSquareIcon className="h-4 w-4" />
                   Edit
@@ -876,7 +888,7 @@ function PersonnelSummaryCard({
                   href={entry.attachment_url}
                   target="_blank"
                   rel="noreferrer"
-                  className={`${ui.buttonSecondary} inline-flex min-h-10 items-center gap-2 rounded-full px-4 text-xs font-semibold`}
+                  className={`app-clickable ${ui.buttonSecondary} inline-flex min-h-10 items-center gap-2 rounded-full px-4 text-xs font-semibold`}
                 >
                   <DocumentIcon className="h-4 w-4" />
                   Preview
@@ -976,7 +988,7 @@ function PersonnelFormCard({
             <select
               value={form.status}
               onChange={(event) => onChange({ ...form, status: event.target.value as OrgStatus })}
-              className={`${ui.input.replace("pl-11", "pl-4")}`}
+              className={`app-clickable ${ui.input.replace("pl-11", "pl-4")}`}
             >
               <option value="active">Active</option>
               {ARCHIVE_STATUS_OPTIONS.map((option) => (
@@ -1063,34 +1075,48 @@ function PersonnelModal({
   children: React.ReactNode;
   ui: ReturnType<typeof repoTheme>;
 }) {
+  const { overlayMotion, panelMotion } = useEditModalMotion();
+
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[130] flex items-center justify-center p-3 sm:p-4">
-      <button
-        type="button"
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-        onClick={onClose}
-        aria-label="Close personnel modal"
-      />
-      <div className={`${ui.modal} relative z-[131] flex max-h-[92vh] w-full max-w-4xl flex-col rounded-[30px] border shadow-[0_32px_90px_rgba(0,0,0,0.24)]`}>
-        <div className="flex items-start justify-between gap-4 border-b border-[var(--ui-border)] px-5 py-4 sm:px-6">
-          <div>
-            <p className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${ui.textSoft}`}>Personnel Form</p>
-            <h2 className={`mt-1 text-2xl font-semibold ${ui.textMain}`}>{title}</h2>
-            <p className={`mt-2 text-sm ${ui.textMuted}`}>{subtitle}</p>
+    <AnimatePresence>
+      <motion.div
+        initial={overlayMotion.initial}
+        animate={overlayMotion.animate}
+        exit={overlayMotion.exit}
+        className="fixed inset-0 z-[130] flex items-center justify-center p-3 sm:p-4"
+      >
+        <button
+          type="button"
+          className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+          onClick={onClose}
+          aria-label="Close personnel modal"
+        />
+        <motion.div
+          initial={panelMotion.initial}
+          animate={panelMotion.animate}
+          exit={panelMotion.exit}
+          className={`${ui.modal} relative z-[131] flex max-h-[92vh] w-full max-w-4xl flex-col rounded-[30px] border shadow-[0_32px_90px_rgba(0,0,0,0.24)]`}
+        >
+          <div className="flex items-start justify-between gap-4 border-b border-[var(--ui-border)] px-5 py-4 sm:px-6">
+            <div>
+              <p className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${ui.textSoft}`}>Personnel Form</p>
+              <h2 className={`mt-1 text-2xl font-semibold ${ui.textMain}`}>{title}</h2>
+              <p className={`mt-2 text-sm ${ui.textMuted}`}>{subtitle}</p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className={`${ui.buttonSecondary} inline-flex min-h-10 items-center justify-center rounded-full px-3`}
+            >
+              <XMarkIcon className="h-4 w-4" />
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className={`${ui.buttonSecondary} inline-flex min-h-10 items-center justify-center rounded-full px-3`}
-          >
-            <XMarkIcon className="h-4 w-4" />
-          </button>
-        </div>
-        <div className="overflow-y-auto p-4 sm:p-5">{children}</div>
-      </div>
-    </div>
+          <div className="overflow-y-auto p-4 sm:p-5">{children}</div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
   );
 }
 
@@ -1132,6 +1158,7 @@ function RecordList({
   dark: boolean;
 }) {
   const [openActionId, setOpenActionId] = useState<number | null>(null);
+  const { dropdownMotion, actionPressMotion } = useModalMotion();
 
   useEffect(() => {
     if (openActionId === null) return;
@@ -1205,7 +1232,7 @@ function RecordList({
                 archiveMode ? "border-[var(--ui-border)] bg-[var(--ui-bg)]/38 opacity-90" : "border-[var(--ui-border)] bg-[var(--ui-bg)]/62"
               } ${
                 canEdit
-                  ? "cursor-pointer transition duration-150 ease-out hover:-translate-y-[1px] hover:border-[rgba(57,92,122,0.32)] hover:bg-[var(--ui-bg)]/78 hover:shadow-[0_12px_24px_rgba(15,23,42,0.09)] focus:outline-none focus:ring-2 focus:ring-[#395C7A]/25"
+                  ? "app-clickable-row transition duration-150 ease-out hover:-translate-y-[1px] hover:border-[rgba(57,92,122,0.32)] hover:bg-[var(--ui-bg)]/78 hover:shadow-[0_12px_24px_rgba(15,23,42,0.09)] focus:outline-none focus:ring-2 focus:ring-[#395C7A]/25"
                   : ""
               }`}
             >
@@ -1253,7 +1280,7 @@ function RecordList({
                             target="_blank"
                             rel="noreferrer"
                             onClick={(event) => event.stopPropagation()}
-                            className="inline-flex items-center gap-1.5 text-[var(--ui-text-main)] underline-offset-2 hover:underline"
+                            className="app-clickable inline-flex items-center gap-1.5 text-[var(--ui-text-main)] underline-offset-2 hover:underline"
                           >
                             <ArrowTopRightOnSquareIcon className="h-3.5 w-3.5" />
                             Preview file
@@ -1291,71 +1318,81 @@ function RecordList({
                 <div className={`flex flex-wrap items-start gap-2 ${compactTable ? "lg:justify-end lg:justify-self-end" : "xl:max-w-[220px] xl:justify-end"}`}>
                   {(canEdit && (onArchive || onRestore || onDelete)) ? (
                     <div className="relative">
-                      <button
+                      <motion.button
                         type="button"
                         onClick={(event) => {
                           event.stopPropagation();
                           setOpenActionId((current) => (current === entry.id ? null : entry.id));
                         }}
-                        className={`${ui.buttonSecondary} inline-flex min-h-10 items-center justify-center rounded-full px-3`}
+                        whileTap={actionPressMotion}
+                        className={`app-clickable ${ui.buttonSecondary} inline-flex min-h-10 items-center justify-center rounded-full px-3`}
                         aria-haspopup="menu"
                         aria-expanded={openActionId === entry.id}
                         aria-label="More actions"
                       >
                         <EllipsisHorizontalIcon className="h-5 w-5" />
-                      </button>
+                      </motion.button>
 
-                      {openActionId === entry.id ? (
-                        <div
-                          role="menu"
-                          className={`${ui.modal} absolute right-0 z-20 mt-2 min-w-[160px] rounded-[18px] border border-[var(--ui-border)] p-1.5 shadow-[0_16px_34px_rgba(15,23,42,0.14)]`}
-                          onClick={(event) => event.stopPropagation()}
-                        >
-                          {onArchive ? (
-                            <button
-                              type="button"
-                              role="menuitem"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                setOpenActionId(null);
-                                onArchive(entry);
-                              }}
-                              className="flex w-full items-center gap-2 rounded-[12px] px-3 py-2 text-left text-sm text-[var(--ui-text-main)] transition hover:bg-[var(--ui-bg)]/60"
-                            >
-                              <ArchiveBoxArrowDownIcon className="h-4 w-4" />
-                              Archive
-                            </button>
-                          ) : null}
-                          {onRestore ? (
-                            <button
-                              type="button"
-                              role="menuitem"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                setOpenActionId(null);
-                                onRestore(entry);
-                              }}
-                              className="flex w-full items-center gap-2 rounded-[12px] px-3 py-2 text-left text-sm text-[var(--ui-text-main)] transition hover:bg-[var(--ui-bg)]/60"
-                            >
-                              <ArrowPathIcon className="h-4 w-4" />
-                              Restore
-                            </button>
-                          ) : null}
-                          <button
-                            type="button"
-                            role="menuitem"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setOpenActionId(null);
-                              onDelete(entry);
-                            }}
-                            className="flex w-full items-center gap-2 rounded-[12px] px-3 py-2 text-left text-sm text-rose-600 transition hover:bg-rose-50"
+                      <AnimatePresence>
+                        {openActionId === entry.id ? (
+                          <motion.div
+                            role="menu"
+                            initial={dropdownMotion.initial}
+                            animate={dropdownMotion.animate}
+                            exit={dropdownMotion.exit}
+                            transition={dropdownMotion.transition}
+                            className={`${ui.modal} absolute right-0 z-20 mt-2 min-w-[160px] origin-top-right rounded-[18px] border border-[var(--ui-border)] p-1.5 shadow-[0_16px_34px_rgba(15,23,42,0.14)]`}
+                            onClick={(event) => event.stopPropagation()}
                           >
-                            <TrashIcon className="h-4 w-4" />
-                            Delete
-                          </button>
-                        </div>
-                      ) : null}
+                            {onArchive ? (
+                              <motion.button
+                                type="button"
+                                role="menuitem"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setOpenActionId(null);
+                                  onArchive(entry);
+                                }}
+                                whileTap={actionPressMotion}
+                                className="app-clickable flex w-full items-center gap-2 rounded-[12px] px-3 py-2 text-left text-sm text-[var(--ui-text-main)] transition hover:bg-[var(--ui-bg)]/60"
+                              >
+                                <ArchiveBoxArrowDownIcon className="h-4 w-4" />
+                                Archive
+                              </motion.button>
+                            ) : null}
+                            {onRestore ? (
+                              <motion.button
+                                type="button"
+                                role="menuitem"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setOpenActionId(null);
+                                  onRestore(entry);
+                                }}
+                                whileTap={actionPressMotion}
+                                className="app-clickable flex w-full items-center gap-2 rounded-[12px] px-3 py-2 text-left text-sm text-[var(--ui-text-main)] transition hover:bg-[var(--ui-bg)]/60"
+                              >
+                                <ArrowPathIcon className="h-4 w-4" />
+                                Restore
+                              </motion.button>
+                            ) : null}
+                            <motion.button
+                              type="button"
+                              role="menuitem"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setOpenActionId(null);
+                                onDelete(entry);
+                              }}
+                              whileTap={actionPressMotion}
+                              className="app-clickable flex w-full items-center gap-2 rounded-[12px] px-3 py-2 text-left text-sm text-rose-600 transition hover:bg-rose-50"
+                            >
+                              <TrashIcon className="h-4 w-4" />
+                              Delete
+                            </motion.button>
+                          </motion.div>
+                        ) : null}
+                      </AnimatePresence>
                     </div>
                   ) : null}
                 </div>
@@ -1371,6 +1408,7 @@ function RecordList({
 export default function OrganizationalChartPage() {
   const { user } = useAuth();
   const { theme } = useProtectedTheme();
+  const { overlayMotion, panelMotion } = useModalMotion();
   const ui = repoTheme(theme);
   const dark = theme === "dark";
   const manageAccess = canManage(user?.role);
@@ -1747,55 +1785,69 @@ export default function OrganizationalChartPage() {
         onCancel={() => setDeleteTarget(null)}
       />
 
-      {archiveTarget ? (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
-          <button
-            type="button"
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-            onClick={() => setArchiveTarget(null)}
-            aria-label="Close archive dialog"
-          />
-          <div className={`${ui.modal} relative z-[121] w-full max-w-md rounded-[28px] p-6 shadow-[0_28px_80px_rgba(0,0,0,0.34)]`}>
-            <p className={`text-[11px] font-semibold uppercase tracking-[0.12em] ${ui.textSoft}`}>Archive Staff</p>
-            <h2 className={`mt-2 text-2xl font-semibold ${ui.textMain}`}>{archiveTarget.full_name}</h2>
-            <p className={`mt-3 text-sm ${ui.textMuted}`}>
-              Select the archive reason. The record will move from active staff to the archive section.
-            </p>
-            <label className="mt-5 block">
-              <span className={`mb-2 block text-[11px] font-semibold uppercase tracking-[0.12em] ${ui.textSoft}`}>
-                Archive Reason
-              </span>
-              <select
-                value={archiveStatus}
-                onChange={(event) => setArchiveStatus(event.target.value as OrgStatus)}
-                className={`${ui.input.replace("pl-11", "pl-4")}`}
-              >
-                {ARCHIVE_STATUS_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <div className="mt-6 flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={() => setArchiveTarget(null)}
-                className={`${ui.buttonSecondary} inline-flex min-h-11 items-center rounded-full px-5 text-sm font-semibold`}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => void archivePamoEntry()}
-                className={`${ui.buttonPrimary} inline-flex min-h-11 items-center rounded-full px-5 text-sm font-semibold`}
-              >
-                Archive Record
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <AnimatePresence>
+        {archiveTarget ? (
+          <motion.div
+            initial={overlayMotion.initial}
+            animate={overlayMotion.animate}
+            exit={overlayMotion.exit}
+            transition={overlayMotion.transition}
+            className="fixed inset-0 z-[120] flex items-center justify-center p-4"
+          >
+            <button
+              type="button"
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+              onClick={() => setArchiveTarget(null)}
+              aria-label="Close archive dialog"
+            />
+            <motion.div
+              initial={panelMotion.initial}
+              animate={panelMotion.animate}
+              exit={panelMotion.exit}
+              transition={panelMotion.transition}
+              className={`${ui.modal} relative z-[121] w-full max-w-md rounded-[28px] p-6 shadow-[0_28px_80px_rgba(0,0,0,0.34)]`}
+            >
+              <p className={`text-[11px] font-semibold uppercase tracking-[0.12em] ${ui.textSoft}`}>Archive Staff</p>
+              <h2 className={`mt-2 text-2xl font-semibold ${ui.textMain}`}>{archiveTarget.full_name}</h2>
+              <p className={`mt-3 text-sm ${ui.textMuted}`}>
+                Select the archive reason. The record will move from active staff to the archive section.
+              </p>
+              <label className="mt-5 block">
+                <span className={`mb-2 block text-[11px] font-semibold uppercase tracking-[0.12em] ${ui.textSoft}`}>
+                  Archive Reason
+                </span>
+                <select
+                  value={archiveStatus}
+                  onChange={(event) => setArchiveStatus(event.target.value as OrgStatus)}
+                  className={`app-clickable ${ui.input.replace("pl-11", "pl-4")}`}
+                >
+                  {ARCHIVE_STATUS_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="mt-6 flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={() => setArchiveTarget(null)}
+                  className={`${ui.buttonSecondary} inline-flex min-h-11 items-center rounded-full px-5 text-sm font-semibold`}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void archivePamoEntry()}
+                  className={`${ui.buttonPrimary} inline-flex min-h-11 items-center rounded-full px-5 text-sm font-semibold`}
+                >
+                  Archive Record
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
       <div className="mx-auto max-w-7xl space-y-4">
         <section className={`${ui.card} overflow-hidden p-5 sm:p-6`}>
           <div className="grid gap-5 xl:grid-cols-[1.2fr_auto] xl:items-end">

@@ -1,7 +1,7 @@
 "use client";
 
-import { motion, useReducedMotion, type MotionProps, type Variants } from "framer-motion";
-import { useEffect, useState } from "react";
+import { motion, type MotionProps, type Variants } from "framer-motion";
+import { useLightMotion } from "@/app/hooks/useLightMotion";
 
 const revealVariants: Variants = {
   hidden: {
@@ -41,24 +41,6 @@ const viewportDefaults: MotionProps["viewport"] = {
   amount: 0.18,
   margin: "0px 0px -8% 0px",
 };
-
-function useLightMotion() {
-  const prefersReducedMotion = useReducedMotion();
-  const [isSmallScreen, setIsSmallScreen] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const mediaQuery = window.matchMedia("(max-width: 767px)");
-    const update = () => setIsSmallScreen(mediaQuery.matches);
-    update();
-
-    mediaQuery.addEventListener("change", update);
-    return () => mediaQuery.removeEventListener("change", update);
-  }, []);
-
-  return prefersReducedMotion || isSmallScreen;
-}
 
 export function Reveal({
   children,

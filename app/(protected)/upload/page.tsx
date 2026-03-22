@@ -754,7 +754,7 @@ function UploadPageContent() {
                   <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value as Category)}
-                    className={inputBase}
+                    className={`app-clickable-trigger ${inputBase}`}
                   >
                     <option value="Academe">
                       Academe
@@ -791,7 +791,7 @@ function UploadPageContent() {
                     type="date"
                     value={dateReceived}
                     onChange={(e) => setDateReceived(e.target.value)}
-                    className={inputBase}
+                    className={`app-clickable-trigger ${inputBase}`}
                   />
                   <div className={`mt-2 text-[12px] ${dark ? "text-cyan-100/60" : "text-slate-500"}`}>
                     Auto Year:{" "}
@@ -929,7 +929,7 @@ function UploadPageContent() {
                         <button
                           type="button"
                           onClick={pickFile}
-                          className={`font-semibold underline underline-offset-4 ${
+                          className={`app-clickable font-semibold underline underline-offset-4 ${
                             dark ? "text-[#f0cf97] hover:text-[#f6ddb0]" : "text-[#9d6c26] hover:text-[#83581d]"
                           }`}
                         >
@@ -957,7 +957,7 @@ function UploadPageContent() {
                           <button
                             type="button"
                             onClick={clearFile}
-                            className={`h-11 w-11 rounded-xl grid place-items-center ${
+                            className={`app-clickable-icon h-11 w-11 rounded-xl grid place-items-center ${
                               dark
                                 ? "border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] text-[#DAF1DE]"
                                 : "border border-white/60 bg-white/75 hover:bg-white text-[#5d6c80]"

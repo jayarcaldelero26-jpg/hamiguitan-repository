@@ -154,7 +154,7 @@ export default async function PublicSchedulePage({
           className="absolute inset-0 bg-cover bg-center"
           style={{
             backgroundImage:
-              "linear-gradient(180deg, rgba(6,9,14,0.16) 0%, rgba(6,9,14,0.24) 36%, rgba(5,7,11,0.72) 100%), url('/images/bg.jpg')",
+              "linear-gradient(180deg, rgba(6,9,14,0.16) 0%, rgba(6,9,14,0.24) 36%, rgba(5,7,11,0.72) 100%), url('/images/carousel/carousel-04.jpg')",
           }}
         />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(245,158,11,0.14),transparent_18%),radial-gradient(circle_at_76%_18%,rgba(120,180,157,0.14),transparent_18%),linear-gradient(90deg,rgba(7,10,16,0.2)_0%,rgba(7,10,16,0.04)_42%,rgba(7,10,16,0.36)_100%)]" />

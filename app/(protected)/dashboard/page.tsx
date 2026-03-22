@@ -2,6 +2,7 @@
 
 import ConfirmDialog from "@/app/components/ConfirmDialog";
 import { useAuth } from "@/app/components/AuthProvider";
+import SearchInput from "@/app/components/SearchInput";
 
 import {
   DocumentsProvider,
@@ -13,7 +14,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   TrashIcon,
   CloudArrowDownIcon,
-  MagnifyingGlassIcon,
   EyeIcon,
   PencilSquareIcon,
   XMarkIcon,
@@ -24,6 +24,7 @@ import {
   ChartBarIcon,
 } from "@heroicons/react/24/outline";
 import { repoTheme } from "@/app/lib/repoTheme";
+import { useEditModalMotion, useModalMotion } from "@/app/lib/modalMotion";
 import { useProtectedTheme } from "@/app/components/ProtectedThemeProvider";
 import type { BookingRow } from "@/app/lib/bookingTypes";
 import {
@@ -768,10 +769,12 @@ function DashboardContent() {
   };
 
   const btnSm =
-    "app-glass-button app-protected-action-button inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-[11px] font-semibold transition";
+    "app-clickable app-glass-button app-protected-action-button inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-[11px] font-semibold transition";
 
   const dark = pageTheme === "dark";
   const ui = repoTheme(pageTheme);
+  const { overlayMotion, panelMotion } = useModalMotion();
+  const { overlayMotion: editOverlayMotion, panelMotion: editPanelMotion } = useEditModalMotion();
   const rowActionNeutralClassName = dark
     ? "border-white/10 bg-[rgba(255,255,255,0.08)] text-[#E6EDF3] [&_svg]:text-inherit"
     : "border-slate-200/80 bg-[#F3F4F6] text-[#1F2937] [&_svg]:text-inherit";
@@ -962,18 +965,14 @@ function DashboardContent() {
                 </div>
               </div>
 
-              <div className="flex-1 relative max-w-[760px]">
-                <MagnifyingGlassIcon
-                  className={`w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 ${
-                    dark ? "text-[#8EB69B]/65" : "text-[#235347]/45"
-                  }`}
-                />
-                <input
+              <div className="flex-1 max-w-[760px]">
+                <SearchInput
                   value=""
                   readOnly
                   disabled
                   placeholder="Search title, filename, folder, year…"
-                  className={`${inputCls} opacity-80`}
+                  aria-label="Search documents"
+                  inputClassName={`${inputCls} opacity-80`}
                 />
               </div>
 
@@ -1322,7 +1321,7 @@ function DashboardContent() {
                     <select
                       value={selectedStatsYear}
                       onChange={(event) => setSelectedStatsYear(Number(event.target.value))}
-                      className={inputCls}
+                      className={`app-clickable-trigger ${inputCls}`}
                     >
                       {statsYearOptions.map((year) => (
                         <option key={year} value={year}>
@@ -1408,17 +1407,13 @@ function DashboardContent() {
                 </div>
               </div>
 
-              <div className="flex-1 relative max-w-[760px]">
-                <MagnifyingGlassIcon
-                  className={`w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 ${
-                    dark ? "text-[#8EB69B]/65" : "text-[#235347]/45"
-                  }`}
-                />
-                <input
+              <div className="flex-1 max-w-[760px]">
+                <SearchInput
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Search title, filename, folder, year…"
-                  className={inputCls}
+                  aria-label="Search documents"
+                  inputClassName={inputCls}
                 />
               </div>
 
@@ -1633,17 +1628,15 @@ function DashboardContent() {
       <AnimatePresence>
         {editDoc && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.16 }}
+            initial={editOverlayMotion.initial}
+            animate={editOverlayMotion.animate}
+            exit={editOverlayMotion.exit}
             className={`z-[65] ${modalOverlayClassName}`}
           >
             <motion.div
-              initial={{ opacity: 0, y: 16, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 8, scale: 0.98 }}
-              transition={{ duration: 0.18 }}
+              initial={editPanelMotion.initial}
+              animate={editPanelMotion.animate}
+              exit={editPanelMotion.exit}
               className={`relative w-full max-w-2xl rounded-[28px] shadow-2xl overflow-hidden ${ui.modal}`}
             >
               <div className={`px-4 sm:px-6 py-4 sm:py-5 border-b ${dark ? "border-white/8 bg-[#051F20]/45" : "border-white/55 bg-white/45"}`}>
@@ -1672,7 +1665,7 @@ function DashboardContent() {
                       setEditSelectedFolder("");
                       setEditNewFolder("");
                     }}
-                    className={`${ui.input.replace("pl-11", "pl-4")} mt-2 text-sm`}
+                    className={`app-clickable-trigger ${ui.input.replace("pl-11", "pl-4")} mt-2 text-sm`}
                     disabled={savingEdit}
                   >
                     <option value="Academe">Academe</option>
@@ -1698,7 +1691,7 @@ function DashboardContent() {
                       type="date"
                       value={editDateReceived}
                       onChange={(e) => setEditDateReceived(e.target.value)}
-                      className={`${ui.input.replace("pl-11", "pl-4")} mt-2 text-sm`}
+                      className={`app-clickable-trigger ${ui.input.replace("pl-11", "pl-4")} mt-2 text-sm`}
                       disabled={savingEdit}
                     />
                   </div>
@@ -1766,17 +1759,17 @@ function DashboardContent() {
 
         {previewDoc && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.16 }}
+            initial={overlayMotion.initial}
+            animate={overlayMotion.animate}
+            exit={overlayMotion.exit}
+            transition={overlayMotion.transition}
             className={`z-[60] ${modalOverlayClassName}`}
           >
             <motion.div
-              initial={{ opacity: 0, y: 16, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 8, scale: 0.98 }}
-              transition={{ duration: 0.18 }}
+              initial={panelMotion.initial}
+              animate={panelMotion.animate}
+              exit={panelMotion.exit}
+              transition={panelMotion.transition}
               className={`relative w-full max-w-5xl max-h-[92dvh] rounded-[28px] shadow-2xl overflow-hidden ${ui.modal}`}
             >
               <div className={`absolute inset-x-6 top-0 h-1.5 rounded-b-full ${dark ? "bg-[#97bbe4]/55" : "bg-[#97bbe4]/72"}`} />
@@ -1874,3 +1867,4 @@ export default function Dashboard() {
     </DocumentsProvider>
   );
 }
+
