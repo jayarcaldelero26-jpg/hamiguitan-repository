@@ -1,10 +1,9 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
 import { memo, useEffect, useRef, useState } from "react";
-import { useIsSmallScreen, useLightMotion } from "@/app/hooks/useLightMotion";
+import { useLightMotion } from "@/app/hooks/useLightMotion";
 
 type Slide = {
   image: string;
@@ -22,6 +21,9 @@ type Slide = {
 
 const AUTOPLAY_MS = 5000;
 const SWIPE_THRESHOLD = 48;
+const FIRST_SLIDE_BLUR_DATA_URL =
+  "data:image/webp;base64,UklGRkoAAABXRUJQVlA4ID4AAABQAwCdASoQAAkAAUAmJaACdLoB+AADsAD+8ut//NgVzXPv9//S4P0uD9Lg/9KQAAA=";
+
 const partnerLogos = [
   {
     src: "/images/branding/denr-logo.png",
@@ -42,7 +44,7 @@ const partnerLogos = [
 
 const slides: Slide[] = [
   {
-    image: "/images/carousel/carousel-01.jpg",
+    image: "/images/carousel/carousel-01.optimized.webp",
     title: "Range Wildlife Sanctuary",
     subtitle:
       "Discover the sanctuary through a homepage that balances protected area information, trail planning, and visitor coordination.",
@@ -56,7 +58,7 @@ const slides: Slide[] = [
     },
   },
   {
-    image: "/images/carousel/carousel-02.jpg",
+    image: "/images/carousel/carousel-02.optimized.webp",
     title: "Protecting Biodiversity And Natural Heritage",
     subtitle:
       "Learn more about endemic habitats, conservation value, and why Mount Hamiguitan remains one of the Philippines' most important mountain landscapes.",
@@ -70,7 +72,7 @@ const slides: Slide[] = [
     },
   },
   {
-    image: "/images/carousel/carousel-03.jpg",
+    image: "/images/carousel/carousel-03.optimized.webp",
     title: "Trail Information For The Public",
     subtitle:
       "Preview the San Isidro and Governor Generoso trail options before moving into schedule planning and booking.",
@@ -84,7 +86,7 @@ const slides: Slide[] = [
     },
   },
   {
-    image: "/images/carousel/carousel-04.jpg",
+    image: "/images/carousel/carousel-04.optimized.webp",
     title: "Schedule And Climb Preparation",
     subtitle:
       "Use the public schedule view to understand climb timing, trail occupancy, and next steps more clearly.",
@@ -98,7 +100,7 @@ const slides: Slide[] = [
     },
   },
   {
-    image: "/images/carousel/carousel-05.jpg",
+    image: "/images/carousel/carousel-05.optimized.webp",
     title: "Public Access With Protected Systems Separate",
     subtitle:
       "The public website stays focused on visitor information and planning, while protected tools remain separate for authorized users.",
@@ -116,23 +118,21 @@ const slides: Slide[] = [
 function HeroCarousel() {
   const [activeIndex, setActiveIndex] = useState(0);
   const [hoverPaused, setHoverPaused] = useState(false);
-  const isSmallScreen = useIsSmallScreen();
   const lightMotion = useLightMotion();
   const pointerStartXRef = useRef<number | null>(null);
   const pointerActiveRef = useRef(false);
 
-  const isPaused = hoverPaused;
   const activeSlide = slides[activeIndex] ?? slides[0];
 
   useEffect(() => {
-    if (lightMotion || isPaused) return;
+    if (lightMotion || hoverPaused) return;
 
     const timer = window.setInterval(() => {
       setActiveIndex((current) => (current + 1) % slides.length);
     }, AUTOPLAY_MS);
 
     return () => window.clearInterval(timer);
-  }, [isPaused, lightMotion]);
+  }, [hoverPaused, lightMotion]);
 
   const goToSlide = (index: number) => {
     setActiveIndex(index);
@@ -192,33 +192,25 @@ function HeroCarousel() {
       }}
     >
       <div className="relative min-h-[72vh] overflow-hidden bg-[#05070b] md:min-h-[88vh]">
-        <AnimatePresence initial={false} mode="wait">
-          <motion.div
-            key={activeSlide.image}
-            initial={lightMotion ? { opacity: 1 } : { opacity: 0.72, scale: 1.01 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={lightMotion ? { opacity: 1 } : { opacity: 0 }}
-            transition={{ duration: lightMotion ? 0.2 : 0.7, ease: [0.22, 1, 0.36, 1] }}
-            className="absolute inset-0"
-            style={{ backgroundColor: "#0a0f16" }}
-          >
-            <Image
-              src={activeSlide.image}
-              alt=""
-              fill
-              priority={activeIndex === 0}
-              loading={activeIndex === 0 ? "eager" : "lazy"}
-              quality={82}
-              sizes="100vw"
-              className="object-cover"
-            />
-            <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,7,11,0.12)_0%,rgba(5,7,11,0.28)_34%,rgba(5,7,11,0.54)_68%,rgba(5,7,11,0.72)_100%)]" />
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(249,115,22,0.12),transparent_24%),radial-gradient(circle_at_78%_18%,rgba(245,158,11,0.1),transparent_22%),radial-gradient(circle_at_50%_100%,rgba(56,189,248,0.06),transparent_30%),linear-gradient(90deg,rgba(5,7,11,0.42)_0%,rgba(5,7,11,0.12)_42%,rgba(5,7,11,0.48)_100%)]" />
-          </motion.div>
-        </AnimatePresence>
+        <div key={activeSlide.image} className="absolute inset-0" style={{ backgroundColor: "#0a0f16" }}>
+          <Image
+            src={activeSlide.image}
+            alt=""
+            fill
+            priority={activeIndex === 0}
+            loading={activeIndex === 0 ? "eager" : "lazy"}
+            placeholder={activeIndex === 0 ? "blur" : "empty"}
+            blurDataURL={activeIndex === 0 ? FIRST_SLIDE_BLUR_DATA_URL : undefined}
+            quality={70}
+            sizes="100vw"
+            className="object-cover"
+          />
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,7,11,0.12)_0%,rgba(5,7,11,0.28)_34%,rgba(5,7,11,0.54)_68%,rgba(5,7,11,0.72)_100%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(249,115,22,0.12),transparent_24%),radial-gradient(circle_at_78%_18%,rgba(245,158,11,0.1),transparent_22%),radial-gradient(circle_at_50%_100%,rgba(56,189,248,0.06),transparent_30%),linear-gradient(90deg,rgba(5,7,11,0.42)_0%,rgba(5,7,11,0.12)_42%,rgba(5,7,11,0.48)_100%)]" />
+        </div>
 
         <div className="pointer-events-none absolute inset-0 z-[1]">
-          {!isSmallScreen ? (
+          {!lightMotion ? (
             <>
               <div className="absolute left-[8%] top-[18%] h-32 w-32 rounded-full bg-[radial-gradient(circle,rgba(249,115,22,0.1),transparent_70%)] blur-lg md:h-40 md:w-40" />
               <div className="absolute right-[6%] top-[14%] hidden h-40 w-40 rounded-full bg-[radial-gradient(circle,rgba(245,158,11,0.08),transparent_70%)] blur-xl md:block md:h-48 md:w-48" />
@@ -227,13 +219,7 @@ function HeroCarousel() {
         </div>
 
         <div className="relative z-10 mx-auto flex min-h-[72vh] max-w-[1180px] items-end px-5 pb-14 pt-28 sm:px-6 sm:pb-16 md:min-h-[88vh] md:px-8 md:pb-20 md:pt-32">
-          <motion.div
-            initial={{ opacity: 0, y: 28 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.45 }}
-            transition={{ duration: lightMotion ? 0 : 0.58, ease: [0.22, 1, 0.36, 1] }}
-            className="grid w-full items-end gap-8 lg:grid-cols-[minmax(0,1fr)_280px] lg:gap-10"
-          >
+          <div className="grid w-full items-end gap-8 lg:grid-cols-[minmax(0,1fr)_280px] lg:gap-10">
             <div className="public-panel-highlight pointer-events-auto max-w-4xl overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(13,18,28,0.68),rgba(7,10,16,0.5))] px-6 py-6 shadow-[0_16px_42px_rgba(0,0,0,0.24)] backdrop-blur-[6px] sm:px-7 sm:py-7 md:rounded-[38px] md:px-9 md:py-9">
               <span className="public-kicker">UNESCO World Heritage Site</span>
               <h1 className="mt-5 text-[2.5rem] font-semibold leading-[0.98] tracking-[-0.05em] text-white sm:text-[3.4rem] md:text-[5rem]">
@@ -279,13 +265,7 @@ function HeroCarousel() {
               </div>
             </div>
 
-            <motion.aside
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.45 }}
-              transition={{ duration: lightMotion ? 0 : 0.62, delay: lightMotion ? 0 : 0.08, ease: [0.22, 1, 0.36, 1] }}
-              className="hidden pointer-events-auto lg:grid lg:gap-4"
-            >
+            <aside className="hidden pointer-events-auto lg:grid lg:gap-4">
               <div className="public-hero-stat rounded-[26px] p-5">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#ffd08a]">
                   Visitor Journey
@@ -306,8 +286,8 @@ function HeroCarousel() {
                   Premium presentation with public information kept clear and uncluttered.
                 </p>
               </div>
-            </motion.aside>
-          </motion.div>
+            </aside>
+          </div>
         </div>
 
         <div className="absolute inset-x-0 bottom-5 z-20 mx-auto flex max-w-[1180px] items-end justify-between px-5 sm:bottom-6 sm:px-6 md:bottom-10 md:px-8">

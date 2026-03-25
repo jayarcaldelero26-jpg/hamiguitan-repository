@@ -1,11 +1,9 @@
 "use client";
 
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import Link from "next/link";
 import { memo, useState } from "react";
 import { ChevronLeftIcon, ChevronRightIcon } from "@heroicons/react/24/outline";
 import type { PublicDocumentRow } from "@/app/lib/publicDocuments";
-import { useIsSmallScreen } from "@/app/hooks/useLightMotion";
 
 function documentPreviewUrl(fileId: string) {
   return `https://drive.google.com/file/d/${fileId}/preview`;
@@ -27,14 +25,11 @@ function LatestPublicDocumentsShowcase({
 }: {
   documents: PublicDocumentRow[];
 }) {
-  const prefersReducedMotion = useReducedMotion();
   const [activeIndex, setActiveIndex] = useState(0);
-  const isSmallScreen = useIsSmallScreen();
   const [previewRequested, setPreviewRequested] = useState(false);
   const activeDocument = documents[activeIndex] ?? null;
   const activePreviewUrl = activeDocument?.fileId ? documentPreviewUrl(activeDocument.fileId) : "";
   const canPreviewActiveDocument = supportsFeaturedPreview(activeDocument?.type);
-  const lightMotion = prefersReducedMotion || isSmallScreen;
 
   const goTo = (index: number) => {
     if (!documents.length) return;
@@ -122,25 +117,14 @@ function LatestPublicDocumentsShowcase({
             </div>
 
             <div className="flex flex-col justify-between rounded-[26px] border border-white/10 bg-[rgba(255,255,255,0.03)] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={activeDocument?.id}
-                  initial={lightMotion ? false : { opacity: 0, y: 16 }}
-                  animate={lightMotion ? {} : { opacity: 1, y: 0 }}
-                  exit={lightMotion ? {} : { opacity: 0, y: -12 }}
-                  transition={{
-                    duration: lightMotion ? 0 : 0.28,
-                    ease: [0.22, 1, 0.36, 1],
-                  }}
-                >
-                  <span className="inline-flex rounded-full border border-[rgba(245,158,11,0.18)] bg-[rgba(245,158,11,0.08)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--public-accent)]">
-                    {activeDocument?.kind}
-                  </span>
-                  <h3 className="mt-5 text-[1.7rem] font-semibold leading-[1.08] tracking-[-0.035em] text-[var(--public-text)] md:text-[2.15rem]">
-                    {activeDocument?.title}
-                  </h3>
-                </motion.div>
-              </AnimatePresence>
+              <div>
+                <span className="inline-flex rounded-full border border-[rgba(245,158,11,0.18)] bg-[rgba(245,158,11,0.08)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--public-accent)]">
+                  {activeDocument?.kind}
+                </span>
+                <h3 className="mt-5 text-[1.7rem] font-semibold leading-[1.08] tracking-[-0.035em] text-[var(--public-text)] md:text-[2.15rem]">
+                  {activeDocument?.title}
+                </h3>
+              </div>
 
               <div className="mt-8 grid gap-3">
                 <div className="public-card-soft w-full px-4 py-3 text-sm text-[var(--public-text-muted)]">

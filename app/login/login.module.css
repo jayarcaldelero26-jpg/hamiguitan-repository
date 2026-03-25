@@ -44,13 +44,13 @@
 
 /* ---------- background ---------- */
 
-.bgImage {
+.bgMedia {
   position: absolute;
   inset: 0;
-  background-image: url("/images/auth/hamiguitan-login-bg.jpg");
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
+}
+
+.bgImage {
+  object-fit: cover;
   transform: scale(1.03);
 }
 
@@ -487,15 +487,24 @@
 
 .inlineRegister{
   margin-left:8px;
-  background:none;
-  border:none;
   color:#11f2ff;
   font-weight:700;
-  cursor:pointer;
+  text-decoration:none;
 }
 
 .inlineRegister:hover{
   color:#72f6ff;
+}
+
+.statusMessage{
+  margin-bottom:14px;
+  padding:12px 14px;
+  border-radius:16px;
+  border:1px solid rgba(255,209,138,0.18);
+  background:rgba(122,46,55,0.34);
+  color:#fff1da;
+  font-size:13px;
+  line-height:1.5;
 }
 
 .footerLine{
@@ -515,17 +524,6 @@
   text-align:center;
   font-size:14px;
   color:rgba(245,251,255,0.88);
-}
-
-/* ---------- loading ---------- */
-
-.loadingScreen{
-  min-height:100vh;
-  display:grid;
-  place-items:center;
-  background:linear-gradient(135deg,#02040a 0%,#07111d 45%,#03070d 100%);
-  color:white;
-  font-weight:700;
 }
 
 /* ---------- animations ---------- */
