@@ -9,7 +9,7 @@ import {
   useDocuments,
   type DocumentRow,
 } from "@/app/components/DocumentsProvider";
-import { memo, useEffect, useMemo, useState } from "react";
+import { memo, useDeferredValue, useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   TrashIcon,
@@ -359,6 +359,7 @@ const dashboardTimeFormatter = new Intl.DateTimeFormat("en-US", {
 });
 
 const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const INITIAL_VISIBLE_DOCUMENTS = 25;
 
 const LiveDateTimeMeta = memo(function LiveDateTimeMeta({
   textMain,
@@ -404,9 +405,11 @@ function DashboardContent() {
 
   const { theme: pageTheme } = useProtectedTheme();
   const [query, setQuery] = useState("");
+  const deferredQuery = useDeferredValue(query);
   const [activeTab, setActiveTab] = useState<
     "all" | "academe" | "stakeholder" | "pamo"
   >("all");
+  const [visibleDocCount, setVisibleDocCount] = useState(INITIAL_VISIBLE_DOCUMENTS);
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [successOpen, setSuccessOpen] = useState(false);
@@ -451,7 +454,7 @@ function DashboardContent() {
   }, [docs]);
 
   const filteredDocs = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = deferredQuery.trim().toLowerCase();
 
     return docs.filter((d) => {
       const c = normalizeCat(d.category);
@@ -474,7 +477,12 @@ function DashboardContent() {
 
       return hay.includes(q);
     });
-  }, [docs, query, activeTab]);
+  }, [activeTab, deferredQuery, docs]);
+
+  const visibleFilteredDocs = useMemo(
+    () => filteredDocs.slice(0, visibleDocCount),
+    [filteredDocs, visibleDocCount]
+  );
 
   const recentUploads = useMemo(() => {
     const arr = [...docs];
@@ -598,6 +606,10 @@ function DashboardContent() {
     setSelectedStatsYear(statsYearOptions[0] || new Date().getFullYear());
   }, [selectedStatsYear, statsYearOptions]);
 
+  useEffect(() => {
+    setVisibleDocCount(INITIAL_VISIBLE_DOCUMENTS);
+  }, [activeTab, deferredQuery]);
+
   const monthlyBookingStats = useMemo(
     () => getMonthlyStats(bookings, selectedStatsYear),
     [bookings, selectedStatsYear]
@@ -642,8 +654,12 @@ function DashboardContent() {
     if (loadingUser || !user) return;
 
     let active = true;
+    const win = window as Window & {
+      requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
 
-    (async () => {
+    const loadBookings = async () => {
       try {
         setLoadingBookings(true);
         const res = await fetch("/api/bookings", {
@@ -665,10 +681,23 @@ function DashboardContent() {
       } finally {
         if (active) setLoadingBookings(false);
       }
-    })();
+    };
+
+    const timeoutId = window.setTimeout(() => {
+      void loadBookings();
+    }, 600);
+
+    const idleId = win.requestIdleCallback?.(() => {
+      window.clearTimeout(timeoutId);
+      void loadBookings();
+    }, { timeout: 1600 });
 
     return () => {
       active = false;
+      window.clearTimeout(timeoutId);
+      if (idleId !== undefined) {
+        win.cancelIdleCallback?.(idleId);
+      }
     };
   }, [loadingUser, user]);
 
@@ -960,7 +989,8 @@ function DashboardContent() {
                   Search and refine document results
                 </div>
                 <div className={`mt-1 text-[12px] ${textMuted}`}>
-                  Showing <span className={`font-medium ${textMain}`}>{filteredDocs.length}</span> of{" "}
+                  Showing <span className={`font-medium ${textMain}`}>{visibleFilteredDocs.length}</span> of{" "}
+                  <span className={`font-medium ${textMain}`}>{filteredDocs.length}</span> filtered,{" "}
                   <span className={`font-medium ${textMain}`}>{docs.length}</span> documents
                 </div>
               </div>
@@ -1504,11 +1534,11 @@ function DashboardContent() {
 
                 <div
                   className={`scroll-docs overflow-y-auto ${
-                    filteredDocs.length > 4 ? "max-h-[430px]" : ""
+                    visibleFilteredDocs.length > 4 ? "max-h-[430px]" : ""
                   }`}
                 >
                   <div className={dark ? "divide-y divide-white/8" : "divide-y divide-white/50"}>
-                    {filteredDocs.map((doc) => (
+                    {visibleFilteredDocs.map((doc) => (
                       <div
                         key={doc.id}
                         className={`px-4 py-4 lg:px-5 transition-all duration-200 ${ui.rowHover}`}
@@ -1615,6 +1645,25 @@ function DashboardContent() {
                     ))}
                   </div>
                 </div>
+
+                {visibleFilteredDocs.length < filteredDocs.length && (
+                  <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                    <div className={`text-[12px] ${textMuted}`}>
+                      Rendering the first {visibleFilteredDocs.length} rows initially to keep the dashboard responsive.
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setVisibleDocCount((current) =>
+                          Math.min(current + INITIAL_VISIBLE_DOCUMENTS, filteredDocs.length)
+                        )
+                      }
+                      className={`min-h-11 px-5 py-3 rounded-[20px] font-medium text-sm transition ${ui.buttonSecondary}`}
+                    >
+                      Show More
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 

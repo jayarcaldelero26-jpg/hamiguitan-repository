@@ -41,19 +41,21 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({
   children,
+  initialUser = null,
   redirectTo = "/",
 }: {
   children: React.ReactNode;
+  initialUser?: AuthUser | null;
   redirectTo?: string;
 }) {
   const router = useRouter();
   const pathname = usePathname();
 
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<AuthUser | null>(initialUser);
+  const [loading, setLoading] = useState(initialUser ? false : true);
 
   const mountedRef = useRef(true);
-  const fetchedOnceRef = useRef(false);
+  const fetchedOnceRef = useRef(Boolean(initialUser));
 
   const isPublicRoute =
     pathname === "/login" || pathname === "/register" || pathname === "/";
@@ -191,12 +193,14 @@ export function AuthProvider({
     if (!fetchedOnceRef.current) {
       fetchedOnceRef.current = true;
       fetchMe({ silent: false, redirectOnFail: true });
+    } else if (mountedRef.current) {
+      setLoading(false);
     }
 
     return () => {
       mountedRef.current = false;
     };
-  }, [fetchMe, isPublicRoute, redirectTo, router]);
+  }, [fetchMe, initialUser, isPublicRoute, redirectTo, router]);
 
   useEffect(() => {
     if (!user) return;

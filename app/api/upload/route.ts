@@ -14,8 +14,6 @@ import {
   normalizeFolderName,
 } from "@/app/lib/googleDrive";
 
-const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
-
 function normalizeRole(role?: string) {
   return (role || "").trim().toLowerCase();
 }
@@ -111,13 +109,6 @@ export async function POST(req: NextRequest) {
 
     if (!fileObj.size) {
       return NextResponse.json({ error: "Selected file is empty." }, { status: 400 });
-    }
-
-    if (fileObj.size > MAX_FILE_SIZE) {
-      return NextResponse.json(
-        { error: "Maximum file size is 50 MB." },
-        { status: 400 }
-      );
     }
 
     console.log("UPLOAD START:", {

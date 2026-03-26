@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { clearBrowserTabDenied, markBrowserSessionActive } from "@/app/lib/authSession";
@@ -61,6 +61,10 @@ export default function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
+  useEffect(() => {
+    router.prefetch("/dashboard");
+  }, [router]);
+
   const handleLogin = async () => {
     if (loading) return;
 
@@ -88,7 +92,6 @@ export default function LoginForm() {
       clearBrowserTabDenied();
       markBrowserSessionActive(Date.now(), { regenerateTabId: true });
       router.replace("/dashboard");
-      router.refresh();
     } catch {
       setErrorMsg("Server unreachable. Check internet or server.");
     } finally {

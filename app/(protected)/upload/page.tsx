@@ -26,10 +26,10 @@ import {
 
 type Category = "Academe" | "Stakeholder" | "PAMO Activity";
 type FoldersState = { academe: string[]; stakeholders: string[]; pamo: string[] };
+type UploadMode = "direct" | "legacy";
 
 const TEMP_BUCKET = "temp-uploads";
-const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
-const DIRECT_UPLOAD_THRESHOLD = 4 * 1024 * 1024; // 4 MB Vercel-safe threshold
+const LEGACY_MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB temp-storage compatibility limit
 const USE_DIRECT_UPLOAD = process.env.NEXT_PUBLIC_USE_DIRECT_UPLOAD !== "false";
 
 function initials(name: string) {
@@ -86,8 +86,34 @@ function getFolderStateKey(category: string): keyof FoldersState {
   return "academe";
 }
 
-function shouldUseDirectUpload(fileSize: number) {
-  return USE_DIRECT_UPLOAD && fileSize <= DIRECT_UPLOAD_THRESHOLD;
+function getRepositoryUploadMode(fileSize: number): UploadMode {
+  return USE_DIRECT_UPLOAD && fileSize > 0 ? "direct" : "legacy";
+}
+
+function validateRepositoryFile(file: File | null) {
+  if (!file) {
+    return {
+      ok: false as const,
+      error: "",
+      mode: "legacy" as UploadMode,
+    };
+  }
+
+  const mode = getRepositoryUploadMode(file.size);
+
+  if (mode === "legacy" && file.size > LEGACY_MAX_FILE_SIZE) {
+    return {
+      ok: false as const,
+      error: "File is too large for the legacy upload path. Maximum allowed file size is 50 MB.",
+      mode,
+    };
+  }
+
+  return {
+    ok: true as const,
+    error: "",
+    mode,
+  };
 }
 
 function emptyFoldersState(): FoldersState {
@@ -287,9 +313,8 @@ function UploadPageContent() {
   const folderRequired = category === "Stakeholder" || category === "PAMO Activity";
   const fileSize = file?.size ?? 0;
   const fileType = file?.type || "unknown";
-  const useDirectUploadForSelectedFile = file
-    ? shouldUseDirectUpload(file.size)
-    : false;
+  const selectedFileValidation = validateRepositoryFile(file);
+  const selectedUploadMode = selectedFileValidation.mode;
 
   const requiredOk = useMemo(() => {
     if (!title.trim()) return false;
@@ -331,14 +356,16 @@ function UploadPageContent() {
       return;
     }
 
-    if (f.size > MAX_FILE_SIZE) {
+    const validation = validateRepositoryFile(f);
+
+    if (!validation.ok) {
       setFile(null);
 
       if (inputRef.current) {
         inputRef.current.value = "";
       }
 
-      setErrorMsg("File is too large. Maximum allowed file size is 50 MB.");
+      setErrorMsg(validation.error);
       setErrorOpen(true);
       return;
     }
@@ -587,8 +614,8 @@ function UploadPageContent() {
       return;
     }
 
-    if (file.size > MAX_FILE_SIZE) {
-      setErrorMsg("File is too large. Maximum allowed file size is 50 MB.");
+    if (!selectedFileValidation.ok) {
+      setErrorMsg(selectedFileValidation.error);
       setErrorOpen(true);
       return;
     }
@@ -619,13 +646,13 @@ function UploadPageContent() {
     setUploadPercent(5);
     setUploadStage("Preparing upload");
     setUploadDetail(
-      useDirectUploadForSelectedFile
+      selectedUploadMode === "direct"
         ? "Checking required fields and preparing direct server upload."
         : "Checking required fields and preparing temporary storage."
     );
 
     try {
-      if (shouldUseDirectUpload(file.size)) {
+      if (selectedUploadMode === "direct") {
         await uploadViaDirectRoute(file, finalFolder);
       } else {
         await uploadViaLegacyTransfer(file, finalFolder);
@@ -1141,7 +1168,9 @@ function UploadPageContent() {
                 </div>
 
                 <p className={`mt-3 text-[12px] ${dark ? "text-cyan-100/65" : "text-slate-500"}`}>
-                  Files up to 4 MB use direct server upload. Larger files use the compatibility upload path.
+                  {USE_DIRECT_UPLOAD
+                    ? "Files are routed directly to Google Drive. The old temporary-storage compatibility path remains available only when direct upload is disabled."
+                    : "Direct upload is disabled. Files use the compatibility upload path with a 50 MB limit."}
                 </p>
               </div>
 
@@ -1354,7 +1383,15 @@ function UploadPageContent() {
                 }`}
               >
                 <div className={`text-[12px] ${dark ? "text-amber-100/85" : "text-amber-700"}`}>
-                  Upload limit: <span className="font-semibold">50 MB maximum per file</span>
+                  {USE_DIRECT_UPLOAD ? (
+                    <>
+                      Upload mode: <span className="font-semibold">Direct Google Drive upload enabled</span>
+                    </>
+                  ) : (
+                    <>
+                      Upload limit: <span className="font-semibold">50 MB maximum per file</span>
+                    </>
+                  )}
                 </div>
               </div>
 
