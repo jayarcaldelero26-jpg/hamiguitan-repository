@@ -90,6 +90,14 @@ function shouldUseDirectUpload(fileSize: number) {
   return USE_DIRECT_UPLOAD && fileSize <= DIRECT_UPLOAD_THRESHOLD;
 }
 
+function emptyFoldersState(): FoldersState {
+  return {
+    academe: [],
+    stakeholders: [],
+    pamo: [],
+  };
+}
+
 function Skeleton({
   className,
   dark,
@@ -117,10 +125,13 @@ function UploadPageContent() {
   const [title, setTitle] = useState("");
   const [dateReceived, setDateReceived] = useState("");
 
-  const [folders, setFolders] = useState<FoldersState>({
-    academe: [],
-    stakeholders: [],
-    pamo: [],
+  const [folders, setFolders] = useState<FoldersState>(emptyFoldersState);
+  const [loadedFolderGroups, setLoadedFolderGroups] = useState<
+    Record<keyof FoldersState, boolean>
+  >({
+    academe: false,
+    stakeholders: false,
+    pamo: false,
   });
   const [loadingFolders, setLoadingFolders] = useState(true);
 
@@ -154,8 +165,15 @@ function UploadPageContent() {
     }
   }, [loadingMe, me, router]);
 
-  const fetchFolders = useCallback(async (signal?: AbortSignal) => {
-    const r = await fetch("/api/folders", {
+  const fetchFolders = useCallback(async (
+    requestedCategory?: string,
+    signal?: AbortSignal
+  ) => {
+    const query = requestedCategory
+      ? `?category=${encodeURIComponent(requestedCategory)}`
+      : "";
+
+    const r = await fetch(`/api/folders${query}`, {
       credentials: "include",
       cache: "no-store",
       signal,
@@ -163,10 +181,35 @@ function UploadPageContent() {
 
     const data = r.ok ? await r.json() : null;
 
+    if (requestedCategory) {
+      const folderKey = getFolderStateKey(requestedCategory);
+
+      setFolders((current) => ({
+        ...current,
+        [folderKey]: safeArray(
+          folderKey === "stakeholders"
+            ? data?.stakeholders ?? data?.stakeholder
+            : data?.[folderKey]
+        ),
+      }));
+
+      setLoadedFolderGroups((current) => ({
+        ...current,
+        [folderKey]: true,
+      }));
+
+      return;
+    }
+
     setFolders({
       academe: safeArray(data?.academe),
       stakeholders: safeArray(data?.stakeholders ?? data?.stakeholder),
       pamo: safeArray(data?.pamo),
+    });
+    setLoadedFolderGroups({
+      academe: true,
+      stakeholders: true,
+      pamo: true,
     });
   }, []);
 
@@ -175,20 +218,25 @@ function UploadPageContent() {
     if (!me) return;
     if (me.role !== "admin" && me.role !== "co_admin") return;
 
+    const folderKey = getFolderStateKey(category);
+    if (loadedFolderGroups[folderKey]) {
+      setLoadingFolders(false);
+      return;
+    }
+
     const controller = new AbortController();
 
     async function loadFolders() {
       try {
         setLoadingFolders(true);
-        await fetchFolders(controller.signal);
+        await fetchFolders(category, controller.signal);
       } catch (err: unknown) {
         if (isAbortError(err)) return;
 
-        setFolders({
-          academe: [],
-          stakeholders: [],
-          pamo: [],
-        });
+        setFolders((current) => ({
+          ...current,
+          [folderKey]: [],
+        }));
       } finally {
         if (!controller.signal.aborted) {
           setLoadingFolders(false);
@@ -199,7 +247,7 @@ function UploadPageContent() {
     loadFolders();
 
     return () => controller.abort();
-  }, [loadingMe, me, fetchFolders]);
+  }, [loadingMe, me, fetchFolders, category, loadedFolderGroups]);
 
   useEffect(() => {
     setSelectedFolder("");
@@ -325,6 +373,11 @@ function UploadPageContent() {
         ),
       };
     });
+
+    setLoadedFolderGroups((current) => ({
+      ...current,
+      [folderKey]: true,
+    }));
   }
 
   async function finalizeSuccessfulUpload({
@@ -345,7 +398,7 @@ function UploadPageContent() {
     if (refreshAfterSuccess) {
       try {
         setLoadingFolders(true);
-        await Promise.all([fetchFolders(), refreshDocuments()]);
+        await Promise.all([fetchFolders(resolvedCategory), refreshDocuments()]);
       } catch (refreshErr) {
         console.error("POST-UPLOAD REFRESH ERROR:", refreshErr);
       } finally {
@@ -375,8 +428,6 @@ function UploadPageContent() {
   }
 
   async function uploadViaDirectRoute(fileToUpload: File, folderValue: string) {
-    await wait(200);
-
     setUploadPercent(15);
     setUploadStage("Uploading to server");
     setUploadDetail("Sending file to the server for direct Google Drive upload.");
@@ -390,8 +441,8 @@ function UploadPageContent() {
     formData.append("year", year || new Date().getFullYear().toString());
 
     setUploadPercent(38);
-    setUploadStage("Uploading to Google Drive");
-    setUploadDetail("Uploading the file directly to Google Drive and saving metadata.");
+    setUploadStage("Processing upload...");
+    setUploadDetail("Uploading and saving file...");
 
     const uploadRes = await fetch("/api/upload", {
       method: "POST",
@@ -1090,12 +1141,6 @@ function UploadPageContent() {
                 </div>
 
                 <p className={`mt-3 text-[12px] ${dark ? "text-cyan-100/65" : "text-slate-500"}`}>
-                  Maximum allowed file size:{" "}
-                  <span className={`font-semibold ${dark ? "text-cyan-200" : "text-slate-700"}`}>
-                    50 MB
-                  </span>
-                </p>
-                <p className={`mt-1 text-[12px] ${dark ? "text-cyan-100/65" : "text-slate-500"}`}>
                   Files up to 4 MB use direct server upload. Larger files use the compatibility upload path.
                 </p>
               </div>

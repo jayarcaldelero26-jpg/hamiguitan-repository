@@ -39,64 +39,79 @@ function getVariant(variant?: DialogVariant, danger?: boolean): DialogVariant {
 }
 
 function AnimatedSuccessIcon() {
-  const circleLength = 182.212;
-  const checkLength = 36;
+  const circleLength = 282.743;
+  const checkLength = 50;
 
   return (
-    <motion.svg
-      viewBox="0 0 48 48"
-      className="h-8 w-8"
-      fill="none"
-      initial={{ scale: 0.75, opacity: 0, rotate: -12 }}
-      animate={{ scale: 1, opacity: 1, rotate: 0 }}
-      transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+    <motion.div
+      initial={{ scale: 0.72, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      transition={{ duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
+      className="relative flex items-center justify-center"
       aria-hidden="true"
     >
-      <motion.circle
-        cx="24"
-        cy="24"
-        r="21.5"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        opacity={0.18}
+      <motion.div
+        className="absolute inset-0 rounded-full border border-white/10"
         initial={{ scale: 0.8, opacity: 0 }}
-        animate={{ scale: 1.5, opacity: [0, 0.22, 0] }}
-        transition={{ delay: 0.15, duration: 0.65, ease: "easeOut" }}
+        animate={{ scale: 1.45, opacity: [0, 0.18, 0] }}
+        transition={{ delay: 0.08, duration: 0.7, ease: "easeOut" }}
       />
-      <motion.circle
-        cx="24"
-        cy="24"
-        r="19"
-        stroke="currentColor"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeDasharray={circleLength}
-        initial={{ strokeDashoffset: circleLength, scale: 0.82, opacity: 0.4 }}
-        animate={{ strokeDashoffset: 0, scale: [0.82, 1.06, 1], opacity: 1 }}
-        transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-        style={{ originX: "50%", originY: "50%" }}
+      <motion.div
+        className="absolute inset-0 rounded-full border border-white/10"
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1.7, opacity: [0, 0.12, 0] }}
+        transition={{ delay: 0.18, duration: 0.85, ease: "easeOut" }}
       />
-      <motion.path
-        d="M16.5 24.5L21.5 29.5L31.5 19.5"
-        stroke="currentColor"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeDasharray={checkLength}
-        initial={{ strokeDashoffset: checkLength, scale: 0.7, opacity: 0.6 }}
-        animate={{
-          strokeDashoffset: 0,
-          opacity: 1,
-          scale: [0.7, 1.18, 0.96, 1],
-        }}
-        style={{ originX: "50%", originY: "50%" }}
-        transition={{
-          delay: 0.5,
-          duration: 0.55,
-          ease: [0.22, 1, 0.36, 1],
-        }}
-      />
-    </motion.svg>
+      <motion.svg
+        viewBox="0 0 100 100"
+        className="h-8 w-8 drop-shadow-[0_0_10px_rgba(96,165,250,0.32)]"
+        fill="none"
+      >
+        <motion.circle
+          cx="50"
+          cy="50"
+          r="45"
+          stroke="currentColor"
+          strokeWidth="4"
+          strokeLinecap="round"
+          strokeDasharray={circleLength}
+          strokeDashoffset={circleLength}
+          initial={{ strokeDashoffset: circleLength, scale: 0.78, opacity: 0.45 }}
+          animate={{
+            strokeDashoffset: 0,
+            scale: [0.78, 1.1, 0.98, 1],
+            opacity: 1,
+          }}
+          transition={{
+            duration: 0.78,
+            ease: [0.22, 1, 0.36, 1],
+          }}
+          style={{ originX: "50%", originY: "50%" }}
+        />
+        <motion.path
+          d="M30 50 L45 65 L70 35"
+          stroke="currentColor"
+          strokeWidth="4"
+          fill="none"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeDasharray={checkLength}
+          strokeDashoffset={checkLength}
+          initial={{ strokeDashoffset: checkLength, scale: 0.55, opacity: 0.55 }}
+          animate={{
+            strokeDashoffset: 0,
+            scale: [0.55, 1.22, 0.92, 1.03, 1],
+            opacity: 1,
+          }}
+          transition={{
+            delay: 0.46,
+            duration: 0.62,
+            ease: [0.22, 1, 0.36, 1],
+          }}
+          style={{ originX: "50%", originY: "50%" }}
+        />
+      </motion.svg>
+    </motion.div>
   );
 }
 
