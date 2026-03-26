@@ -3,7 +3,6 @@
 import Image from "next/image";
 import Link from "next/link";
 import { memo, useEffect, useRef, useState } from "react";
-import { useLightMotion } from "@/app/hooks/useLightMotion";
 
 type Slide = {
   image: string;
@@ -21,6 +20,8 @@ type Slide = {
 
 const AUTOPLAY_MS = 5000;
 const SWIPE_THRESHOLD = 48;
+const SMALL_SCREEN_QUERY = "(max-width: 767px)";
+const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 const FIRST_SLIDE_BLUR_DATA_URL =
   "data:image/webp;base64,UklGRkoAAABXRUJQVlA4ID4AAABQAwCdASoQAAkAAUAmJaACdLoB+AADsAD+8ut//NgVzXPv9//S4P0uD9Lg/9KQAAA=";
 
@@ -44,7 +45,7 @@ const partnerLogos = [
 
 const slides: Slide[] = [
   {
-    image: "/images/carousel/carousel-01.optimized.webp",
+    image: "/images/carousel/carousel-01.optimized.avif",
     title: "Range Wildlife Sanctuary",
     subtitle:
       "Discover the sanctuary through a homepage that balances protected area information, trail planning, and visitor coordination.",
@@ -58,7 +59,7 @@ const slides: Slide[] = [
     },
   },
   {
-    image: "/images/carousel/carousel-02.optimized.webp",
+    image: "/images/carousel/carousel-02.optimized.avif",
     title: "Protecting Biodiversity And Natural Heritage",
     subtitle:
       "Learn more about endemic habitats, conservation value, and why Mount Hamiguitan remains one of the Philippines' most important mountain landscapes.",
@@ -72,7 +73,7 @@ const slides: Slide[] = [
     },
   },
   {
-    image: "/images/carousel/carousel-03.optimized.webp",
+    image: "/images/carousel/carousel-03.optimized.avif",
     title: "Trail Information For The Public",
     subtitle:
       "Preview the San Isidro and Governor Generoso trail options before moving into schedule planning and booking.",
@@ -86,7 +87,7 @@ const slides: Slide[] = [
     },
   },
   {
-    image: "/images/carousel/carousel-04.optimized.webp",
+    image: "/images/carousel/carousel-04.optimized.avif",
     title: "Schedule And Climb Preparation",
     subtitle:
       "Use the public schedule view to understand climb timing, trail occupancy, and next steps more clearly.",
@@ -100,7 +101,7 @@ const slides: Slide[] = [
     },
   },
   {
-    image: "/images/carousel/carousel-05.optimized.webp",
+    image: "/images/carousel/carousel-05.optimized.avif",
     title: "Public Access With Protected Systems Separate",
     subtitle:
       "The public website stays focused on visitor information and planning, while protected tools remain separate for authorized users.",
@@ -118,21 +119,49 @@ const slides: Slide[] = [
 function HeroCarousel() {
   const [activeIndex, setActiveIndex] = useState(0);
   const [hoverPaused, setHoverPaused] = useState(false);
-  const lightMotion = useLightMotion();
+  const [interactiveReady, setInteractiveReady] = useState(false);
+  const [lightMotion, setLightMotion] = useState(false);
   const pointerStartXRef = useRef<number | null>(null);
   const pointerActiveRef = useRef(false);
 
   const activeSlide = slides[activeIndex] ?? slides[0];
 
   useEffect(() => {
-    if (lightMotion || hoverPaused) return;
+    const frameId = window.requestAnimationFrame(() => {
+      setInteractiveReady(true);
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, []);
+
+  useEffect(() => {
+    if (!interactiveReady) return;
+
+    const reducedMotionMedia = window.matchMedia(REDUCED_MOTION_QUERY);
+    const smallScreenMedia = window.matchMedia(SMALL_SCREEN_QUERY);
+    const updateLightMotion = () => {
+      setLightMotion(reducedMotionMedia.matches || smallScreenMedia.matches);
+    };
+
+    updateLightMotion();
+    reducedMotionMedia.addEventListener("change", updateLightMotion);
+    smallScreenMedia.addEventListener("change", updateLightMotion);
+
+    return () => {
+      reducedMotionMedia.removeEventListener("change", updateLightMotion);
+      smallScreenMedia.removeEventListener("change", updateLightMotion);
+    };
+  }, [interactiveReady]);
+
+  useEffect(() => {
+    if (!interactiveReady || lightMotion || hoverPaused) return;
 
     const timer = window.setInterval(() => {
       setActiveIndex((current) => (current + 1) % slides.length);
     }, AUTOPLAY_MS);
 
     return () => window.clearInterval(timer);
-  }, [hoverPaused, lightMotion]);
+  }, [hoverPaused, interactiveReady, lightMotion]);
 
   const goToSlide = (index: number) => {
     setActiveIndex(index);
@@ -180,13 +209,13 @@ function HeroCarousel() {
   return (
     <section
       className="relative isolate overflow-hidden"
-      onMouseEnter={() => setHoverPaused(true)}
-      onMouseLeave={() => setHoverPaused(false)}
-      onPointerDown={(event) => handlePointerStart(event.clientX)}
-      onPointerUp={(event) => handlePointerEnd(event.clientX)}
-      onPointerCancel={resetPointerTracking}
+      onMouseEnter={interactiveReady ? () => setHoverPaused(true) : undefined}
+      onMouseLeave={interactiveReady ? () => setHoverPaused(false) : undefined}
+      onPointerDown={interactiveReady ? (event) => handlePointerStart(event.clientX) : undefined}
+      onPointerUp={interactiveReady ? (event) => handlePointerEnd(event.clientX) : undefined}
+      onPointerCancel={interactiveReady ? resetPointerTracking : undefined}
       onPointerLeave={() => {
-        if (pointerActiveRef.current) {
+        if (interactiveReady && pointerActiveRef.current) {
           resetPointerTracking();
         }
       }}
@@ -210,7 +239,7 @@ function HeroCarousel() {
         </div>
 
         <div className="pointer-events-none absolute inset-0 z-[1]">
-          {!lightMotion ? (
+          {!interactiveReady || !lightMotion ? (
             <>
               <div className="absolute left-[8%] top-[18%] h-32 w-32 rounded-full bg-[radial-gradient(circle,rgba(249,115,22,0.1),transparent_70%)] blur-lg md:h-40 md:w-40" />
               <div className="absolute right-[6%] top-[14%] hidden h-40 w-40 rounded-full bg-[radial-gradient(circle,rgba(245,158,11,0.08),transparent_70%)] blur-xl md:block md:h-48 md:w-48" />
