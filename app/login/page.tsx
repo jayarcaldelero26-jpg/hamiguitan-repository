@@ -1,19 +1,11 @@
 import Image from "next/image";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import LoginForm from "@/app/login/LoginForm";
-import { getCurrentUser } from "@/app/lib/auth";
 import styles from "./login.module.css";
 
 const LOGIN_BACKGROUND_SRC = "/images/auth/hamiguitan-login-bg.optimized.webp";
 
 export default async function LoginPage() {
-  const user = await getCurrentUser();
-
-  if (user) {
-    redirect("/dashboard");
-  }
-
   return (
     <main className={styles.wrap}>
       <div className={styles.bgMedia} aria-hidden="true">
