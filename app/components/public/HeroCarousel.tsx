@@ -124,7 +124,9 @@ function HeroCarousel() {
   const pointerStartXRef = useRef<number | null>(null);
   const pointerActiveRef = useRef(false);
 
-  const activeSlide = slides[activeIndex] ?? slides[0];
+  const initialSlide = slides[0];
+  const activeSlide =
+    interactiveReady ? (slides[activeIndex] ?? initialSlide) : initialSlide;
 
   useEffect(() => {
     const frameId = window.requestAnimationFrame(() => {
@@ -139,11 +141,15 @@ function HeroCarousel() {
 
     const reducedMotionMedia = window.matchMedia(REDUCED_MOTION_QUERY);
     const smallScreenMedia = window.matchMedia(SMALL_SCREEN_QUERY);
+
     const updateLightMotion = () => {
-      setLightMotion(reducedMotionMedia.matches || smallScreenMedia.matches);
+      setLightMotion(
+        reducedMotionMedia.matches || smallScreenMedia.matches
+      );
     };
 
     updateLightMotion();
+
     reducedMotionMedia.addEventListener("change", updateLightMotion);
     smallScreenMedia.addEventListener("change", updateLightMotion);
 
@@ -189,9 +195,7 @@ function HeroCarousel() {
     pointerStartXRef.current = null;
     pointerActiveRef.current = false;
 
-    if (Math.abs(delta) < SWIPE_THRESHOLD) {
-      return;
-    }
+    if (Math.abs(delta) < SWIPE_THRESHOLD) return;
 
     if (delta > 0) {
       goToPrevious();
@@ -211,8 +215,16 @@ function HeroCarousel() {
       className="relative isolate overflow-hidden"
       onMouseEnter={interactiveReady ? () => setHoverPaused(true) : undefined}
       onMouseLeave={interactiveReady ? () => setHoverPaused(false) : undefined}
-      onPointerDown={interactiveReady ? (event) => handlePointerStart(event.clientX) : undefined}
-      onPointerUp={interactiveReady ? (event) => handlePointerEnd(event.clientX) : undefined}
+      onPointerDown={
+        interactiveReady
+          ? (event) => handlePointerStart(event.clientX)
+          : undefined
+      }
+      onPointerUp={
+        interactiveReady
+          ? (event) => handlePointerEnd(event.clientX)
+          : undefined
+      }
       onPointerCancel={interactiveReady ? resetPointerTracking : undefined}
       onPointerLeave={() => {
         if (interactiveReady && pointerActiveRef.current) {
@@ -221,19 +233,34 @@ function HeroCarousel() {
       }}
     >
       <div className="relative min-h-[72vh] overflow-hidden bg-[#05070b] md:min-h-[88vh]">
-        <div key={activeSlide.image} className="absolute inset-0" style={{ backgroundColor: "#0a0f16" }}>
-          <Image
-            src={activeSlide.image}
-            alt=""
-            fill
-            priority={activeIndex === 0}
-            loading={activeIndex === 0 ? "eager" : "lazy"}
-            placeholder={activeIndex === 0 ? "blur" : "empty"}
-            blurDataURL={activeIndex === 0 ? FIRST_SLIDE_BLUR_DATA_URL : undefined}
-            quality={70}
-            sizes="100vw"
-            className="object-cover"
-          />
+        <div className="absolute inset-0" style={{ backgroundColor: "#0a0f16" }}>
+          {slides.map((slide, index) => {
+            const isActive = index === activeIndex;
+            const isFirst = index === 0;
+
+            return (
+              <div
+                key={slide.image}
+                aria-hidden={!isActive}
+                className={`absolute inset-0 transition-opacity duration-700 ease-out will-change-[opacity] ${
+                  isActive ? "opacity-100" : "opacity-0"
+                }`}
+              >
+                <Image
+                  src={slide.image}
+                  alt=""
+                  fill
+                  priority={isFirst}
+                  loading={isFirst ? "eager" : "lazy"}
+                  placeholder={isFirst ? "blur" : "empty"}
+                  blurDataURL={isFirst ? FIRST_SLIDE_BLUR_DATA_URL : undefined}
+                  quality={70}
+                  sizes="100vw"
+                  className="object-cover"
+                />
+              </div>
+            );
+          })}
           <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,7,11,0.12)_0%,rgba(5,7,11,0.28)_34%,rgba(5,7,11,0.54)_68%,rgba(5,7,11,0.72)_100%)]" />
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(249,115,22,0.12),transparent_24%),radial-gradient(circle_at_78%_18%,rgba(245,158,11,0.1),transparent_22%),radial-gradient(circle_at_50%_100%,rgba(56,189,248,0.06),transparent_30%),linear-gradient(90deg,rgba(5,7,11,0.42)_0%,rgba(5,7,11,0.12)_42%,rgba(5,7,11,0.48)_100%)]" />
         </div>
