@@ -2,6 +2,7 @@
 import "server-only";
 
 import { google, drive_v3 } from "googleapis";
+import { supabaseAdmin } from "@/app/lib/db";
 import { serverEnv } from "@/app/lib/serverEnv";
 
 export function createOAuthClient() {
@@ -57,15 +58,140 @@ const CONFIGURED_REPOSITORY_ROOT_IDS = [
   serverEnv.drivePamoFolderId,
 ].filter(Boolean);
 
+type FolderCacheRow = {
+  folder_id: string;
+  parent_id: string | null;
+  folder_name: string;
+};
+
+function isMissingFolderCacheTableError(
+  error: { code?: string | null; message?: string | null } | null | undefined
+) {
+  const code = String(error?.code || "").trim();
+  const message = String(error?.message || "").toLowerCase();
+
+  if (code === "42P01" || code === "PGRST205") {
+    return true;
+  }
+
+  return message.includes("drive_folder_cache");
+}
+
+async function readFolderCache(
+  parentId: string | undefined,
+  folderName: string
+): Promise<FolderCacheRow | null> {
+  const { data, error } = await supabaseAdmin
+    .from("drive_folder_cache")
+    .select("folder_id,parent_id,folder_name")
+    .eq("parent_id", parentId || "")
+    .eq("folder_name", folderName)
+    .maybeSingle();
+
+  if (error) {
+    if (!isMissingFolderCacheTableError(error)) {
+      console.error("DRIVE FOLDER CACHE READ ERROR:", error);
+    }
+    return null;
+  }
+
+  return (data as FolderCacheRow | null) || null;
+}
+
+async function writeFolderCache(
+  parentId: string | undefined,
+  folderName: string,
+  folderId: string
+) {
+  const { error } = await supabaseAdmin.from("drive_folder_cache").upsert(
+    {
+      parent_id: parentId || "",
+      folder_name: folderName,
+      folder_id: folderId,
+      last_verified_at: new Date().toISOString(),
+    },
+    {
+      onConflict: "parent_id,folder_name",
+    }
+  );
+
+  if (error && !isMissingFolderCacheTableError(error)) {
+    console.error("DRIVE FOLDER CACHE WRITE ERROR:", error);
+  }
+}
+
+async function deleteFolderCache(parentId: string | undefined, folderName: string) {
+  const { error } = await supabaseAdmin
+    .from("drive_folder_cache")
+    .delete()
+    .eq("parent_id", parentId || "")
+    .eq("folder_name", folderName);
+
+  if (error && !isMissingFolderCacheTableError(error)) {
+    console.error("DRIVE FOLDER CACHE DELETE ERROR:", error);
+  }
+}
+
+async function verifyCachedFolder(
+  drive: drive_v3.Drive,
+  folderId: string,
+  folderName: string,
+  parentId?: string
+): Promise<boolean> {
+  try {
+    const res = await drive.files.get({
+      fileId: folderId,
+      fields: "id,name,mimeType,parents,trashed",
+      supportsAllDrives: true,
+    });
+
+    const data = res.data;
+    const parents = (data.parents || []).filter(Boolean);
+    const isFolder = data.mimeType === "application/vnd.google-apps.folder";
+    const matchesParent = parentId ? parents.includes(parentId) : true;
+    const matchesName = normalizeFolderName(data.name || "") === folderName;
+
+    return Boolean(data.id) && isFolder && !data.trashed && matchesParent && matchesName;
+  } catch (error) {
+    console.error("DRIVE FOLDER CACHE VERIFY ERROR:", {
+      folderId,
+      folderName,
+      parentId: parentId || "",
+      error,
+    });
+    return false;
+  }
+}
+
 export async function findOrCreateFolder(
   drive: drive_v3.Drive,
   name: string,
   parentId?: string
 ): Promise<string> {
-  const existingId = await findFolderId(drive, name, parentId);
-  if (existingId) return existingId;
-
   const cleanName = normalizeFolderName(name);
+  const cached = await readFolderCache(parentId, cleanName);
+
+  if (cached?.folder_id) {
+    const isValid = await verifyCachedFolder(
+      drive,
+      cached.folder_id,
+      cleanName,
+      parentId
+    );
+
+    if (isValid) {
+      await writeFolderCache(parentId, cleanName, cached.folder_id);
+      return cached.folder_id;
+    }
+
+    await deleteFolderCache(parentId, cleanName);
+  }
+
+  const existingId = await findFolderId(drive, cleanName, parentId);
+  if (existingId) {
+    await writeFolderCache(parentId, cleanName, existingId);
+    return existingId;
+  }
 
   const created = await drive.files.create({
     requestBody: {
@@ -81,6 +207,8 @@ export async function findOrCreateFolder(
   if (!createdId) {
     throw new Error(`Failed to create folder: ${cleanName}`);
   }
+
+  await writeFolderCache(parentId, cleanName, createdId);
 
   return createdId;
 }

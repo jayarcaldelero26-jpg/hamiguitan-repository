@@ -3,7 +3,6 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect } from "react";
 import {
-  CheckIcon,
   ExclamationTriangleIcon,
   InformationCircleIcon,
   TrashIcon,
@@ -39,12 +38,74 @@ function getVariant(variant?: DialogVariant, danger?: boolean): DialogVariant {
   return "success";
 }
 
+function AnimatedSuccessIcon() {
+  const circleLength = 182.212;
+  const checkLength = 36;
+
+  return (
+    <motion.svg
+      viewBox="0 0 48 48"
+      className="h-8 w-8"
+      fill="none"
+      initial={{ scale: 0.75, opacity: 0, rotate: -12 }}
+      animate={{ scale: 1, opacity: 1, rotate: 0 }}
+      transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+      aria-hidden="true"
+    >
+      <motion.circle
+        cx="24"
+        cy="24"
+        r="21.5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        opacity={0.18}
+        initial={{ scale: 0.8, opacity: 0 }}
+        animate={{ scale: 1.5, opacity: [0, 0.22, 0] }}
+        transition={{ delay: 0.15, duration: 0.65, ease: "easeOut" }}
+      />
+      <motion.circle
+        cx="24"
+        cy="24"
+        r="19"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeDasharray={circleLength}
+        initial={{ strokeDashoffset: circleLength, scale: 0.82, opacity: 0.4 }}
+        animate={{ strokeDashoffset: 0, scale: [0.82, 1.06, 1], opacity: 1 }}
+        transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+        style={{ originX: "50%", originY: "50%" }}
+      />
+      <motion.path
+        d="M16.5 24.5L21.5 29.5L31.5 19.5"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeDasharray={checkLength}
+        initial={{ strokeDashoffset: checkLength, scale: 0.7, opacity: 0.6 }}
+        animate={{
+          strokeDashoffset: 0,
+          opacity: 1,
+          scale: [0.7, 1.18, 0.96, 1],
+        }}
+        style={{ originX: "50%", originY: "50%" }}
+        transition={{
+          delay: 0.5,
+          duration: 0.55,
+          ease: [0.22, 1, 0.36, 1],
+        }}
+      />
+    </motion.svg>
+  );
+}
+
 function VariantIcon({ variant }: { variant: DialogVariant }) {
   const base =
     "w-8 h-8";
 
   if (variant === "success") {
-    return <CheckIcon className={base} />;
+    return <AnimatedSuccessIcon />;
   }
 
   if (variant === "warning") {

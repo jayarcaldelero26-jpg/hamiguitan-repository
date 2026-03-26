@@ -14,7 +14,7 @@ import {
   normalizeFolderName,
 } from "@/app/lib/googleDrive";
 
-const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100 MB
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
 
 function normalizeRole(role?: string) {
   return (role || "").trim().toLowerCase();
@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
 
     if (fileObj.size > MAX_FILE_SIZE) {
       return NextResponse.json(
-        { error: "Maximum file size is 100MB." },
+        { error: "Maximum file size is 50 MB." },
         { status: 400 }
       );
     }
@@ -181,7 +181,7 @@ export async function POST(req: NextRequest) {
           uploadedAt,
         },
       ])
-      .select("id")
+      .select("id,fileId,name,type,category,folder,title,dateReceived,year,uploadedAt")
       .single();
     console.timeEnd("db-save");
 
@@ -217,6 +217,20 @@ export async function POST(req: NextRequest) {
       name: fileName,
       category,
       folder: folder || "",
+      document: insertedRow
+        ? {
+            id: insertedRow.id,
+            fileId: insertedRow.fileId,
+            name: insertedRow.name,
+            type: insertedRow.type,
+            category: insertedRow.category,
+            folder: insertedRow.folder,
+            title: insertedRow.title,
+            dateReceived: insertedRow.dateReceived,
+            year: insertedRow.year,
+            uploadedAt: insertedRow.uploadedAt,
+          }
+        : null,
     });
   } catch (error: unknown) {
     console.error("UPLOAD ERROR:", error);

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/app/components/AuthProvider";
 import {
   DocumentsProvider,
+  type DocumentRow,
   useDocuments,
 } from "@/app/components/DocumentsProvider";
 import { useProtectedTheme } from "@/app/components/ProtectedThemeProvider";
@@ -28,6 +29,8 @@ type FoldersState = { academe: string[]; stakeholders: string[]; pamo: string[] 
 
 const TEMP_BUCKET = "temp-uploads";
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
+const DIRECT_UPLOAD_THRESHOLD = 4 * 1024 * 1024; // 4 MB Vercel-safe threshold
+const USE_DIRECT_UPLOAD = process.env.NEXT_PUBLIC_USE_DIRECT_UPLOAD !== "false";
 
 function initials(name: string) {
   const parts = (name || "").trim().split(/\s+/).filter(Boolean);
@@ -71,6 +74,22 @@ function sanitizeFileName(name: string) {
   return name.replace(/[^\w.\-() ]+/g, "_");
 }
 
+function getFolderStateKey(category: string): keyof FoldersState {
+  if (category === "Stakeholder" || category === "Stakeholders") {
+    return "stakeholders";
+  }
+
+  if (category === "PAMO Activity") {
+    return "pamo";
+  }
+
+  return "academe";
+}
+
+function shouldUseDirectUpload(fileSize: number) {
+  return USE_DIRECT_UPLOAD && fileSize <= DIRECT_UPLOAD_THRESHOLD;
+}
+
 function Skeleton({
   className,
   dark,
@@ -90,7 +109,7 @@ function Skeleton({
 function UploadPageContent() {
   const router = useRouter();
   const { user: me, loading: loadingMe } = useAuth();
-  const { refreshDocuments } = useDocuments();
+  const { refreshDocuments, upsertDocument } = useDocuments();
 
   const { theme: pageTheme } = useProtectedTheme();
 
@@ -220,6 +239,9 @@ function UploadPageContent() {
   const folderRequired = category === "Stakeholder" || category === "PAMO Activity";
   const fileSize = file?.size ?? 0;
   const fileType = file?.type || "unknown";
+  const useDirectUploadForSelectedFile = file
+    ? shouldUseDirectUpload(file.size)
+    : false;
 
   const requiredOk = useMemo(() => {
     if (!title.trim()) return false;
@@ -284,6 +306,227 @@ function UploadPageContent() {
     if (f) onFileSelected(f);
   }
 
+  function addFolderOption(categoryName: string, folderName: string) {
+    const cleanFolder = folderName.trim();
+    if (!cleanFolder) return;
+
+    const folderKey = getFolderStateKey(categoryName);
+
+    setFolders((current) => {
+      const nextFolders = current[folderKey];
+      if (nextFolders.includes(cleanFolder)) {
+        return current;
+      }
+
+      return {
+        ...current,
+        [folderKey]: [...nextFolders, cleanFolder].sort((a, b) =>
+          a.localeCompare(b)
+        ),
+      };
+    });
+  }
+
+  async function finalizeSuccessfulUpload({
+    document,
+    resolvedCategory,
+    resolvedFolder,
+    refreshAfterSuccess,
+  }: {
+    document?: DocumentRow | null;
+    resolvedCategory: string;
+    resolvedFolder: string;
+    refreshAfterSuccess: boolean;
+  }) {
+    setUploadPercent(97);
+    setUploadStage("Finalizing upload");
+    setUploadDetail("Refreshing repository data and preparing success response.");
+
+    if (refreshAfterSuccess) {
+      try {
+        setLoadingFolders(true);
+        await Promise.all([fetchFolders(), refreshDocuments()]);
+      } catch (refreshErr) {
+        console.error("POST-UPLOAD REFRESH ERROR:", refreshErr);
+      } finally {
+        setLoadingFolders(false);
+      }
+    } else {
+      if (document) {
+        upsertDocument(document);
+      } else {
+        await refreshDocuments();
+      }
+
+      if (resolvedFolder) {
+        addFolderOption(resolvedCategory, resolvedFolder);
+      }
+    }
+
+    await wait(250);
+
+    setUploadPercent(100);
+    setUploadStage("Upload complete");
+    setUploadDetail("Your document has been uploaded successfully.");
+
+    await wait(300);
+
+    setSuccessOpen(true);
+  }
+
+  async function uploadViaDirectRoute(fileToUpload: File, folderValue: string) {
+    await wait(200);
+
+    setUploadPercent(15);
+    setUploadStage("Uploading to server");
+    setUploadDetail("Sending file to the server for direct Google Drive upload.");
+
+    const formData = new FormData();
+    formData.append("file", fileToUpload);
+    formData.append("category", category);
+    formData.append("title", title.trim());
+    formData.append("dateReceived", dateReceived);
+    formData.append("folder", folderValue);
+    formData.append("year", year || new Date().getFullYear().toString());
+
+    setUploadPercent(38);
+    setUploadStage("Uploading to Google Drive");
+    setUploadDetail("Uploading the file directly to Google Drive and saving metadata.");
+
+    const uploadRes = await fetch("/api/upload", {
+      method: "POST",
+      credentials: "include",
+      body: formData,
+    });
+
+    const uploadData = await uploadRes.json().catch(() => null);
+
+    if (!uploadRes.ok) {
+      throw new Error(uploadData?.error || "Failed to upload document.");
+    }
+
+    await finalizeSuccessfulUpload({
+      document: uploadData?.document ?? null,
+      resolvedCategory: uploadData?.category || category,
+      resolvedFolder: uploadData?.folder || folderValue,
+      refreshAfterSuccess: false,
+    });
+  }
+
+  async function uploadViaLegacyTransfer(fileToUpload: File, folderValue: string) {
+    const safeFileName = sanitizeFileName(fileToUpload.name);
+    const uniqueId =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+    const tempPath = `${me?.id || "user"}/${uniqueId}-${safeFileName}`;
+
+    console.log("DIRECT TEMP UPLOAD:", {
+      tempPath,
+      fileName: fileToUpload.name,
+      size: fileToUpload.size,
+      type: fileToUpload.type,
+    });
+
+    await wait(200);
+
+    setUploadPercent(15);
+    setUploadStage("Uploading to temporary storage");
+    setUploadDetail("Sending file directly to Supabase temporary storage.");
+
+    const rotatingStages = [
+      {
+        percent: 30,
+        title: "Staging upload",
+        detail: "Temporary file is being prepared for transfer.",
+      },
+      {
+        percent: 55,
+        title: "Transferring to Google Drive",
+        detail: "Moving the uploaded file to permanent cloud storage.",
+      },
+      {
+        percent: 80,
+        title: "Saving repository record",
+        detail: "Saving file details to the repository database.",
+      },
+      {
+        percent: 92,
+        title: "Cleaning temporary storage",
+        detail: "Removing the staged file after transfer.",
+      },
+    ];
+
+    let idx = 0;
+    const applyStage = () => {
+      const s = rotatingStages[Math.min(idx, rotatingStages.length - 1)];
+      setUploadPercent(s.percent);
+      setUploadStage(s.title);
+      setUploadDetail(s.detail);
+      idx += 1;
+    };
+
+    const { error: tempUploadError } = await supabaseBrowser.storage
+      .from(TEMP_BUCKET)
+      .upload(tempPath, fileToUpload, {
+        cacheControl: "3600",
+        upsert: false,
+        contentType: fileToUpload.type || "application/octet-stream",
+      });
+
+    if (tempUploadError) {
+      console.error("DIRECT TEMP UPLOAD ERROR:", tempUploadError);
+      throw new Error(
+        tempUploadError.message || "Failed to upload temporary file."
+      );
+    }
+
+    applyStage();
+    const stageTimer = setInterval(() => {
+      if (idx < rotatingStages.length) {
+        applyStage();
+      }
+    }, 1100);
+
+    try {
+      const transferRes = await fetch("/api/transfer-to-drive", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          tempPath,
+          originalName: fileToUpload.name,
+          mimeType: fileToUpload.type || "application/octet-stream",
+          fileSize: fileToUpload.size,
+          category,
+          title: title.trim(),
+          dateReceived,
+          folder: folderValue,
+          year: year || new Date().getFullYear().toString(),
+        }),
+      });
+
+      const transferData = await transferRes.json().catch(() => null);
+
+      if (!transferRes.ok) {
+        throw new Error(
+          transferData?.error || "Failed to transfer file to Google Drive."
+        );
+      }
+
+      await finalizeSuccessfulUpload({
+        resolvedCategory: transferData?.category || category,
+        resolvedFolder: transferData?.folder || folderValue,
+        refreshAfterSuccess: true,
+      });
+    } finally {
+      clearInterval(stageTimer);
+    }
+  }
+
   async function handleUpload() {
     if (uploading) return;
 
@@ -324,145 +567,20 @@ function UploadPageContent() {
     setUploading(true);
     setUploadPercent(5);
     setUploadStage("Preparing upload");
-    setUploadDetail("Checking required fields and preparing temporary storage.");
-
-    let stageTimer: ReturnType<typeof setInterval> | null = null;
+    setUploadDetail(
+      useDirectUploadForSelectedFile
+        ? "Checking required fields and preparing direct server upload."
+        : "Checking required fields and preparing temporary storage."
+    );
 
     try {
-      const safeFileName = sanitizeFileName(file.name);
-      const uniqueId =
-        typeof crypto !== "undefined" && "randomUUID" in crypto
-          ? crypto.randomUUID()
-          : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-
-      const tempPath = `${me?.id || "user"}/${uniqueId}-${safeFileName}`;
-
-      console.log("DIRECT TEMP UPLOAD:", {
-        tempPath,
-        fileName: file.name,
-        size: file.size,
-        type: file.type,
-      });
-
-      await wait(200);
-
-      setUploadPercent(15);
-      setUploadStage("Uploading to temporary storage");
-      setUploadDetail("Sending file directly to Supabase temporary storage.");
-
-      const rotatingStages = [
-        {
-          percent: 30,
-          title: "Staging upload",
-          detail: "Temporary file is being prepared for transfer.",
-        },
-        {
-          percent: 55,
-          title: "Transferring to Google Drive",
-          detail: "Moving the uploaded file to permanent cloud storage.",
-        },
-        {
-          percent: 80,
-          title: "Saving repository record",
-          detail: "Saving file details to the repository database.",
-        },
-        {
-          percent: 92,
-          title: "Cleaning temporary storage",
-          detail: "Removing the staged file after transfer.",
-        },
-      ];
-
-      let idx = 0;
-      const applyStage = () => {
-        const s = rotatingStages[Math.min(idx, rotatingStages.length - 1)];
-        setUploadPercent(s.percent);
-        setUploadStage(s.title);
-        setUploadDetail(s.detail);
-        idx += 1;
-      };
-
-      const { error: tempUploadError } = await supabaseBrowser.storage
-        .from(TEMP_BUCKET)
-        .upload(tempPath, file, {
-          cacheControl: "3600",
-          upsert: false,
-          contentType: file.type || "application/octet-stream",
-        });
-
-      if (tempUploadError) {
-        console.error("DIRECT TEMP UPLOAD ERROR:", tempUploadError);
-        throw new Error(
-          tempUploadError.message || "Failed to upload temporary file."
-        );
+      if (shouldUseDirectUpload(file.size)) {
+        await uploadViaDirectRoute(file, finalFolder);
+      } else {
+        await uploadViaLegacyTransfer(file, finalFolder);
       }
-
-      applyStage();
-      stageTimer = setInterval(() => {
-        if (idx < rotatingStages.length) {
-          applyStage();
-        }
-      }, 1100);
-
-      const transferRes = await fetch("/api/transfer-to-drive", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify({
-          tempPath,
-          originalName: file.name,
-          mimeType: file.type || "application/octet-stream",
-          fileSize: file.size,
-          category,
-          title: title.trim(),
-          dateReceived,
-          folder: finalFolder,
-          year: year || new Date().getFullYear().toString(),
-        }),
-      });
-
-      const transferData = await transferRes.json().catch(() => null);
-
-      if (!transferRes.ok) {
-        throw new Error(transferData?.error || "Failed to transfer file to Google Drive.");
-      }
-
-      if (stageTimer) {
-        clearInterval(stageTimer);
-        stageTimer = null;
-      }
-
-      setUploadPercent(97);
-      setUploadStage("Finalizing upload");
-      setUploadDetail("Refreshing repository data and preparing success response.");
-
-      try {
-        setLoadingFolders(true);
-        await Promise.all([fetchFolders(), refreshDocuments()]);
-      } catch (refreshErr) {
-        console.error("POST-UPLOAD REFRESH ERROR:", refreshErr);
-      } finally {
-        setLoadingFolders(false);
-      }
-
-      await wait(250);
-
-      setUploadPercent(100);
-      setUploadStage("Upload complete");
-      setUploadDetail("Your document has been uploaded successfully.");
-
-      await wait(300);
-
-      setSuccessOpen(true);
     } catch (err: unknown) {
       console.error("UPLOAD PAGE ERROR:", err);
-
-      if (stageTimer) {
-        clearInterval(stageTimer);
-        stageTimer = null;
-      }
 
       setUploadPercent(0);
       setUploadStage("Upload failed");
@@ -471,7 +589,6 @@ function UploadPageContent() {
       setErrorMsg(message);
       setErrorOpen(true);
     } finally {
-      if (stageTimer) clearInterval(stageTimer);
       setUploading(false);
     }
   }
@@ -977,6 +1094,9 @@ function UploadPageContent() {
                   <span className={`font-semibold ${dark ? "text-cyan-200" : "text-slate-700"}`}>
                     50 MB
                   </span>
+                </p>
+                <p className={`mt-1 text-[12px] ${dark ? "text-cyan-100/65" : "text-slate-500"}`}>
+                  Files up to 4 MB use direct server upload. Larger files use the compatibility upload path.
                 </p>
               </div>
 

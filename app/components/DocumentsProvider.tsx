@@ -31,6 +31,7 @@ type ContextType = {
   documents: DocumentRow[];
   loading: boolean;
   refreshDocuments: () => Promise<void>;
+  upsertDocument: (document: DocumentRow) => void;
 };
 
 const DocumentsContext = createContext<ContextType | null>(null);
@@ -67,6 +68,22 @@ function clearDocumentsCache() {
   documentsRequest = null;
 }
 
+function mergeDocumentRows(current: DocumentRow[], next: DocumentRow) {
+  const existingIndex = current.findIndex((doc) => doc.id === next.id);
+
+  if (existingIndex === -1) {
+    return [next, ...current];
+  }
+
+  const merged = [...current];
+  merged[existingIndex] = {
+    ...merged[existingIndex],
+    ...next,
+  };
+
+  return merged;
+}
+
 export function DocumentsProvider({
   children,
 }: {
@@ -77,6 +94,16 @@ export function DocumentsProvider({
 
   const [documents, setDocuments] = useState<DocumentRow[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const upsertDocument = useCallback((document: DocumentRow) => {
+    if (!user) return;
+
+    setDocuments((current) => {
+      const nextDocuments = mergeDocumentRows(current, document);
+      writeDocumentsCache(user.id, nextDocuments);
+      return nextDocuments;
+    });
+  }, [user]);
 
   const loadDocuments = useCallback(async (options?: { force?: boolean }) => {
     if (!user) {
@@ -180,6 +207,7 @@ export function DocumentsProvider({
         documents,
         loading,
         refreshDocuments: () => loadDocuments({ force: true }),
+        upsertDocument,
       }}
     >
       {children}
