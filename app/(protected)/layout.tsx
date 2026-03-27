@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { AuthProvider } from "@/app/components/AuthProvider";
+import { AuthProvider, type AuthUser } from "@/app/components/AuthProvider";
 import ProtectedShell from "@/app/components/ProtectedShell";
 import { ProtectedThemeProvider } from "@/app/components/ProtectedThemeProvider";
 import { getCurrentUser } from "@/app/lib/auth";
@@ -15,8 +15,13 @@ export default async function ProtectedLayout({
     redirect("/login");
   }
 
+  const initialUser: AuthUser = {
+    ...user,
+    avatar: user.avatar ?? undefined,
+  };
+
   return (
-    <AuthProvider initialUser={user} redirectTo="/login">
+    <AuthProvider initialUser={initialUser} redirectTo="/login">
       <ProtectedThemeProvider>
         <ProtectedShell>{children}</ProtectedShell>
       </ProtectedThemeProvider>
