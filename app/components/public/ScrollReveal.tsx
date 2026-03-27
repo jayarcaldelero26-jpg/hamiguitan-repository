@@ -3,7 +3,9 @@
 import { motion, type MotionProps, type Variants } from "framer-motion";
 import { useLightMotion } from "@/app/hooks/useLightMotion";
 
-const revealVariants: Variants = {
+export const revealEase = [0.22, 1, 0.36, 1] as const;
+
+export const revealVariants: Variants = {
   hidden: {
     opacity: 0,
     y: 24,
@@ -61,7 +63,7 @@ export function Reveal({
       transition={{
         duration: lightMotion ? 0 : duration,
         delay: lightMotion ? 0 : delay,
-        ease: [0.22, 1, 0.36, 1],
+        ease: revealEase,
       }}
     >
       {children}
@@ -113,7 +115,7 @@ export function StaggerItem({
       transition={{
         duration: lightMotion ? 0 : 0.54,
         delay: lightMotion ? 0 : delay,
-        ease: [0.22, 1, 0.36, 1],
+        ease: revealEase,
       }}
     >
       {children}

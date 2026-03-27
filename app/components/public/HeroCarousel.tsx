@@ -3,6 +3,12 @@
 import Image from "next/image";
 import Link from "next/link";
 import { memo, useEffect, useRef, useState } from "react";
+import { motion, type Variants } from "framer-motion";
+import {
+  revealEase,
+  revealVariants,
+} from "@/app/components/public/ScrollReveal";
+import { useLightMotion } from "@/app/hooks/useLightMotion";
 
 type Slide = {
   image: string;
@@ -20,10 +26,18 @@ type Slide = {
 
 const AUTOPLAY_MS = 5000;
 const SWIPE_THRESHOLD = 48;
-const SMALL_SCREEN_QUERY = "(max-width: 767px)";
-const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 const FIRST_SLIDE_BLUR_DATA_URL =
   "data:image/webp;base64,UklGRkoAAABXRUJQVlA4ID4AAABQAwCdASoQAAkAAUAmJaACdLoB+AADsAD+8ut//NgVzXPv9//S4P0uD9Lg/9KQAAA=";
+
+const heroContentVariants: Variants = {
+  hidden: {},
+  visible: {
+    transition: {
+      delayChildren: 0.05,
+      staggerChildren: 0.07,
+    },
+  },
+};
 
 const partnerLogos = [
   {
@@ -120,9 +134,9 @@ function HeroCarousel() {
   const [activeIndex, setActiveIndex] = useState(0);
   const [hoverPaused, setHoverPaused] = useState(false);
   const [interactiveReady, setInteractiveReady] = useState(false);
-  const [lightMotion, setLightMotion] = useState(false);
   const pointerStartXRef = useRef<number | null>(null);
   const pointerActiveRef = useRef(false);
+  const lightMotion = useLightMotion();
 
   const activeSlide = slides[activeIndex] ?? slides[0];
 
@@ -133,25 +147,6 @@ function HeroCarousel() {
 
     return () => window.cancelAnimationFrame(frameId);
   }, []);
-
-  useEffect(() => {
-    if (!interactiveReady) return;
-
-    const reducedMotionMedia = window.matchMedia(REDUCED_MOTION_QUERY);
-    const smallScreenMedia = window.matchMedia(SMALL_SCREEN_QUERY);
-    const updateLightMotion = () => {
-      setLightMotion(reducedMotionMedia.matches || smallScreenMedia.matches);
-    };
-
-    updateLightMotion();
-    reducedMotionMedia.addEventListener("change", updateLightMotion);
-    smallScreenMedia.addEventListener("change", updateLightMotion);
-
-    return () => {
-      reducedMotionMedia.removeEventListener("change", updateLightMotion);
-      smallScreenMedia.removeEventListener("change", updateLightMotion);
-    };
-  }, [interactiveReady]);
 
   useEffect(() => {
     if (!interactiveReady || lightMotion || hoverPaused) return;
@@ -249,38 +244,71 @@ function HeroCarousel() {
 
         <div className="relative z-10 mx-auto flex min-h-[72vh] max-w-[1180px] items-end px-5 pb-14 pt-28 sm:px-6 sm:pb-16 md:min-h-[88vh] md:px-8 md:pb-20 md:pt-32">
           <div className="grid w-full items-end gap-8 lg:grid-cols-[minmax(0,1fr)_280px] lg:gap-10">
-            <div className="public-panel-highlight pointer-events-auto max-w-4xl overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(13,18,28,0.68),rgba(7,10,16,0.5))] px-6 py-6 shadow-[0_16px_42px_rgba(0,0,0,0.24)] backdrop-blur-[6px] sm:px-7 sm:py-7 md:rounded-[38px] md:px-9 md:py-9">
-              <span className="public-kicker">UNESCO World Heritage Site</span>
-              <h1 className="mt-5 text-[2.5rem] font-semibold leading-[0.98] tracking-[-0.05em] text-white sm:text-[3.4rem] md:text-[5rem]">
+            <motion.div
+              initial={lightMotion ? false : "hidden"}
+              animate={lightMotion ? undefined : "visible"}
+              variants={heroContentVariants}
+              transition={
+                lightMotion
+                  ? undefined
+                  : {
+                      delayChildren: 0.05,
+                      staggerChildren: 0.07,
+                    }
+              }
+              className="public-panel-highlight pointer-events-auto max-w-4xl overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(13,18,28,0.68),rgba(7,10,16,0.5))] px-6 py-6 shadow-[0_16px_42px_rgba(0,0,0,0.24)] backdrop-blur-[4px] sm:px-7 sm:py-7 md:rounded-[38px] md:px-9 md:py-9"
+            >
+              <motion.span variants={revealVariants} transition={{ duration: 0.52, ease: revealEase }}>
+                <span className="public-kicker">UNESCO World Heritage Site</span>
+              </motion.span>
+              <motion.h1
+                variants={revealVariants}
+                transition={{ duration: 0.6, ease: revealEase }}
+                className="mt-5 text-[2.5rem] font-semibold leading-[0.98] tracking-[-0.05em] text-white sm:text-[3.4rem] md:text-[5rem]"
+              >
                 <span className="block text-white/96">MT. HAMIGUITAN</span>
                 <span className="mt-2 block bg-[linear-gradient(180deg,#ffffff_0%,#ffddb0_100%)] bg-clip-text text-transparent">
                   {activeSlide.title}
                 </span>
-              </h1>
-              <p className="mt-5 max-w-2xl text-[0.98rem] leading-8 text-[color:rgba(236,242,249,0.92)] sm:text-[1.05rem] md:text-[1.12rem]">
+              </motion.h1>
+              <motion.p
+                variants={revealVariants}
+                transition={{ duration: 0.54, ease: revealEase }}
+                className="mt-5 max-w-2xl text-[0.98rem] leading-8 text-[color:rgba(236,242,249,0.92)] sm:text-[1.05rem] md:text-[1.12rem]"
+              >
                 {activeSlide.subtitle}
-              </p>
+              </motion.p>
 
-              <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+              <motion.div
+                variants={revealVariants}
+                transition={{ duration: 0.54, ease: revealEase }}
+                className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center"
+              >
                 <Link
                   href={activeSlide.primaryCta.href}
+                  prefetch={activeSlide.primaryCta.href === "/schedule"}
                   className="public-button-primary inline-flex min-h-12 items-center justify-center rounded-full px-6 font-semibold sm:min-w-[176px]"
                 >
                   {activeSlide.primaryCta.label}
                 </Link>
                 <Link
                   href={activeSlide.secondaryCta.href}
+                  prefetch={activeSlide.secondaryCta.href === "/schedule"}
                   className="public-button-secondary-light inline-flex min-h-12 items-center justify-center rounded-full px-6 font-semibold sm:min-w-[176px]"
                 >
                   {activeSlide.secondaryCta.label}
                 </Link>
-              </div>
+              </motion.div>
 
-              <div className="mt-8 flex flex-wrap items-center gap-3">
+              <motion.div
+                variants={revealVariants}
+                transition={{ duration: 0.5, ease: revealEase }}
+                className="mt-8 flex flex-wrap items-center gap-3"
+              >
                 {partnerLogos.map((logo) => (
                   <div
                     key={logo.alt}
-                    className="flex h-14 items-center justify-center rounded-[18px] border border-white/12 bg-[rgba(255,255,255,0.12)] px-4 shadow-[0_10px_24px_rgba(0,0,0,0.16)] backdrop-blur-[2px]"
+                    className="flex h-14 items-center justify-center rounded-[18px] border border-white/12 bg-[rgba(255,255,255,0.12)] px-4 shadow-[0_10px_24px_rgba(0,0,0,0.16)]"
                   >
                     <Image
                       src={logo.src}
@@ -291,10 +319,16 @@ function HeroCarousel() {
                     />
                   </div>
                 ))}
-              </div>
-            </div>
+              </motion.div>
+            </motion.div>
 
-            <aside className="hidden pointer-events-auto lg:grid lg:gap-4">
+            <motion.aside
+              initial={lightMotion ? false : "hidden"}
+              animate={lightMotion ? undefined : "visible"}
+              variants={revealVariants}
+              transition={lightMotion ? undefined : { duration: 0.58, ease: revealEase, delay: 0.18 }}
+              className="hidden pointer-events-auto lg:grid lg:gap-4"
+            >
               <div className="public-hero-stat rounded-[26px] p-5">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#ffd08a]">
                   Visitor Journey
@@ -315,15 +349,27 @@ function HeroCarousel() {
                   Premium presentation with public information kept clear and uncluttered.
                 </p>
               </div>
-            </aside>
+            </motion.aside>
           </div>
         </div>
 
         <div className="absolute inset-x-0 bottom-5 z-20 mx-auto flex max-w-[1180px] items-end justify-between px-5 sm:bottom-6 sm:px-6 md:bottom-10 md:px-8">
-          <div className="hidden rounded-full border border-white/10 bg-black/24 px-4 py-2 text-[11px] font-medium tracking-[0.16em] text-[var(--public-text-muted)] backdrop-blur-sm md:inline-flex">
+          <motion.div
+            initial={lightMotion ? false : "hidden"}
+            animate={lightMotion ? undefined : "visible"}
+            variants={revealVariants}
+            transition={lightMotion ? undefined : { duration: 0.52, ease: revealEase, delay: 0.22 }}
+            className="hidden rounded-full border border-white/10 bg-black/24 px-4 py-2 text-[11px] font-medium tracking-[0.16em] text-[var(--public-text-muted)] backdrop-blur-sm md:inline-flex"
+          >
             Public trail planning and sanctuary overview
-          </div>
-          <div className="ml-auto flex items-center gap-2 sm:gap-3">
+          </motion.div>
+          <motion.div
+            initial={lightMotion ? false : "hidden"}
+            animate={lightMotion ? undefined : "visible"}
+            variants={revealVariants}
+            transition={lightMotion ? undefined : { duration: 0.52, ease: revealEase, delay: 0.26 }}
+            className="ml-auto flex items-center gap-2 sm:gap-3"
+          >
             {slides.map((slide, index) => (
               <button
                 key={slide.image}
@@ -338,7 +384,7 @@ function HeroCarousel() {
                 }`}
               />
             ))}
-          </div>
+          </motion.div>
         </div>
       </div>
     </section>

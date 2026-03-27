@@ -51,7 +51,13 @@ function isRegularBookingType(bookingType: string) {
   return bookingType === "Regular Booking";
 }
 
-function applyDerivedBookingStatus<T extends BookingRow>(booking: T) {
+function applyDerivedBookingStatus<
+  T extends {
+    booking_type?: string | null;
+    booking_status?: string | null;
+    end_date?: string | null;
+  },
+>(booking: T) {
   return {
     ...booking,
     booking_status: getEffectiveBookingStatus(booking) as BookingRow["booking_status"],
@@ -274,32 +280,32 @@ type CalendarData = {
   bookings: SelectedDateBooking[];
 };
 
+type CalendarMonthBounds = {
+  monthStart: string;
+  monthStartDate: Date;
+  monthEnd: string;
+  monthEndDate: Date;
+};
+
+type CalendarQueryRow = Pick<
+  BookingRow,
+  | "id"
+  | "booking_code"
+  | "contact_name"
+  | "participant_category"
+  | "trail"
+  | "pax"
+  | "start_date"
+  | "end_date"
+  | "booking_type"
+  | "booking_status"
+  | "approval_status"
+  | "remarks"
+>;
+
 export const ALL_CATEGORIES = "All Categories" as const;
 
-function matchesParticipantCategory(
-  booking: BookingRow,
-  category: ParticipantCategoryOption | typeof ALL_CATEGORIES
-) {
-  if (category === ALL_CATEGORIES) return true;
-  if (isOffSeasonLikeType(booking.booking_type)) return true;
-  return booking.participant_category === category;
-}
-
-function inferDayState(input: {
-  occupancy: number;
-  blocked: boolean;
-  fullSchedule: boolean;
-}): CalendarDayData["sanState"] {
-  if (input.blocked) return "blocked";
-  if (input.fullSchedule) return "full";
-  if (input.occupancy >= 24) return "limited";
-  return "available";
-}
-
-export async function getCalendarData(
-  month: string,
-  category: ParticipantCategoryOption | typeof ALL_CATEGORIES = ALL_CATEGORIES
-): Promise<CalendarData> {
+function getCalendarMonthBounds(month: string): CalendarMonthBounds {
   if (!/^\d{4}-\d{2}$/.test(month)) {
     throw new Error("Invalid month.");
   }
@@ -310,12 +316,25 @@ export async function getCalendarData(
     throw new Error("Invalid month.");
   }
 
-  const nextMonth = new Date(Date.UTC(monthStartDate.getUTCFullYear(), monthStartDate.getUTCMonth() + 1, 1));
+  const nextMonth = new Date(
+    Date.UTC(monthStartDate.getUTCFullYear(), monthStartDate.getUTCMonth() + 1, 1)
+  );
   const monthEndDate = addDays(nextMonth, -1);
-  const monthEnd = formatDateOnly(monthEndDate);
+
+  return {
+    monthStart,
+    monthStartDate,
+    monthEnd: formatDateOnly(monthEndDate),
+    monthEndDate,
+  };
+}
+
+async function loadCalendarQueryRows(monthStart: string, monthEnd: string): Promise<CalendarQueryRow[]> {
   const { data, error } = await supabaseAdmin
     .from(BOOKINGS_TABLE)
-    .select("*")
+    .select(
+      "id,booking_code,contact_name,participant_category,trail,pax,start_date,end_date,booking_type,booking_status,approval_status,remarks"
+    )
     .is("deleted_at", null)
     .lte("start_date", monthEnd)
     .gte("end_date", monthStart)
@@ -325,15 +344,15 @@ export async function getCalendarData(
     throw wrapBookingsError(error, "Failed to load calendar data.");
   }
 
-  const relevantBookings = ((data || []) as BookingRow[]).filter((row) =>
-    bookingCountsTowardCapacity(row)
-  );
-  const filteredBookings = relevantBookings
-    .map(applyDerivedBookingStatus)
-    .filter((booking) =>
-    matchesParticipantCategory(booking, category)
-    );
-  const occupancyBookings = filteredBookings.filter(
+  return (data || []) as CalendarQueryRow[];
+}
+
+function buildCalendarAggregation(input: {
+  filteredBookings: CalendarQueryRow[];
+  monthStartDate: Date;
+  monthEndDate: Date;
+}) {
+  const occupancyBookings = input.filteredBookings.filter(
     (booking) => !isOffSeasonLikeType(booking.booking_type)
   );
 
@@ -351,7 +370,7 @@ export async function getCalendarData(
     }
   >();
 
-  for (const booking of filteredBookings) {
+  for (const booking of input.filteredBookings) {
     const days = expandDateRange(booking.start_date, booking.end_date);
 
     if (booking.booking_type === "Off Season") {
@@ -423,7 +442,11 @@ export async function getCalendarData(
   let fullTrailDays = 0;
   let specialOrBlockedDays = 0;
 
-  for (let current = monthStartDate; current <= monthEndDate; current = addDays(current, 1)) {
+  for (
+    let current = input.monthStartDate;
+    current <= input.monthEndDate;
+    current = addDays(current, 1)
+  ) {
     const date = formatDateOnly(current);
     const rawEntry = occupancy.get(date) || { sanIsidro: 0, governorGeneroso: 0 };
     const entry = {
@@ -438,18 +461,18 @@ export async function getCalendarData(
       entry.sanIsidro === 0 && linkedWarnings["San Isidro Trail"]
         ? linkedWarnings["San Isidro Trail"]!
         : inferDayState({
-      occupancy: entry.sanIsidro,
-      blocked: blockedSet.has("San Isidro Trail"),
-      fullSchedule: fullSet.has("San Isidro Trail"),
-    });
+            occupancy: entry.sanIsidro,
+            blocked: blockedSet.has("San Isidro Trail"),
+            fullSchedule: fullSet.has("San Isidro Trail"),
+          });
     const govState =
       entry.governorGeneroso === 0 && linkedWarnings["Governor Generoso Trail"]
         ? linkedWarnings["Governor Generoso Trail"]!
         : inferDayState({
-      occupancy: entry.governorGeneroso,
-      blocked: blockedSet.has("Governor Generoso Trail"),
-      fullSchedule: fullSet.has("Governor Generoso Trail"),
-    });
+            occupancy: entry.governorGeneroso,
+            blocked: blockedSet.has("Governor Generoso Trail"),
+            fullSchedule: fullSet.has("Governor Generoso Trail"),
+          });
 
     if (sanState !== "full" && sanState !== "blocked") sanOpenDays += 1;
     if (govState !== "full" && govState !== "blocked") govOpenDays += 1;
@@ -467,21 +490,6 @@ export async function getCalendarData(
     });
   }
 
-  const monthBookings = filteredBookings.map((booking) => ({
-      id: booking.id,
-      booking_code: booking.booking_code,
-      contact_name: booking.contact_name,
-      participant_category: booking.participant_category,
-      trail: booking.trail,
-      pax: booking.pax,
-      start_date: booking.start_date,
-      end_date: booking.end_date,
-      booking_type: booking.booking_type,
-      booking_status: booking.booking_status,
-      approval_status: booking.approval_status,
-      remarks: booking.remarks,
-    }));
-
   return {
     days,
     summary: {
@@ -490,8 +498,79 @@ export async function getCalendarData(
       fullTrailDays,
       specialOrBlockedDays,
     },
+  };
+}
+
+function matchesParticipantCategory(
+  booking: CalendarQueryRow,
+  category: ParticipantCategoryOption | typeof ALL_CATEGORIES
+) {
+  if (category === ALL_CATEGORIES) return true;
+  if (isOffSeasonLikeType(booking.booking_type)) return true;
+  return booking.participant_category === category;
+}
+
+function inferDayState(input: {
+  occupancy: number;
+  blocked: boolean;
+  fullSchedule: boolean;
+}): CalendarDayData["sanState"] {
+  if (input.blocked) return "blocked";
+  if (input.fullSchedule) return "full";
+  if (input.occupancy >= 24) return "limited";
+  return "available";
+}
+
+export async function getCalendarData(
+  month: string,
+  category: ParticipantCategoryOption | typeof ALL_CATEGORIES = ALL_CATEGORIES
+): Promise<CalendarData> {
+  const { monthStart, monthStartDate, monthEnd, monthEndDate } = getCalendarMonthBounds(month);
+  const rows = await loadCalendarQueryRows(monthStart, monthEnd);
+  const relevantBookings = rows.filter((row) => bookingCountsTowardCapacity(row));
+  const filteredBookings = relevantBookings
+    .map(applyDerivedBookingStatus)
+    .filter((booking) => matchesParticipantCategory(booking, category));
+  const { days, summary } = buildCalendarAggregation({
+    filteredBookings,
+    monthStartDate,
+    monthEndDate,
+  });
+
+  const monthBookings = filteredBookings.map((booking) => ({
+    id: booking.id,
+    booking_code: booking.booking_code,
+    contact_name: booking.contact_name,
+    participant_category: booking.participant_category,
+    trail: booking.trail,
+    pax: booking.pax,
+    start_date: booking.start_date,
+    end_date: booking.end_date,
+    booking_type: booking.booking_type,
+    booking_status: booking.booking_status,
+    approval_status: booking.approval_status,
+    remarks: booking.remarks,
+  }));
+
+  return {
+    days,
+    summary,
     bookings: monthBookings,
   };
+}
+
+export async function getPublicCalendarDays(month: string) {
+  const { monthStart, monthStartDate, monthEnd, monthEndDate } = getCalendarMonthBounds(month);
+  const rows = await loadCalendarQueryRows(monthStart, monthEnd);
+  const filteredBookings = rows
+    .filter((row) => bookingCountsTowardCapacity(row))
+    .map(applyDerivedBookingStatus);
+
+  return buildCalendarAggregation({
+    filteredBookings,
+    monthStartDate,
+    monthEndDate,
+  }).days;
 }
 
 export async function createBooking(payload: BookingFormPayload) {

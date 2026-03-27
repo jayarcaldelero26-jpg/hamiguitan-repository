@@ -78,9 +78,9 @@
   --public-text-muted: #bcc7d6;
   --public-border: rgba(255, 255, 255, 0.11);
   --public-border-strong: rgba(255, 255, 255, 0.18);
-  --public-shadow: 0 20px 48px rgba(0, 0, 0, 0.34);
-  --public-shadow-soft: 0 12px 28px rgba(0, 0, 0, 0.2);
-  --public-glow: 0 0 0 1px rgba(245, 158, 11, 0.08), 0 16px 42px rgba(245, 158, 11, 0.1);
+  --public-shadow: 0 16px 36px rgba(0, 0, 0, 0.3);
+  --public-shadow-soft: 0 10px 22px rgba(0, 0, 0, 0.18);
+  --public-glow: 0 0 0 1px rgba(245, 158, 11, 0.07), 0 12px 30px rgba(245, 158, 11, 0.09);
   --space-1: 8px;
   --space-2: 16px;
   --space-3: 24px;
@@ -1183,9 +1183,9 @@ select:-webkit-autofill:active {
   inset: 0;
   z-index: -2;
   background:
-    radial-gradient(circle at top left, rgba(249, 115, 22, 0.1), transparent 26%),
-    radial-gradient(circle at 85% 12%, rgba(245, 158, 11, 0.08), transparent 22%),
-    radial-gradient(circle at 50% 100%, rgba(56, 189, 248, 0.06), transparent 28%),
+    radial-gradient(circle at top left, rgba(249, 115, 22, 0.08), transparent 24%),
+    radial-gradient(circle at 85% 12%, rgba(245, 158, 11, 0.065), transparent 20%),
+    radial-gradient(circle at 50% 100%, rgba(56, 189, 248, 0.05), transparent 24%),
     linear-gradient(180deg, #06080d 0%, #090d14 36%, #05070b 100%);
   pointer-events: none;
 }
@@ -1196,11 +1196,11 @@ select:-webkit-autofill:active {
   inset: 0;
   z-index: -1;
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
-  background-size: 96px 96px;
+    linear-gradient(rgba(255, 255, 255, 0.016) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.016) 1px, transparent 1px);
+  background-size: 112px 112px;
   mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.3), transparent 88%);
-  opacity: 0.12;
+  opacity: 0.1;
   pointer-events: none;
 }
 
@@ -1231,8 +1231,8 @@ select:-webkit-autofill:active {
   border: 1px solid var(--public-border);
   box-shadow: var(--public-shadow);
   border-radius: 32px;
-  backdrop-filter: blur(3px);
-  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
 }
 
 .public-card-soft {
@@ -1240,8 +1240,8 @@ select:-webkit-autofill:active {
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: var(--public-shadow-soft);
   border-radius: 24px;
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(1px);
+  -webkit-backdrop-filter: blur(1px);
 }
 
 .public-eyebrow {
@@ -1293,7 +1293,7 @@ select:-webkit-autofill:active {
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
   color: var(--public-text);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.16);
   transition:
     background-color 0.24s ease,
     border-color 0.24s ease,
@@ -1304,7 +1304,7 @@ select:-webkit-autofill:active {
 .public-button-secondary-light:hover {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.06));
   border-color: rgba(255, 255, 255, 0.18);
-  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.22);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
   transform: translateY(-1px);
 }
 
@@ -1316,7 +1316,7 @@ select:-webkit-autofill:active {
     linear-gradient(135deg, rgba(249, 115, 22, 0.98) 0%, rgba(245, 158, 11, 0.94) 100%);
   color: #130b03;
   box-shadow:
-    0 14px 30px rgba(249, 115, 22, 0.22),
+    0 12px 24px rgba(249, 115, 22, 0.2),
     inset 0 1px 0 rgba(255, 244, 214, 0.44);
   transition:
     transform 0.24s ease,
@@ -1336,7 +1336,7 @@ select:-webkit-autofill:active {
   transform: translateY(-1px);
   filter: saturate(1.03) brightness(1.02);
   box-shadow:
-    0 18px 38px rgba(249, 115, 22, 0.28),
+    0 15px 30px rgba(249, 115, 22, 0.24),
     inset 0 1px 0 rgba(255, 244, 214, 0.5);
 }
 
@@ -1357,25 +1357,25 @@ select:-webkit-autofill:active {
   inset: 1px;
   border-radius: inherit;
   background:
-    radial-gradient(circle at top right, rgba(245, 158, 11, 0.09), transparent 30%),
-    radial-gradient(circle at bottom left, rgba(56, 189, 248, 0.06), transparent 26%);
+    radial-gradient(circle at top right, rgba(245, 158, 11, 0.075), transparent 26%),
+    radial-gradient(circle at bottom left, rgba(56, 189, 248, 0.05), transparent 22%);
   pointer-events: none;
 }
 
 .public-hero-stat {
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.03));
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.2);
-  backdrop-filter: blur(3px);
-  -webkit-backdrop-filter: blur(3px);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
 }
 
 .public-nav-shell {
   border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(9, 12, 18, 0.78);
-  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.24);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  background: rgba(9, 12, 18, 0.82);
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
 }
 
 .public-nav-link {
@@ -1458,10 +1458,10 @@ select:-webkit-autofill:active {
   content: "";
   position: absolute;
   inset: auto -18% -30% auto;
-  width: 220px;
-  height: 220px;
+  width: 180px;
+  height: 180px;
   border-radius: 999px;
-  background: radial-gradient(circle, rgba(245, 158, 11, 0.12), transparent 68%);
+  background: radial-gradient(circle, rgba(245, 158, 11, 0.1), transparent 64%);
   pointer-events: none;
 }
 
@@ -1548,8 +1548,8 @@ select:-webkit-autofill:active {
 
   .public-card {
     border-radius: 28px;
-    backdrop-filter: blur(3px);
-    -webkit-backdrop-filter: blur(3px);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
   }
 
   .public-card-soft {
