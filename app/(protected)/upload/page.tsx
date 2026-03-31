@@ -26,11 +26,11 @@ import {
 
 type Category = "Academe" | "Stakeholder" | "PAMO Activity";
 type FoldersState = { academe: string[]; stakeholders: string[]; pamo: string[] };
-type UploadMode = "direct" | "legacy";
+type UploadMode = "temp_transfer" | "resumable";
 
 const TEMP_BUCKET = "temp-uploads";
-const LEGACY_MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB temp-storage compatibility limit
-const USE_DIRECT_UPLOAD = process.env.NEXT_PUBLIC_USE_DIRECT_UPLOAD !== "false";
+const TEMP_UPLOAD_MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
+const RESUMABLE_CHUNK_SIZE = 8 * 1024 * 1024; // 8 MB
 
 function initials(name: string) {
   const parts = (name || "").trim().split(/\s+/).filter(Boolean);
@@ -87,7 +87,7 @@ function getFolderStateKey(category: string): keyof FoldersState {
 }
 
 function getRepositoryUploadMode(fileSize: number): UploadMode {
-  return USE_DIRECT_UPLOAD && fileSize > 0 ? "direct" : "legacy";
+  return fileSize > TEMP_UPLOAD_MAX_FILE_SIZE ? "resumable" : "temp_transfer";
 }
 
 function validateRepositoryFile(file: File | null) {
@@ -95,25 +95,78 @@ function validateRepositoryFile(file: File | null) {
     return {
       ok: false as const,
       error: "",
-      mode: "legacy" as UploadMode,
+      mode: "temp_transfer" as UploadMode,
     };
   }
 
   const mode = getRepositoryUploadMode(file.size);
-
-  if (mode === "legacy" && file.size > LEGACY_MAX_FILE_SIZE) {
-    return {
-      ok: false as const,
-      error: "File is too large for the legacy upload path. Maximum allowed file size is 50 MB.",
-      mode,
-    };
-  }
 
   return {
     ok: true as const,
     error: "",
     mode,
   };
+}
+
+async function uploadFileToResumableSession(args: {
+  file: File;
+  sessionUri: string;
+  chunkSize?: number;
+  onProgress?: (uploadedBytes: number, totalBytes: number) => void;
+}) {
+  const chunkSize = args.chunkSize || RESUMABLE_CHUNK_SIZE;
+  const totalBytes = args.file.size;
+  let offset = 0;
+  let completedPayload: { id?: string; name?: string; mimeType?: string } | null = null;
+
+  while (offset < totalBytes) {
+    const endExclusive = Math.min(offset + chunkSize, totalBytes);
+    const chunk = args.file.slice(offset, endExclusive);
+
+    const response = await fetch("/api/upload/resumable/chunk", {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/octet-stream",
+        "X-Upload-Session-Uri": args.sessionUri,
+        "X-Upload-Content-Type": args.file.type || "application/octet-stream",
+        "X-Upload-Content-Range": `bytes ${offset}-${endExclusive - 1}/${totalBytes}`,
+      },
+      body: chunk,
+    });
+
+    const payload = (await response.json().catch(() => null)) as
+      | {
+          ok?: boolean;
+          complete?: boolean;
+          error?: string;
+          file?: { id?: string; name?: string; mimeType?: string } | null;
+        }
+      | null;
+
+    if (!response.ok) {
+      throw new Error(
+        payload?.error || "Large-file upload failed while sending chunk."
+      );
+    }
+
+    if (!payload?.complete) {
+      offset = endExclusive;
+      args.onProgress?.(offset, totalBytes);
+      continue;
+    }
+
+    completedPayload = payload.file ?? null;
+
+    offset = totalBytes;
+    args.onProgress?.(totalBytes, totalBytes);
+  }
+
+  if (!completedPayload?.id) {
+    throw new Error("Google Drive did not return a file ID after resumable upload.");
+  }
+
+  return completedPayload;
 }
 
 function emptyFoldersState(): FoldersState {
@@ -454,43 +507,6 @@ function UploadPageContent() {
     setSuccessOpen(true);
   }
 
-  async function uploadViaDirectRoute(fileToUpload: File, folderValue: string) {
-    setUploadPercent(15);
-    setUploadStage("Uploading to server");
-    setUploadDetail("Sending file to the server for direct Google Drive upload.");
-
-    const formData = new FormData();
-    formData.append("file", fileToUpload);
-    formData.append("category", category);
-    formData.append("title", title.trim());
-    formData.append("dateReceived", dateReceived);
-    formData.append("folder", folderValue);
-    formData.append("year", year || new Date().getFullYear().toString());
-
-    setUploadPercent(38);
-    setUploadStage("Processing upload...");
-    setUploadDetail("Uploading and saving file...");
-
-    const uploadRes = await fetch("/api/upload", {
-      method: "POST",
-      credentials: "include",
-      body: formData,
-    });
-
-    const uploadData = await uploadRes.json().catch(() => null);
-
-    if (!uploadRes.ok) {
-      throw new Error(uploadData?.error || "Failed to upload document.");
-    }
-
-    await finalizeSuccessfulUpload({
-      document: uploadData?.document ?? null,
-      resolvedCategory: uploadData?.category || category,
-      resolvedFolder: uploadData?.folder || folderValue,
-      refreshAfterSuccess: false,
-    });
-  }
-
   async function uploadViaLegacyTransfer(fileToUpload: File, folderValue: string) {
     const safeFileName = sanitizeFileName(fileToUpload.name);
     const uniqueId =
@@ -605,6 +621,87 @@ function UploadPageContent() {
     }
   }
 
+  async function uploadViaResumableRoute(fileToUpload: File, folderValue: string) {
+    setUploadPercent(8);
+    setUploadStage("Preparing large-file upload");
+    setUploadDetail("Creating a resumable Google Drive upload session.");
+
+    const initiateRes = await fetch("/api/upload/resumable/initiate", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify({
+        originalName: fileToUpload.name,
+        mimeType: fileToUpload.type || "application/octet-stream",
+        fileSize: fileToUpload.size,
+        category,
+        title: title.trim(),
+        dateReceived,
+        folder: folderValue,
+        year: year || new Date().getFullYear().toString(),
+      }),
+    });
+
+    const initiateData = await initiateRes.json().catch(() => null);
+    if (!initiateRes.ok || !initiateData?.sessionUri) {
+      throw new Error(
+        initiateData?.error || "Failed to prepare large-file upload."
+      );
+    }
+
+    setUploadStage("Uploading large file");
+    setUploadDetail("Uploading file chunks through the secure server proxy.");
+
+    const uploadedFile = await uploadFileToResumableSession({
+      file: fileToUpload,
+      sessionUri: String(initiateData.sessionUri),
+      onProgress: (uploadedBytes, totalBytes) => {
+        const ratio = totalBytes > 0 ? uploadedBytes / totalBytes : 0;
+        const normalized = 18 + ratio * 72;
+        setUploadPercent(Math.max(18, Math.min(90, Math.round(normalized))));
+      },
+    });
+
+    setUploadPercent(93);
+    setUploadStage("Finalizing upload");
+    setUploadDetail("Saving repository metadata for the completed Drive upload.");
+
+    const finalizeRes = await fetch("/api/upload/resumable/finalize", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify({
+        fileId: uploadedFile.id,
+        originalName: fileToUpload.name,
+        mimeType: fileToUpload.type || "application/octet-stream",
+        fileSize: fileToUpload.size,
+        category,
+        title: title.trim(),
+        dateReceived,
+        folder: folderValue,
+        year: year || new Date().getFullYear().toString(),
+      }),
+    });
+
+    const finalizeData = await finalizeRes.json().catch(() => null);
+    if (!finalizeRes.ok) {
+      throw new Error(
+        finalizeData?.error || "Failed to finalize large-file upload."
+      );
+    }
+
+    await finalizeSuccessfulUpload({
+      document: finalizeData?.document ?? null,
+      resolvedCategory: finalizeData?.category || category,
+      resolvedFolder: finalizeData?.folder || folderValue,
+      refreshAfterSuccess: false,
+    });
+  }
+
   async function handleUpload() {
     if (uploading) return;
 
@@ -646,16 +743,16 @@ function UploadPageContent() {
     setUploadPercent(5);
     setUploadStage("Preparing upload");
     setUploadDetail(
-      selectedUploadMode === "direct"
-        ? "Checking required fields and preparing direct server upload."
+      selectedUploadMode === "resumable"
+        ? "Checking required fields and preparing resumable large-file upload."
         : "Checking required fields and preparing temporary storage."
     );
 
     try {
-      if (selectedUploadMode === "direct") {
-        await uploadViaDirectRoute(file, finalFolder);
-      } else {
+      if (selectedUploadMode === "temp_transfer") {
         await uploadViaLegacyTransfer(file, finalFolder);
+      } else {
+        await uploadViaResumableRoute(file, finalFolder);
       }
     } catch (err: unknown) {
       console.error("UPLOAD PAGE ERROR:", err);
@@ -1168,9 +1265,7 @@ function UploadPageContent() {
                 </div>
 
                 <p className={`mt-3 text-[12px] ${dark ? "text-cyan-100/65" : "text-slate-500"}`}>
-                  {USE_DIRECT_UPLOAD
-                    ? "Files are routed directly to Google Drive. The old temporary-storage compatibility path remains available only when direct upload is disabled."
-                    : "Direct upload is disabled. Files use the compatibility upload path with a 50 MB limit."}
+                  Files up to 50 MB upload to temporary storage first, then transfer into Google Drive. Larger files switch to a resumable Google Drive upload flow.
                 </p>
               </div>
 
@@ -1383,15 +1478,13 @@ function UploadPageContent() {
                 }`}
               >
                 <div className={`text-[12px] ${dark ? "text-amber-100/85" : "text-amber-700"}`}>
-                  {USE_DIRECT_UPLOAD ? (
-                    <>
-                      Upload mode: <span className="font-semibold">Direct Google Drive upload enabled</span>
-                    </>
-                  ) : (
-                    <>
-                      Upload limit: <span className="font-semibold">50 MB maximum per file</span>
-                    </>
-                  )}
+                  Upload mode:{" "}
+                  <span className="font-semibold">
+                    {selectedUploadMode === "resumable"
+                      ? "Resumable Google Drive upload"
+                      : "Temporary storage + Drive transfer"}
+                  </span>
+                  {file ? ` (${formatBytes(file.size)})` : " (select a file to detect mode)"}
                 </div>
               </div>
 

@@ -12,6 +12,7 @@ import {
   normalizeFolderName,
 } from "@/app/lib/googleDrive";
 import { getCurrentUser } from "@/app/lib/auth";
+import { assertTrustedOrigin, isInvalidOriginError } from "@/app/lib/requestSecurity";
 import { serverEnv } from "@/app/lib/serverEnv";
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
@@ -36,18 +37,20 @@ function getCategoryFolderId(category: string) {
 }
 
 export async function POST(req: NextRequest) {
-  const me = await getCurrentUser();
-
-  if (!me) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const role = normalizeRole(me.role);
-  if (role !== "admin" && role !== "co_admin") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
   try {
+    assertTrustedOrigin(req);
+
+    const me = await getCurrentUser();
+
+    if (!me) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const role = normalizeRole(me.role);
+    if (role !== "admin" && role !== "co_admin") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     const body = await req.json();
 
     const tempPath = requiredString(body?.tempPath);
@@ -259,6 +262,10 @@ export async function POST(req: NextRequest) {
       folder: folder || "",
     });
   } catch (error: unknown) {
+    if (isInvalidOriginError(error)) {
+      return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
+    }
+
     console.error("TRANSFER ERROR:", error);
     return NextResponse.json(
       { error: getErrorMessage(error, "Transfer failed.") },

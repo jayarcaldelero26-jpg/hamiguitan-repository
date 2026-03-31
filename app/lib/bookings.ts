@@ -15,6 +15,7 @@ import type {
   BookingWritePayload,
   CalendarDayData,
   ParticipantCategoryOption,
+  PublicCalendarEntry,
   SelectedDateBooking,
   TrailOption,
 } from "@/app/lib/bookingTypes";
@@ -351,6 +352,7 @@ function buildCalendarAggregation(input: {
   filteredBookings: CalendarQueryRow[];
   monthStartDate: Date;
   monthEndDate: Date;
+  expandOccupancyAcrossRange?: boolean;
 }) {
   const occupancyBookings = input.filteredBookings.filter(
     (booking) => !isOffSeasonLikeType(booking.booking_type)
@@ -369,6 +371,8 @@ function buildCalendarAggregation(input: {
       governorGeneroso: number;
     }
   >();
+  const entriesByDate = new Map<string, PublicCalendarEntry[]>();
+  const entryKeysByDate = new Map<string, Set<string>>();
 
   for (const booking of input.filteredBookings) {
     const days = expandDateRange(booking.start_date, booking.end_date);
@@ -425,15 +429,54 @@ function buildCalendarAggregation(input: {
   }
 
   for (const booking of occupancyBookings) {
-    const day = booking.start_date;
-    const entry = occupancy.get(day) || { sanIsidro: 0, governorGeneroso: 0 };
+    const coveredDays = input.expandOccupancyAcrossRange
+      ? expandDateRange(booking.start_date, booking.end_date)
+      : [booking.start_date];
 
-    if (booking.trail === "San Isidro Trail") {
-      entry.sanIsidro += booking.pax;
-    } else if (booking.trail === "Governor Generoso Trail") {
-      entry.governorGeneroso += booking.pax;
+    for (const day of coveredDays) {
+      const entry = occupancy.get(day) || { sanIsidro: 0, governorGeneroso: 0 };
+
+      if (booking.trail === "San Isidro Trail") {
+        entry.sanIsidro += booking.pax;
+      } else if (booking.trail === "Governor Generoso Trail") {
+        entry.governorGeneroso += booking.pax;
+      }
+
+      occupancy.set(day, entry);
     }
-    occupancy.set(day, entry);
+  }
+
+  for (const booking of input.filteredBookings) {
+    const publicEntry: PublicCalendarEntry = {
+      id: booking.id,
+      trail: booking.trail,
+      bookingType: booking.booking_type,
+      pax: booking.pax,
+      participantCategory: booking.participant_category,
+      startDate: booking.start_date,
+      endDate: booking.end_date,
+    };
+
+    for (const day of expandDateRange(booking.start_date, booking.end_date)) {
+      const entryKey = [
+        String(booking.id),
+        booking.trail,
+        booking.start_date,
+        booking.end_date,
+      ].join("|");
+      const existingKeys = entryKeysByDate.get(day) || new Set<string>();
+
+      if (existingKeys.has(entryKey)) {
+        continue;
+      }
+
+      existingKeys.add(entryKey);
+      entryKeysByDate.set(day, existingKeys);
+
+      const existingEntries = entriesByDate.get(day) || [];
+      existingEntries.push(publicEntry);
+      entriesByDate.set(day, existingEntries);
+    }
   }
 
   const days: CalendarDayData[] = [];
@@ -487,6 +530,12 @@ function buildCalendarAggregation(input: {
       governorGeneroso: entry.governorGeneroso,
       sanState,
       govState,
+      entries: (entriesByDate.get(date) || []).slice().sort((a, b) => {
+        if (a.trail !== b.trail) return a.trail.localeCompare(b.trail);
+        if (a.startDate !== b.startDate) return a.startDate.localeCompare(b.startDate);
+        if (a.bookingType !== b.bookingType) return a.bookingType.localeCompare(b.bookingType);
+        return a.id - b.id;
+      }),
     });
   }
 
@@ -570,6 +619,7 @@ export async function getPublicCalendarDays(month: string) {
     filteredBookings,
     monthStartDate,
     monthEndDate,
+    expandOccupancyAcrossRange: true,
   }).days;
 }
 

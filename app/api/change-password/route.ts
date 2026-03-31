@@ -2,9 +2,12 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcrypt";
 import { supabaseAdmin } from "@/app/lib/db";
 import { getCurrentUser } from "@/app/lib/auth";
+import { assertTrustedOrigin, isInvalidOriginError } from "@/app/lib/requestSecurity";
 
 export async function POST(req: Request) {
   try {
+    assertTrustedOrigin(req);
+
     const me = await getCurrentUser();
 
     if (!me) {
@@ -61,6 +64,10 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true });
   } catch (e) {
+    if (isInvalidOriginError(e)) {
+      return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
+    }
+
     console.error("CHANGE PASSWORD ERROR:", e);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }

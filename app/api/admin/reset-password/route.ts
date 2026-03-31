@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcrypt";
 import { supabaseAdmin } from "@/app/lib/db";
 import { getCurrentUser } from "@/app/lib/auth";
+import { assertTrustedOrigin, isInvalidOriginError } from "@/app/lib/requestSecurity";
 
 function normalizeRole(role?: string) {
   return (role || "").trim().toLowerCase();
@@ -13,6 +14,8 @@ function isValidEmail(email: string) {
 
 export async function POST(req: Request) {
   try {
+    assertTrustedOrigin(req);
+
     const me = await getCurrentUser();
 
     if (!me) {
@@ -75,6 +78,10 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true, email: cleanEmail });
   } catch (error) {
+    if (isInvalidOriginError(error)) {
+      return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
+    }
+
     console.error("RESET PASSWORD ERROR:", error);
     return NextResponse.json({ error: "Server error." }, { status: 500 });
   }

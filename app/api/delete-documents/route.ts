@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/app/lib/auth";
 import { writeAuditLog } from "@/app/lib/auditLog";
 import { deleteDriveFileById, getDriveClient } from "@/app/lib/googleDrive";
 import { getOrganizationalChartSourceModule } from "@/app/lib/organizationalChartDocuments";
+import { assertTrustedOrigin, isInvalidOriginError } from "@/app/lib/requestSecurity";
 
 function isValidId(value: number) {
   return Number.isInteger(value) && value > 0;
@@ -21,6 +22,7 @@ export async function DELETE(req: NextRequest) {
   try {
     console.time("delete-total");
     totalStarted = true;
+    assertTrustedOrigin(req);
 
     const me = await getCurrentUser();
 
@@ -151,6 +153,10 @@ export async function DELETE(req: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    if (isInvalidOriginError(error)) {
+      return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
+    }
+
     console.error("DELETE DOCUMENT ERROR:", error);
 
     if (totalStarted) {

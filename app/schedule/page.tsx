@@ -1,13 +1,8 @@
 import Image from "next/image";
-import Link from "next/link";
-import {
-  ArrowLeftIcon,
-  ArrowRightIcon,
-  CalendarDaysIcon,
-} from "@heroicons/react/24/outline";
+import { CalendarDaysIcon } from "@heroicons/react/24/outline";
 import PublicShell from "@/app/components/public/PublicShell";
 import { Reveal } from "@/app/components/public/ScrollReveal";
-import { formatMonthLabel, shiftMonth } from "@/app/lib/bookingUtils";
+import { formatMonthLabel } from "@/app/lib/bookingUtils";
 import PublicScheduleCalendarClient from "@/app/schedule/PublicScheduleCalendarClient";
 
 function getValidMonth(value?: string) {
@@ -24,8 +19,6 @@ export default async function PublicSchedulePage({
   const params = (await searchParams) || {};
   const monthParam = Array.isArray(params.month) ? params.month[0] : params.month;
   const month = getValidMonth(monthParam);
-  const previousMonth = shiftMonth(month, -1);
-  const nextMonth = shiftMonth(month, 1);
 
   return (
     <PublicShell>
@@ -53,30 +46,17 @@ export default async function PublicSchedulePage({
                   Check monthly trail availability
                 </h1>
                 <p className="mt-5 max-w-2xl text-[1rem] leading-8 text-[rgba(236,242,249,0.88)] sm:text-[1.06rem]">
-                  See date-based trail availability for San Isidro and Governor Generoso in one public calendar view.
+                  See a polished public summary of San Isidro and Governor Generoso trail availability by month.
                 </p>
               </div>
-              <div className="flex shrink-0 flex-wrap gap-3">
+              <div className="flex shrink-0 flex-wrap gap-3 md:max-w-[20rem] md:justify-end">
                 <div className="inline-flex items-center gap-3 rounded-full border border-white/10 bg-[rgba(8,12,18,0.3)] px-4 py-3 text-sm text-[var(--public-text)]">
                   <CalendarDaysIcon className="h-5 w-5 text-[var(--public-accent)]" />
                   <span className="font-semibold">{formatMonthLabel(month)}</span>
                 </div>
-                <Link
-                  href={`/schedule?month=${previousMonth}`}
-                  prefetch
-                  className="public-button-secondary-light inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-5 text-sm font-semibold"
-                >
-                  <ArrowLeftIcon className="h-4 w-4" />
-                  Previous
-                </Link>
-                <Link
-                  href={`/schedule?month=${nextMonth}`}
-                  prefetch
-                  className="public-button-secondary-light inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-5 text-sm font-semibold"
-                >
-                  Next
-                  <ArrowRightIcon className="h-4 w-4" />
-                </Link>
+                <p className="max-w-xs text-sm leading-7 text-[rgba(236,242,249,0.68)]">
+                  Move between months below and scan both trail capacities at a glance.
+                </p>
               </div>
             </div>
           </Reveal>

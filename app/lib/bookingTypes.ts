@@ -85,6 +85,17 @@ export type CalendarDayData = {
   governorGeneroso: number;
   sanState: "available" | "limited" | "full" | "blocked";
   govState: "available" | "limited" | "full" | "blocked";
+  entries?: PublicCalendarEntry[];
+};
+
+export type PublicCalendarEntry = {
+  id: number;
+  trail: TrailOption;
+  bookingType: BookingTypeOption;
+  pax: number;
+  participantCategory: ParticipantCategoryOption;
+  startDate: string;
+  endDate: string;
 };
 
 export type SelectedDateBooking = {

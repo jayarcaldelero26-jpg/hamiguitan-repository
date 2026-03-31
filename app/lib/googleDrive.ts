@@ -23,6 +23,131 @@ export function getDriveClient(): drive_v3.Drive {
   return google.drive({ version: "v3", auth: oauth });
 }
 
+export async function getDriveAccessToken(): Promise<string> {
+  const oauth = createOAuthClient();
+
+  oauth.setCredentials({
+    refresh_token: serverEnv.googleRefreshToken,
+  });
+
+  const token = await oauth.getAccessToken();
+  const accessToken = typeof token === "string" ? token : token?.token;
+
+  if (!accessToken) {
+    throw new Error("Failed to acquire Google Drive access token.");
+  }
+
+  return accessToken;
+}
+
+export async function createDriveResumableUploadSession(args: {
+  fileName: string;
+  mimeType: string;
+  parentId: string;
+  fileSize: number;
+}) {
+  const accessToken = await getDriveAccessToken();
+  const response = await fetch(
+    "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&supportsAllDrives=true&fields=id,name,parents,size,mimeType",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json; charset=UTF-8",
+        "X-Upload-Content-Type": args.mimeType,
+        "X-Upload-Content-Length": String(args.fileSize),
+      },
+      body: JSON.stringify({
+        name: args.fileName,
+        parents: [args.parentId],
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const message = await response.text().catch(() => "");
+    throw new Error(
+      `Failed to create Google Drive resumable session. ${message || response.statusText}`.trim()
+    );
+  }
+
+  const sessionUri = response.headers.get("location");
+  if (!sessionUri) {
+    throw new Error("Google Drive did not return a resumable session URL.");
+  }
+
+  return {
+    sessionUri,
+  };
+}
+
+function ensureDriveResumableSessionUri(sessionUri: string) {
+  let parsed: URL;
+
+  try {
+    parsed = new URL(sessionUri);
+  } catch {
+    throw new Error("Invalid Google Drive resumable session URL.");
+  }
+
+  if (parsed.protocol !== "https:") {
+    throw new Error("Google Drive resumable session URL must use HTTPS.");
+  }
+
+  if (parsed.hostname !== "www.googleapis.com") {
+    throw new Error("Unexpected Google Drive resumable session host.");
+  }
+
+  if (!parsed.pathname.startsWith("/upload/drive/")) {
+    throw new Error("Unexpected Google Drive resumable session path.");
+  }
+
+  if (parsed.searchParams.get("uploadType") !== "resumable") {
+    throw new Error("Google Drive resumable session URL is missing uploadType=resumable.");
+  }
+}
+
+export async function uploadDriveResumableChunk(args: {
+  sessionUri: string;
+  chunk: ArrayBuffer;
+  contentType: string;
+  contentRange: string;
+}) {
+  ensureDriveResumableSessionUri(args.sessionUri);
+
+  const response = await fetch(args.sessionUri, {
+    method: "PUT",
+    headers: {
+      "Content-Type": args.contentType || "application/octet-stream",
+      "Content-Range": args.contentRange,
+    },
+    body: Buffer.from(args.chunk),
+  });
+
+  if (response.status === 308) {
+    return {
+      complete: false as const,
+      range: response.headers.get("range") || "",
+    };
+  }
+
+  if (!response.ok) {
+    const message = await response.text().catch(() => "");
+    throw new Error(
+      `Large-file upload failed. ${message || response.statusText}`.trim()
+    );
+  }
+
+  const payload = (await response.json().catch(() => null)) as
+    | { id?: string; name?: string; mimeType?: string }
+    | null;
+
+  return {
+    complete: true as const,
+    payload,
+  };
+}
+
 export function normalizeDriveCategory(input: string) {
   const s = (input || "").trim().toLowerCase();
 

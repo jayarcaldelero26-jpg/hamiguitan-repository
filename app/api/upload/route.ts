@@ -6,6 +6,7 @@ import type { ReadableStream as NodeReadableStream } from "stream/web";
 import { supabaseAdmin } from "@/app/lib/db";
 import { getCurrentUser } from "@/app/lib/auth";
 import { writeAuditLog } from "@/app/lib/auditLog";
+import { assertTrustedOrigin, isInvalidOriginError } from "@/app/lib/requestSecurity";
 import { serverEnv } from "@/app/lib/serverEnv";
 import {
   getDriveClient,
@@ -13,6 +14,8 @@ import {
   normalizeDriveCategory,
   normalizeFolderName,
 } from "@/app/lib/googleDrive";
+
+const MAX_DIRECT_UPLOAD_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
 
 function normalizeRole(role?: string) {
   return (role || "").trim().toLowerCase();
@@ -40,6 +43,7 @@ export async function POST(req: NextRequest) {
   try {
     console.time("upload-total");
     uploadTotalStarted = true;
+    assertTrustedOrigin(req);
 
     const me = await getCurrentUser();
 
@@ -109,6 +113,16 @@ export async function POST(req: NextRequest) {
 
     if (!fileObj.size) {
       return NextResponse.json({ error: "Selected file is empty." }, { status: 400 });
+    }
+
+    if (fileObj.size > MAX_DIRECT_UPLOAD_FILE_SIZE) {
+      return NextResponse.json(
+        {
+          error:
+            "Direct server upload is limited to 50 MB. Use the resumable large-file upload flow instead.",
+        },
+        { status: 400 }
+      );
     }
 
     console.log("UPLOAD START:", {
@@ -224,6 +238,10 @@ export async function POST(req: NextRequest) {
         : null,
     });
   } catch (error: unknown) {
+    if (isInvalidOriginError(error)) {
+      return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
+    }
+
     console.error("UPLOAD ERROR:", error);
 
     if (uploadTotalStarted) {

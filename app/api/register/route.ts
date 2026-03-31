@@ -2,6 +2,17 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcrypt";
 import { supabaseAdmin } from "@/app/lib/db";
 
+function isPublicRegistrationEnabled() {
+  const override = String(process.env.ALLOW_PUBLIC_REGISTRATION || "")
+    .trim()
+    .toLowerCase();
+
+  if (override === "true") return true;
+  if (override === "false") return false;
+
+  return process.env.NODE_ENV !== "production";
+}
+
 function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i.test(email);
 }
@@ -16,6 +27,16 @@ function normalizeOptional(value: unknown) {
 
 export async function POST(req: Request) {
   try {
+    if (!isPublicRegistrationEnabled()) {
+      return NextResponse.json(
+        {
+          error:
+            "Public registration is disabled. Please contact an administrator to create your account.",
+        },
+        { status: 403 }
+      );
+    }
+
     const body = await req.json();
 
     const userCode = normalizeOptional(body?.userCode);
@@ -86,6 +107,7 @@ export async function POST(req: Request) {
         name: fullName,
         email,
         password: hashed,
+        // Self-registration can only create the lowest-privilege internal role.
         role: "staff",
 
         userCode: userCode || null,

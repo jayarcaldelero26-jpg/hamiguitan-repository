@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
       { days },
       {
         headers: {
-          "Cache-Control": "public, max-age=60, stale-while-revalidate=300",
+          "Cache-Control": "no-store, max-age=0",
         },
       }
     );

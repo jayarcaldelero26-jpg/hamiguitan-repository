@@ -3,6 +3,7 @@ export const runtime = "nodejs";
 import { NextResponse, type NextRequest } from "next/server";
 import { supabaseAdmin } from "@/app/lib/db";
 import { getCurrentUser } from "@/app/lib/auth";
+import { assertTrustedOrigin, isInvalidOriginError } from "@/app/lib/requestSecurity";
 
 function normalizeCategory(v: string) {
   const s = (v || "").trim().toLowerCase();
@@ -110,13 +111,15 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const me = await getCurrentUser();
-
-  if (!me) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   try {
+    assertTrustedOrigin(req);
+
+    const me = await getCurrentUser();
+
+    if (!me) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const role = normalizeRole(me.role);
 
     if (role !== "admin" && role !== "co_admin") {
@@ -193,6 +196,10 @@ export async function POST(req: NextRequest) {
       folder,
     });
   } catch (error: unknown) {
+    if (isInvalidOriginError(error)) {
+      return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
+    }
+
     console.error("DOCUMENT POST ERROR:", error);
     return NextResponse.json(
       { error: getErrorMessage(error, "Failed to save document.") },
@@ -202,13 +209,15 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const me = await getCurrentUser();
-
-  if (!me) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   try {
+    assertTrustedOrigin(req);
+
+    const me = await getCurrentUser();
+
+    if (!me) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const role = normalizeRole(me.role);
 
     if (role !== "admin" && role !== "co_admin") {
@@ -353,6 +362,10 @@ export async function PATCH(req: NextRequest) {
 
     return NextResponse.json({ ok: true, document: updated });
   } catch (error: unknown) {
+    if (isInvalidOriginError(error)) {
+      return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
+    }
+
     console.error("DOCUMENT PATCH FATAL:", error);
     return NextResponse.json(
       { error: getErrorMessage(error, "Failed to update document.") },
@@ -362,13 +375,15 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
-  const me = await getCurrentUser();
-
-  if (!me) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   try {
+    assertTrustedOrigin(req);
+
+    const me = await getCurrentUser();
+
+    if (!me) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const role = normalizeRole(me.role);
 
     if (role !== "admin" && role !== "co_admin") {
@@ -563,6 +578,10 @@ export async function PUT(req: NextRequest) {
       updatedCount: existingRows.length,
     });
   } catch (error: unknown) {
+    if (isInvalidOriginError(error)) {
+      return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
+    }
+
     console.error("FOLDER RENAME FATAL:", error);
     return NextResponse.json(
       { error: getErrorMessage(error, "Failed to rename folder.") },

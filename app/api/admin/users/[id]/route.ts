@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/db";
 import { getCurrentUser } from "@/app/lib/auth";
+import { assertTrustedOrigin, isInvalidOriginError } from "@/app/lib/requestSecurity";
 
 function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i.test(email.trim());
@@ -31,6 +32,8 @@ export async function PATCH(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
+    assertTrustedOrigin(req);
+
     const me = await getCurrentUser();
 
     if (!me) {
@@ -241,6 +244,10 @@ export async function PATCH(
       user: updated,
     });
   } catch (error) {
+    if (isInvalidOriginError(error)) {
+      return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
+    }
+
     console.error("PATCH USER ROUTE ERROR:", error);
     return NextResponse.json(
       { error: "Failed to update user." },
@@ -254,6 +261,8 @@ export async function DELETE(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
+    assertTrustedOrigin(req);
+
     const me = await getCurrentUser();
     console.log("DELETE USER DEBUG: current user lookup", {
       requestPath: req.nextUrl.pathname,
@@ -379,6 +388,10 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    if (isInvalidOriginError(error)) {
+      return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
+    }
+
     console.error("DELETE USER ROUTE ERROR:", error);
     return NextResponse.json(
       { error: "Failed to delete user." },

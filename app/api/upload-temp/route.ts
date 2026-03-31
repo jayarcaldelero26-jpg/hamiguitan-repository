@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { supabaseAdmin } from "@/app/lib/db";
 import { getCurrentUser } from "@/app/lib/auth";
+import { assertTrustedOrigin, isInvalidOriginError } from "@/app/lib/requestSecurity";
 import { serverEnv } from "@/app/lib/serverEnv";
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
@@ -25,18 +26,20 @@ function getErrorMessage(error: unknown, fallback: string) {
 }
 
 export async function POST(req: NextRequest) {
-  const me = await getCurrentUser();
-
-  if (!me) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const role = normalizeRole(me.role);
-  if (role !== "admin" && role !== "co_admin") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
   try {
+    assertTrustedOrigin(req);
+
+    const me = await getCurrentUser();
+
+    if (!me) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const role = normalizeRole(me.role);
+    if (role !== "admin" && role !== "co_admin") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     const formData = await req.formData();
     const file = formData.get("file");
 
@@ -114,6 +117,10 @@ export async function POST(req: NextRequest) {
       fileSize: file.size,
     });
   } catch (error: unknown) {
+    if (isInvalidOriginError(error)) {
+      return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
+    }
+
     console.error("UPLOAD TEMP ERROR:", error);
 
     return NextResponse.json(

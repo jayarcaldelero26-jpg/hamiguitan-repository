@@ -19,6 +19,7 @@ import {
   validateBookingCapacity,
   validateBookingPayload,
 } from "@/app/lib/bookings";
+import { assertTrustedOrigin, isInvalidOriginError } from "@/app/lib/requestSecurity";
 
 function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
@@ -48,17 +49,19 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const me = await getCurrentUser();
-
-  if (!me) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  if (!canCreateBookings(me.role)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
   try {
+    assertTrustedOrigin(req);
+
+    const me = await getCurrentUser();
+
+    if (!me) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (!canCreateBookings(me.role)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     const body = await req.json();
     const validated = validateBookingPayload(body);
     if (!validated.ok) {
@@ -116,6 +119,10 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(booking, { status: 201 });
   } catch (error) {
+    if (isInvalidOriginError(error)) {
+      return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
+    }
+
     console.error("BOOKING CREATE ERROR:", error);
     return NextResponse.json(
       { error: getErrorMessage(error, "Failed to create booking.") },
@@ -125,17 +132,19 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const me = await getCurrentUser();
-
-  if (!me) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  if (!canEditBookings(me.role)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
   try {
+    assertTrustedOrigin(req);
+
+    const me = await getCurrentUser();
+
+    if (!me) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (!canEditBookings(me.role)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     const body = await req.json();
     const id = Number(body?.id);
 
@@ -205,6 +214,10 @@ export async function PATCH(req: NextRequest) {
 
     return NextResponse.json(booking);
   } catch (error) {
+    if (isInvalidOriginError(error)) {
+      return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
+    }
+
     console.error("BOOKING UPDATE ERROR:", error);
     return NextResponse.json(
       { error: getErrorMessage(error, "Failed to update booking.") },
@@ -214,17 +227,19 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const me = await getCurrentUser();
-
-  if (!me) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  if (!canDeleteBookings(me.role)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
   try {
+    assertTrustedOrigin(req);
+
+    const me = await getCurrentUser();
+
+    if (!me) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (!canDeleteBookings(me.role)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     const url = new URL(req.url);
     const id = Number(url.searchParams.get("id"));
 
@@ -257,6 +272,10 @@ export async function DELETE(req: NextRequest) {
       booking_code: deleted.booking_code,
     });
   } catch (error) {
+    if (isInvalidOriginError(error)) {
+      return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
+    }
+
     console.error("BOOKING DELETE ERROR:", error);
     return NextResponse.json(
       { error: getErrorMessage(error, "Failed to delete booking.") },
